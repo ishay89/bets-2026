@@ -1,11 +1,39 @@
 @import "tailwindcss";
 
 @theme {
-  --color-bg: #0f172a;
-  --color-surface: #1e293b;
-  --color-accent: #22c55e;
-  --color-accent-dim: #22c55e20;
-  --color-warn: #f59e0b;
-  --color-danger: #ef4444;
-  --color-muted: #64748b;
+  /* Backgrounds */
+  --color-bg: #07090f;
+  --color-panel: #0d1222;
+  --color-panel2: #11172a;
+  --color-elev: #171e36;
+  --color-elev2: #1f2748;
+
+  /* Text */
+  --color-text: #eaedf5;
+  --color-sub: #8d99b5;
+  --color-muted: #5a6485;
+  --color-dim: #3a4366;
+
+  /* Accents */
+  --color-accent: #00d97e;
+  --color-accent-soft: rgba(0, 217, 126, 0.14);
+  --color-accent-line: rgba(0, 217, 126, 0.32);
+
+  --color-amber: #f5a623;
+  --color-amber-soft: rgba(245, 166, 35, 0.13);
+
+  --color-danger: #ef4f5b;
+  --color-danger-soft: rgba(239, 79, 91, 0.13);
+
+  --color-gold: #f5c441;
+  --color-silver: #aab4cd;
+  --color-bronze: #d18a4d;
+
+  /* Legacy aliases for existing code */
+  --color-surface: #0d1222;
+  --color-warn: #f5a623;
+
+  /* Fonts */
+  --font-sans: Inter, -apple-system, "SF Pro Text", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "JetBrains Mono", monospace;
 }
