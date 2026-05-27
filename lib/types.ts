@@ -80,6 +80,7 @@ export interface LeaderboardEntry {
   display_name: string
   is_monkey: boolean
   total_points: number
+  today_points: number
 }
 
 export interface ScoreSnapshot {
