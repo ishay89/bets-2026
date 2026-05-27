@@ -26,8 +26,9 @@ async function publishMatchDay(formData: FormData) {
     .from('matches')
     .select('kickoff_time')
     .eq('match_day_id', matchDayId)
+  if (!kickoffRows?.length) throw new Error('No matches found for match day')
   const earliest = Math.min(
-    ...(kickoffRows ?? []).map((m: { kickoff_time: string }) => new Date(m.kickoff_time).getTime())
+    ...kickoffRows.map((m: { kickoff_time: string }) => new Date(m.kickoff_time).getTime())
   )
   const lockTime = new Date(earliest - 30 * 60 * 1000).toISOString()
 
