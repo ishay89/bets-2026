@@ -71,7 +71,10 @@ async function publishMatchDay(formData: FormData) {
       .insert(optionRows)
       .select('id')
 
-    insertedPika.push({ id: pika.id, optionIds: (insertedOptions ?? []).map(o => o.id) })
+    // Skip monkey pick if options failed to insert (guard against empty optionIds)
+    if (!insertedOptions?.length) continue
+
+    insertedPika.push({ id: pika.id, optionIds: insertedOptions.map(o => o.id) })
   }
 
   // Monkey picks

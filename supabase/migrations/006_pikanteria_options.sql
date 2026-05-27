@@ -1,4 +1,4 @@
--- 005_pikanteria_options.sql
+-- 006_pikanteria_options.sql
 -- Generalise Pikanteria from yes/no to N custom options.
 -- Safe to run: no live pikanteria data exists yet.
 

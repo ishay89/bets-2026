@@ -57,6 +57,11 @@ async function enterResults(formData: FormData) {
     const winningOptionId = formData.get(`pik_${pika.id}`) as string | null
     if (!winningOptionId) continue
 
+    // Clear any previously marked correct option before setting the new winner
+    await supabase.from('pikanteria_options')
+      .update({ is_correct: false })
+      .eq('pikanteria_id', pika.id)
+
     await supabase.from('pikanteria_options')
       .update({ is_correct: true })
       .eq('id', winningOptionId)
