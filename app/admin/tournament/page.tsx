@@ -2,6 +2,7 @@ import { createServiceClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { calcPreTournamentWinnerPoints, calcTopScorerPoints } from '@/lib/scoring'
+import { upsertPreTournamentSnapshot } from '@/lib/score-validation'
 
 async function scoreTournamentEnd(formData: FormData) {
   'use server'
@@ -23,10 +24,13 @@ async function scoreTournamentEnd(formData: FormData) {
     await supabase.from('pre_tournament_picks')
       .update({ winner_points: winnerPoints, top_scorer_points: topScorerPoints })
       .eq('id', pick.id)
+
+    await upsertPreTournamentSnapshot(supabase, pick.user_id)
   }
 
   revalidatePath('/')
   revalidatePath('/leaderboard')
+  revalidatePath('/admin/scores')
   redirect('/admin')
 }
 

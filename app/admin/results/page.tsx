@@ -2,6 +2,7 @@ import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { calcMatchPoints, calcPicanteriaPoints } from '@/lib/scoring'
+import { snapshotMatchDay } from '@/lib/score-validation'
 import type { Stage, Pick } from '@/lib/types'
 
 async function enterResults(formData: FormData) {
@@ -68,8 +69,11 @@ async function enterResults(formData: FormData) {
     }
   }
 
+  await snapshotMatchDay(supabase, matchDayId)
+
   revalidatePath('/')
   revalidatePath('/leaderboard')
+  revalidatePath('/admin/scores')
   redirect('/admin')
 }
 
