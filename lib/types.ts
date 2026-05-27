@@ -73,3 +73,20 @@ export interface LeaderboardEntry {
   is_monkey: boolean
   total_points: number
 }
+
+export interface ScoreSnapshot {
+  id: string
+  user_id: string
+  match_day_id: string | null
+  stage: string | null
+  match_points: number
+  pikanteria_points: number
+  pre_tournament_winner_pts: number
+  pre_tournament_scorer_pts: number
+  day_points: number
+  cumulative_points: number
+  is_valid: boolean
+  discrepancy: number | null
+  calculated_at: string
+  created_at: string
+}
