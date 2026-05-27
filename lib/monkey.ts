@@ -13,6 +13,8 @@ export function monkeyMatchPick(matchId: string, date: string): '1' | 'X' | '2' 
   return picks[Math.abs(hashCode(`${matchId}-${date}`)) % 3]
 }
 
-export function monkeyPikanteriaPick(picanteriaId: string, date: string): boolean {
-  return Math.abs(hashCode(`${picanteriaId}-${date}`)) % 2 === 0
+// Returns the id of a randomly chosen option (seeded, reproducible).
+// optionIds must be non-empty; caller is responsible for ensuring this.
+export function monkeyPikanteriaPick(picanteriaId: string, date: string, optionIds: string[]): string {
+  return optionIds[Math.abs(hashCode(`${picanteriaId}-${date}`)) % optionIds.length]
 }
