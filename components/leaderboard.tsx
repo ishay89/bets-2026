@@ -1,3 +1,5 @@
+'use client'
+import { useState } from 'react'
 import type { LeaderboardEntry } from '@/lib/types'
 
 interface Props {
@@ -5,19 +7,13 @@ interface Props {
   currentUserId: string
 }
 
-// Maps display_name initial to a fun emoji avatar (deterministic by first char)
 const AVATARS = ['🦁','🐯','🦊','🐺','🦅','🐻','🐼','🦝','🦄','🐉','🦋','🌟','🔥','⚡','🎯']
 function getAvatar(name: string, isMonkey: boolean): string {
   if (isMonkey) return '🐒'
-  const code = name.charCodeAt(0) % AVATARS.length
-  return AVATARS[code]
+  return AVATARS[name.charCodeAt(0) % AVATARS.length]
 }
 
-const podiumColors = {
-  gold: '#f5c441',
-  silver: '#aab4cd',
-  bronze: '#d18a4d',
-}
+const podiumColors = { gold: '#f5c441', silver: '#aab4cd', bronze: '#d18a4d' }
 const podiumOrder = [
   { idx: 1, color: podiumColors.silver, height: 92 },
   { idx: 0, color: podiumColors.gold, height: 118 },
@@ -25,13 +21,58 @@ const podiumOrder = [
 ]
 
 export function Leaderboard({ entries, currentUserId }: Props) {
-  const top3 = entries.slice(0, 3)
-  const rest = entries.slice(3)
-  const dangerZone = entries.slice(-2)
-  const dangerIds = new Set(dangerZone.map(e => e.id))
+  const [mode, setMode] = useState<'total' | 'today'>('total')
+
+  const sorted = mode === 'today'
+    ? [...entries].sort((a, b) => b.today_points - a.today_points)
+    : entries
+
+  const score = (e: LeaderboardEntry) =>
+    mode === 'today' ? e.today_points : e.total_points
+
+  const top3 = sorted.slice(0, 3)
+  const rest = sorted.slice(3)
+  const dangerZone = sorted.slice(-2)
+
+  const hasToday = entries.some(e => e.today_points > 0)
 
   return (
     <div className="pb-28 px-4">
+      {/* Mode toggle */}
+      <div className="flex justify-center mb-5 mt-1">
+        <div
+          className="relative flex rounded-full p-[3px]"
+          style={{ background: 'var(--color-elev)', border: '1px solid rgba(255,255,255,0.08)' }}
+        >
+          {/* sliding pill */}
+          <div
+            className="absolute top-[3px] bottom-[3px] rounded-full transition-all duration-200"
+            style={{
+              width: 'calc(50% - 3px)',
+              left: mode === 'total' ? '3px' : 'calc(50%)',
+              background: 'var(--color-accent)',
+            }}
+          />
+          {(['total', 'today'] as const).map(m => (
+            <button
+              key={m}
+              onClick={() => setMode(m)}
+              className="relative z-10 px-5 py-1.5 rounded-full text-[11px] font-bold tracking-wide transition-colors duration-150"
+              style={{ color: mode === m ? '#000' : 'var(--color-muted)', minWidth: 72 }}
+            >
+              {m === 'total' ? 'Total' : 'Today'}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* No today data notice */}
+      {mode === 'today' && !hasToday && (
+        <div className="text-center text-[12px] font-semibold mb-4" style={{ color: 'var(--color-muted)' }}>
+          No results scored yet for the latest day
+        </div>
+      )}
+
       {/* Podium */}
       {top3.length > 0 && (
         <div className="flex items-end justify-center gap-2 mb-5 mt-2">
@@ -42,27 +83,17 @@ export function Leaderboard({ entries, currentUserId }: Props) {
             const av = getAvatar(entry.display_name, entry.is_monkey)
             return (
               <div key={entry.id} style={{ width: idx === 0 ? '36%' : '32%', textAlign: 'center' }}>
-                {/* Avatar */}
                 <div
                   className="mx-auto mb-1.5 flex items-center justify-center rounded-full text-xl"
-                  style={{
-                    width: 42, height: 42,
-                    background: 'var(--color-elev)',
-                    border: `2px solid ${color}`,
-                  }}
+                  style={{ width: 42, height: 42, background: 'var(--color-elev)', border: `2px solid ${color}` }}
                 >{av}</div>
                 <div className="font-extrabold text-[13px] text-text truncate">{entry.display_name}</div>
                 <div className="font-mono text-[11px] text-sub mb-1" style={{ fontFamily: 'var(--font-mono)' }}>
-                  {entry.total_points.toFixed(1)}
+                  {score(entry).toFixed(1)}
                 </div>
-                {/* Bar */}
                 <div
                   className="flex items-start justify-center pt-2 rounded-t-lg font-black text-[18px]"
-                  style={{
-                    height,
-                    background: `linear-gradient(180deg, ${color}, ${color}40)`,
-                    color: '#000',
-                  }}
+                  style={{ height, background: `linear-gradient(180deg, ${color}, ${color}40)`, color: '#000' }}
                 >{rank}</div>
               </div>
             )
@@ -83,7 +114,7 @@ export function Leaderboard({ entries, currentUserId }: Props) {
               style={{
                 padding: '10px 12px',
                 background: isMe ? 'rgba(0,217,126,0.06)' : 'transparent',
-                borderBottom: `1px solid rgba(255,255,255,0.06)`,
+                borderBottom: '1px solid rgba(255,255,255,0.06)',
                 borderLeft: isMe ? '2px solid var(--color-accent)' : '2px solid transparent',
                 opacity: entry.is_monkey ? 0.6 : 1,
                 fontStyle: entry.is_monkey ? 'italic' : 'normal',
@@ -91,10 +122,7 @@ export function Leaderboard({ entries, currentUserId }: Props) {
             >
               <div
                 className="font-bold text-[12px] w-[22px]"
-                style={{
-                  fontFamily: 'var(--font-mono)',
-                  color: isMe ? 'var(--color-accent)' : 'var(--color-muted)',
-                }}
+                style={{ fontFamily: 'var(--font-mono)', color: isMe ? 'var(--color-accent)' : 'var(--color-muted)' }}
               >{rank}.</div>
               <div
                 className="flex items-center justify-center rounded-full text-base shrink-0"
@@ -106,16 +134,14 @@ export function Leaderboard({ entries, currentUserId }: Props) {
               >
                 {entry.display_name}
                 {entry.is_monkey && (
-                  <span className="ml-1 text-[9px] not-italic" style={{ color: 'var(--color-muted)' }}>
-                    · shadow
-                  </span>
+                  <span className="ml-1 text-[9px] not-italic" style={{ color: 'var(--color-muted)' }}>· shadow</span>
                 )}
               </div>
               <div
-                className="font-bold text-[13px] w-12 text-right"
+                className="font-bold text-[13px]"
                 style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-text)' }}
               >
-                {entry.total_points.toFixed(1)}
+                {score(entry).toFixed(1)}
               </div>
             </div>
           )
@@ -126,10 +152,7 @@ export function Leaderboard({ entries, currentUserId }: Props) {
       {entries.length >= 2 && (
         <div
           className="rounded-xl p-3"
-          style={{
-            background: 'rgba(239,79,91,0.08)',
-            border: '1px solid rgba(239,79,91,0.25)',
-          }}
+          style={{ background: 'rgba(239,79,91,0.08)', border: '1px solid rgba(239,79,91,0.25)' }}
         >
           <div className="flex items-center gap-1.5 mb-2">
             <span className="text-xs">⚠️</span>
@@ -139,17 +162,14 @@ export function Leaderboard({ entries, currentUserId }: Props) {
             >Danger zone · pays extra</span>
           </div>
           {dangerZone.map((e, i) => {
-            const rank = entries.length - 1 + i
+            const rank = sorted.length - 1 + i
             const fine = i === 0 ? '+₪200' : '+₪100'
             const av = getAvatar(e.display_name, e.is_monkey)
             return (
               <div
                 key={e.id}
                 className="flex items-center gap-2.5"
-                style={{
-                  padding: '6px 0',
-                  borderBottom: i === 0 ? '1px dashed rgba(239,79,91,0.18)' : 'none',
-                }}
+                style={{ padding: '6px 0', borderBottom: i === 0 ? '1px dashed rgba(239,79,91,0.18)' : 'none' }}
               >
                 <div
                   className="font-bold text-[11px] w-[22px]"
@@ -163,7 +183,7 @@ export function Leaderboard({ entries, currentUserId }: Props) {
                 <div
                   className="text-[12px]"
                   style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-sub)' }}
-                >{e.total_points.toFixed(1)}</div>
+                >{score(e).toFixed(1)}</div>
                 <div
                   className="font-bold text-[11px] w-12 text-right"
                   style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-danger)' }}
