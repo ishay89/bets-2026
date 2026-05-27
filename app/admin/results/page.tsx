@@ -3,9 +3,10 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { calcMatchPoints, calcPicanteriaPoints } from '@/lib/scoring'
 import { snapshotMatchDay } from '@/lib/score-validation'
-import type { Stage, Pick, Match, Pikanteria, MatchDay } from '@/lib/types'
+import type { Stage, Pick, Match, Pikanteria, PicanteriaOption, MatchDay } from '@/lib/types'
 
-type MatchDayRow = MatchDay & { matches: Match[]; pikanteria: Pikanteria[] }
+type PikanteriaRow = Pikanteria & { pikanteria_options: PicanteriaOption[] }
+type MatchDayRow = MatchDay & { matches: Match[]; pikanteria: PikanteriaRow[] }
 
 async function enterResults(formData: FormData) {
   'use server'
@@ -46,27 +47,31 @@ async function enterResults(formData: FormData) {
     }
   }
 
+  // Score pikanteria using n-option structure
   const { data: pikaItems } = await supabase
     .from('pikanteria')
-    .select('id, odds_yes, odds_no')
+    .select('id, pikanteria_options(id, odds)')
     .eq('match_day_id', matchDayId)
 
   for (const pika of pikaItems ?? []) {
-    const resultStr = formData.get(`pik_${pika.id}`)
-    if (resultStr === null) continue
-    const result = resultStr === 'true'
+    const winningOptionId = formData.get(`pik_${pika.id}`) as string | null
+    if (!winningOptionId) continue
 
-    await supabase.from('pikanteria').update({ result }).eq('id', pika.id)
+    await supabase.from('pikanteria_options')
+      .update({ is_correct: true })
+      .eq('id', winningOptionId)
+
+    const winningOption = (pika.pikanteria_options as { id: string; odds: number }[])
+      .find(o => o.id === winningOptionId)
+    if (!winningOption) continue
 
     const { data: answers } = await supabase
       .from('pikanteria_answers')
-      .select('id, answer')
+      .select('id, option_id')
       .eq('pikanteria_id', pika.id)
 
-    const oddsForResult = result ? pika.odds_yes : pika.odds_no
-
     for (const ans of answers ?? []) {
-      const points = calcPicanteriaPoints(oddsForResult, ans.answer === result)
+      const points = calcPicanteriaPoints(winningOption.odds, ans.option_id === winningOptionId)
       await supabase.from('pikanteria_answers').update({ points }).eq('id', ans.id)
     }
   }
@@ -79,13 +84,18 @@ async function enterResults(formData: FormData) {
   redirect('/admin')
 }
 
+const inputStyle = {
+  background: 'var(--color-bg)',
+  border: '1px solid rgba(255,255,255,0.1)',
+  color: 'var(--color-text)',
+}
+
 export default async function ResultsPage() {
   const supabase = await createClient()
 
-  // Get most recent published match day that still has unscored matches
   const { data: matchDays } = await supabase
     .from('match_days')
-    .select('*, matches(*), pikanteria(*)')
+    .select('*, matches(*), pikanteria(*, pikanteria_options(*))')
     .not('published_at', 'is', null)
     .order('date', { ascending: false })
     .limit(5)
@@ -94,12 +104,6 @@ export default async function ResultsPage() {
   const matchDay = ((matchDays ?? []) as MatchDayRow[]).find(d =>
     d.matches.some(m => m.result === null)
   ) ?? (matchDays as MatchDayRow[] | null)?.[0]
-
-  const inputStyle = {
-    background: 'var(--color-bg)',
-    border: '1px solid rgba(255,255,255,0.1)',
-    color: 'var(--color-text)',
-  }
 
   if (!matchDay) {
     return (
@@ -120,7 +124,6 @@ export default async function ResultsPage() {
         <div className="text-muted text-xs">{matchDay.date} · {matchDay.stage}</div>
       </div>
 
-      {/* Status */}
       {(() => {
         const total = matchDay.matches.length
         const done = matchDay.matches.filter(m => m.result !== null).length
@@ -159,7 +162,6 @@ export default async function ResultsPage() {
                 </span>
               )}
             </div>
-
             <div className="flex gap-2">
               {[
                 { value: '1', label: `1 — ${match.home_team}` },
@@ -188,30 +190,36 @@ export default async function ResultsPage() {
             <div className="font-bold text-xs uppercase tracking-wider mt-2" style={{ color: 'var(--color-amber)' }}>
               🌶️ Pikanteria Results
             </div>
-            {matchDay.pikanteria.map(pika => (
-              <div key={pika.id} className="rounded-xl p-4 space-y-3"
-                style={{ background: 'var(--color-panel)', border: '1px solid rgba(255,255,255,0.06)' }}>
-                <p className="text-sm font-semibold text-text">{pika.question}</p>
-                <div className="flex gap-2">
-                  {[
-                    { value: 'true', label: 'Yes / Over' },
-                    { value: 'false', label: 'No / Under' },
-                  ].map(({ value, label }) => (
-                    <label key={value}
-                      className="flex-1 flex items-center gap-1.5 rounded-lg p-2 cursor-pointer"
-                      style={inputStyle}>
-                      <input
-                        type="radio"
-                        name={`pik_${pika.id}`}
-                        value={value}
-                        defaultChecked={pika.result !== null && String(pika.result) === value}
-                      />
-                      <span className="text-xs font-medium" style={{ color: 'var(--color-amber)' }}>{label}</span>
-                    </label>
-                  ))}
+            {matchDay.pikanteria.map(pika => {
+              const options = [...pika.pikanteria_options].sort(
+                (a, b) => a.sort_order - b.sort_order
+              )
+              const correctOption = options.find(o => o.is_correct)
+              return (
+                <div key={pika.id} className="rounded-xl p-4 space-y-3"
+                  style={{ background: 'var(--color-panel)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                  <p className="text-sm font-semibold text-text">{pika.question}</p>
+                  <div className="flex gap-2 flex-wrap">
+                    {options.map(opt => (
+                      <label key={opt.id}
+                        className="flex-1 flex items-center gap-1.5 rounded-lg p-2 cursor-pointer min-w-[80px]"
+                        style={inputStyle}>
+                        <input
+                          type="radio"
+                          name={`pik_${pika.id}`}
+                          value={opt.id}
+                          defaultChecked={correctOption?.id === opt.id}
+                        />
+                        <span className="text-xs text-text font-medium">{opt.label}</span>
+                        <span className="text-[10px] text-muted" style={{ fontFamily: 'var(--font-mono)' }}>
+                          {opt.odds.toFixed(2)}
+                        </span>
+                      </label>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            ))}
+              )
+            })}
           </>
         )}
 
