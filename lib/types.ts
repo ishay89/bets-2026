@@ -1,4 +1,4 @@
-export type Stage = 'group' | 'r16' | 'qf' | 'sf' | '3rd' | 'final'
+export type Stage = 'group' | 'r32' | 'r16' | 'qf' | 'sf' | '3rd' | 'final'
 export type Pick = '1' | 'X' | '2'
 
 export interface User {
