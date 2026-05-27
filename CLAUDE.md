@@ -4,6 +4,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 @AGENTS.md
 
+## Git Workflow — MANDATORY
+
+**Every code change must follow this workflow. No exceptions.**
+
+1. **Create a new branch** from main before making any changes. Name it descriptively (e.g. `feature/add-login`, `fix/scoring-bug`).
+2. **Make changes and commit** on that branch.
+3. **Open a Pull Request** targeting main.
+4. **Never push directly to main** — all changes go through a PR.
+
+This applies to every task, no matter how small.
+
 ## Quick Commands
 
 ```bash
