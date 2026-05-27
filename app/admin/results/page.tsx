@@ -3,7 +3,9 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { calcMatchPoints, calcPicanteriaPoints } from '@/lib/scoring'
 import { snapshotMatchDay } from '@/lib/score-validation'
-import type { Stage, Pick } from '@/lib/types'
+import type { Stage, Pick, Match, Pikanteria, MatchDay } from '@/lib/types'
+
+type MatchDayRow = MatchDay & { matches: Match[]; pikanteria: Pikanteria[] }
 
 async function enterResults(formData: FormData) {
   'use server'
@@ -89,9 +91,9 @@ export default async function ResultsPage() {
     .limit(5)
 
   // Find first day with at least one unscored match
-  const matchDay = (matchDays ?? []).find((d: any) =>
-    d.matches.some((m: any) => m.result === null)
-  ) ?? matchDays?.[0]
+  const matchDay = ((matchDays ?? []) as MatchDayRow[]).find(d =>
+    d.matches.some(m => m.result === null)
+  ) ?? (matchDays as MatchDayRow[] | null)?.[0]
 
   const inputStyle = {
     background: 'var(--color-bg)',
@@ -120,8 +122,8 @@ export default async function ResultsPage() {
 
       {/* Status */}
       {(() => {
-        const total = (matchDay.matches as any[]).length
-        const done = (matchDay.matches as any[]).filter((m: any) => m.result !== null).length
+        const total = matchDay.matches.length
+        const done = matchDay.matches.filter(m => m.result !== null).length
         return (
           <div className="rounded-xl p-3 flex items-center gap-3"
             style={{ background: 'rgba(245,166,35,0.08)', border: '1px solid rgba(245,166,35,0.25)' }}>
@@ -140,7 +142,7 @@ export default async function ResultsPage() {
         <input type="hidden" name="match_day_id" value={matchDay.id} />
 
         {/* Matches */}
-        {(matchDay.matches as any[]).map((match: any) => (
+        {matchDay.matches.map(match => (
           <div key={match.id} className="rounded-xl p-4 space-y-3"
             style={{
               background: 'var(--color-panel)',
@@ -181,12 +183,12 @@ export default async function ResultsPage() {
         ))}
 
         {/* Pikanteria */}
-        {(matchDay.pikanteria as any[]).length > 0 && (
+        {matchDay.pikanteria.length > 0 && (
           <>
             <div className="font-bold text-xs uppercase tracking-wider mt-2" style={{ color: 'var(--color-amber)' }}>
               🌶️ Pikanteria Results
             </div>
-            {(matchDay.pikanteria as any[]).map((pika: any) => (
+            {matchDay.pikanteria.map(pika => (
               <div key={pika.id} className="rounded-xl p-4 space-y-3"
                 style={{ background: 'var(--color-panel)', border: '1px solid rgba(255,255,255,0.06)' }}>
                 <p className="text-sm font-semibold text-text">{pika.question}</p>

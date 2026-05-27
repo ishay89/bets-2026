@@ -12,6 +12,7 @@ function fmt(ms: number): string {
 }
 
 export function LockTimer({ lockTime }: { lockTime: string }) {
+  // eslint-disable-next-line react-hooks/purity
   const [remaining, setRemaining] = useState(new Date(lockTime).getTime() - Date.now())
 
   useEffect(() => {

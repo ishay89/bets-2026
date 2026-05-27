@@ -1,5 +1,6 @@
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import type { User } from '@/lib/types'
 
 async function toggleAdmin(formData: FormData) {
   'use server'
@@ -17,8 +18,8 @@ export default async function PlayersPage() {
     .select('*')
     .order('display_name')
 
-  const realPlayers = (players ?? []).filter((p: any) => !p.is_monkey)
-  const monkey = (players ?? []).find((p: any) => p.is_monkey)
+  const realPlayers = ((players ?? []) as User[]).filter(p => !p.is_monkey)
+  const monkey = ((players ?? []) as User[]).find(p => p.is_monkey)
 
   return (
     <div className="max-w-lg mx-auto space-y-4 pb-10">
@@ -30,7 +31,7 @@ export default async function PlayersPage() {
       </div>
 
       <div className="space-y-2">
-        {realPlayers.map((player: any) => (
+        {realPlayers.map((player) => (
           <div key={player.id}
             className="flex items-center justify-between rounded-xl px-4 py-3"
             style={{ background: 'var(--color-panel)', border: '1px solid rgba(255,255,255,0.06)' }}>

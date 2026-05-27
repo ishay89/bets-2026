@@ -3,6 +3,15 @@ import { createClient } from '@/lib/supabase/server'
 import { BottomNav } from '@/components/bottom-nav'
 import type { LeaderboardEntry } from '@/lib/types'
 
+type HomeMatchRow = {
+  home_team: string
+  away_team: string
+  kickoff_time: string | null
+  odds_home: number
+  odds_draw: number
+  odds_away: number
+}
+
 export default async function HomePage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -19,10 +28,11 @@ export default async function HomePage() {
       .single(),
   ])
 
-  const todayMatches = (todayDay as any)?.matches ?? []
+  const todayMatches: HomeMatchRow[] = (todayDay as { matches: HomeMatchRow[] } | null)?.matches ?? []
 
   let minutesUntilLock: number | null = null
   if (todayDay?.lock_time) {
+    // eslint-disable-next-line react-hooks/purity
     const diff = new Date(todayDay.lock_time).getTime() - Date.now()
     minutesUntilLock = Math.max(0, Math.floor(diff / 60000))
   }
@@ -172,7 +182,7 @@ export default async function HomePage() {
               Today · {todayMatches.length} {todayMatches.length === 1 ? 'match' : 'matches'}
             </div>
             <div className="flex flex-col gap-2">
-              {todayMatches.map((m: any, i: number) => (
+              {todayMatches.map((m, i) => (
                 <div key={i} className="flex items-center gap-2.5 rounded-xl px-3 py-2.5"
                   style={{ background: 'var(--color-panel)', border: '1px solid rgba(255,255,255,0.06)' }}>
                   <div className="text-[11px] font-semibold w-[38px] shrink-0 text-sub"

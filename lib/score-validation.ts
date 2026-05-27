@@ -14,7 +14,7 @@ export async function computeMatchPoints(
     .eq('matches.match_day_id', matchDayId)
     .not('points', 'is', null)
 
-  return (data ?? []).reduce((sum: number, row: any) => sum + Number(row.points), 0)
+  return (data ?? []).reduce((sum, row: { points: number | null }) => sum + Number(row.points), 0)
 }
 
 export async function computePicanteriaPoints(
@@ -29,7 +29,7 @@ export async function computePicanteriaPoints(
     .eq('pikanteria.match_day_id', matchDayId)
     .not('points', 'is', null)
 
-  return (data ?? []).reduce((sum: number, row: any) => sum + Number(row.points), 0)
+  return (data ?? []).reduce((sum, row: { points: number | null }) => sum + Number(row.points), 0)
 }
 
 export async function computePreTournamentPoints(
@@ -66,8 +66,8 @@ export async function computeCumulativeFromRaw(
     computePreTournamentPoints(supabase, userId),
   ])
 
-  const predTotal = (preds ?? []).reduce((s: number, r: any) => s + Number(r.points), 0)
-  const pikaTotal = (pikas ?? []).reduce((s: number, r: any) => s + Number(r.points), 0)
+  const predTotal = (preds ?? []).reduce((s, r: { points: number | null }) => s + Number(r.points), 0)
+  const pikaTotal = (pikas ?? []).reduce((s, r: { points: number | null }) => s + Number(r.points), 0)
 
   return predTotal + pikaTotal + preTournament.winnerPts + preTournament.scorerPts
 }
@@ -91,7 +91,7 @@ async function getSnapshotSum(
   }
 
   const { data } = await query
-  return (data ?? []).reduce((s: number, r: any) => s + Number(r.day_points), 0)
+  return (data ?? []).reduce((s, r: { day_points: number }) => s + Number(r.day_points), 0)
 }
 
 export async function upsertMatchDaySnapshot(
@@ -197,10 +197,10 @@ export async function snapshotMatchDay(
     supabase.from('match_days').select('stage').eq('id', matchDayId).single(),
   ])
 
-  const stage = (matchDay as any)?.stage ?? 'group'
+  const stage = (matchDay as { stage: string } | null)?.stage ?? 'group'
 
   await Promise.all(
-    (users ?? []).map((u: any) => upsertMatchDaySnapshot(supabase, u.id, matchDayId, stage))
+    (users ?? []).map((u: { id: string }) => upsertMatchDaySnapshot(supabase, u.id, matchDayId, stage))
   )
 }
 
@@ -214,8 +214,9 @@ export async function recalculateAllSnapshots(
     .not('published_at', 'is', null)
     .order('date', { ascending: true })
 
-  const scoredDays = (matchDays ?? []).filter((d: any) =>
-    (d.matches as any[]).some((m: any) => m.result !== null)
+  type RecalcDay = { id: string; stage: string; matches: { result: string | null }[] }
+  const scoredDays = ((matchDays ?? []) as RecalcDay[]).filter(d =>
+    d.matches.some(m => m.result !== null)
   )
 
   const { data: users } = await supabase.from('users').select('id')
@@ -227,7 +228,7 @@ export async function recalculateAllSnapshots(
   // Process days in chronological order so cumulative calculations are sequential
   for (const day of scoredDays) {
     await Promise.all(
-      allUsers.map((u: any) => upsertMatchDaySnapshot(supabase, u.id, day.id, day.stage))
+      allUsers.map((u: { id: string }) => upsertMatchDaySnapshot(supabase, u.id, day.id, day.stage))
     )
     written += allUsers.length
   }
