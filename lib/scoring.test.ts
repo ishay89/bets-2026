@@ -4,7 +4,6 @@ import {
   calcPicanteriaPoints,
   calcPreTournamentWinnerPoints,
   calcTopScorerPoints,
-  STAGE_MULTIPLIERS,
 } from './scoring'
 
 describe('calcMatchPoints', () => {
