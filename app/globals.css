@@ -1,39 +1,119 @@
 @import "tailwindcss";
 
 @theme {
-  /* Backgrounds */
-  --color-bg: #07090f;
-  --color-panel: #0d1222;
-  --color-panel2: #11172a;
-  --color-elev: #171e36;
-  --color-elev2: #1f2748;
+  /* ── Fonts ─────────────────────────────────────────── */
+  --font-sans:    'Barlow', system-ui, sans-serif;
+  --font-display: 'Oswald', 'Barlow', system-ui, sans-serif;
+  --font-mono:    'IBM Plex Mono', ui-monospace, 'JetBrains Mono', monospace;
 
-  /* Text */
-  --color-text: #eaedf5;
-  --color-sub: #8d99b5;
-  --color-muted: #5a6485;
-  --color-dim: #3a4366;
+  /* ── Dark theme (stadium night) — Tailwind utility defaults ─ */
+  --color-bg:      #05080f;
+  --color-panel:   #0b1120;
+  --color-panel2:  #0f1830;
+  --color-elev:    #152038;
+  --color-elev2:   #1c2c4a;
 
-  /* Accents */
-  --color-accent: #00d97e;
-  --color-accent-soft: rgba(0, 217, 126, 0.14);
-  --color-accent-line: rgba(0, 217, 126, 0.32);
+  --color-text:  #edf2ff;
+  --color-sub:   #8899cc;
+  --color-muted: #4d5f8c;
+  --color-dim:   #2a3a5e;
 
-  --color-amber: #f5a623;
-  --color-amber-soft: rgba(245, 166, 35, 0.13);
+  --color-accent:      #00d97e;
+  --color-accent-soft: #001f12;
+  --color-accent-line: #00462a;
 
-  --color-danger: #ef4f5b;
-  --color-danger-soft: rgba(239, 79, 91, 0.13);
+  --color-amber:      #f5a623;
+  --color-amber-soft: #1e1000;
 
-  --color-gold: #f5c441;
+  --color-danger:      #ef4f5b;
+  --color-danger-soft: #1e0609;
+
+  --color-gold:   #f5c441;
   --color-silver: #aab4cd;
   --color-bronze: #d18a4d;
 
-  /* Legacy aliases for existing code */
-  --color-surface: #0d1222;
-  --color-warn: #f5a623;
+  /* Legacy aliases */
+  --color-surface: #0b1120;
+  --color-warn:    #f5a623;
+}
 
-  /* Fonts */
-  --font-sans: Inter, -apple-system, "SF Pro Text", system-ui, sans-serif;
-  --font-mono: "IBM Plex Mono", ui-monospace, "JetBrains Mono", monospace;
+/* ── Light theme (pitch day) ───────────────────────────── */
+[data-theme="light"] {
+  --color-bg:      #eef4e5;
+  --color-panel:   #ffffff;
+  --color-panel2:  #f4f9ed;
+  --color-elev:    #e5f0d6;
+  --color-elev2:   #d6e8c2;
+
+  --color-text:  #0a1428;
+  --color-sub:   #283f5e;
+  --color-muted: #6a7d9a;
+  --color-dim:   #b5c8d8;
+
+  --color-accent:      #00905a;
+  --color-accent-soft: #dff5ec;
+  --color-accent-line: #b0e5cf;
+
+  --color-amber:      #b87000;
+  --color-amber-soft: #fef3dc;
+
+  --color-danger:      #c0303a;
+  --color-danger-soft: #ffe6e8;
+
+  --color-gold:   #a07800;
+  --color-silver: #607098;
+  --color-bronze: #7a4020;
+
+  --color-surface: #ffffff;
+  --color-warn:    #b87000;
+}
+
+/* ── Shared border & shadow tokens (not Tailwind utilities) ── */
+:root,
+[data-theme="dark"] {
+  --border-base:   rgba(255, 255, 255, 0.07);
+  --border-subtle: rgba(255, 255, 255, 0.04);
+  --border-accent: rgba(0, 217, 126, 0.30);
+  --border-danger: rgba(239, 79, 91, 0.25);
+  --border-warn:   rgba(245, 166, 35, 0.28);
+  --nav-bg:        rgba(5, 8, 15, 0.90);
+  --shadow-card:   0 2px 20px rgba(0, 0, 0, 0.50);
+  --hero-glow:     radial-gradient(circle at 72% 50%, rgba(0, 217, 126, 0.20) 0%, transparent 64%);
+}
+
+[data-theme="light"] {
+  --border-base:   rgba(0, 0, 0, 0.08);
+  --border-subtle: rgba(0, 0, 0, 0.05);
+  --border-accent: rgba(0, 144, 90, 0.28);
+  --border-danger: rgba(192, 48, 58, 0.22);
+  --border-warn:   rgba(184, 112, 0, 0.26);
+  --nav-bg:        rgba(238, 244, 229, 0.92);
+  --shadow-card:   0 2px 12px rgba(0, 0, 0, 0.08);
+  --hero-glow:     radial-gradient(circle at 72% 50%, rgba(0, 144, 90, 0.16) 0%, transparent 64%);
+}
+
+/* ── Pitch stripe utility (for hero / card sections) ─────── */
+.pitch-stripes {
+  background-image: repeating-linear-gradient(
+    180deg,
+    rgba(0, 200, 100, 0.035) 0px,
+    rgba(0, 200, 100, 0.035) 22px,
+    transparent 22px,
+    transparent 44px
+  );
+}
+
+[data-theme="light"] .pitch-stripes {
+  background-image: repeating-linear-gradient(
+    180deg,
+    rgba(0, 150, 70, 0.05) 0px,
+    rgba(0, 150, 70, 0.05) 22px,
+    transparent 22px,
+    transparent 44px
+  );
+}
+
+/* ── Typography helpers ───────────────────────────────────── */
+.font-display {
+  font-family: var(--font-display);
 }

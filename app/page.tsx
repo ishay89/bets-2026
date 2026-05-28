@@ -44,130 +44,291 @@ export default async function HomePage() {
   const top3 = allEntries.slice(0, 3)
   const myEntry = allEntries.find(e => e.id === user?.id)
   const myRank = myEntry ? allEntries.indexOf(myEntry) + 1 : null
-  // Show top 3 + user if outside top 3
   const miniEntries: (LeaderboardEntry & { _rank: number })[] = [
     ...top3.map((e, i) => ({ ...e, _rank: i + 1 })),
     ...(myEntry && myRank && myRank > 3 ? [{ ...myEntry, _rank: myRank }] : []),
   ]
 
-  const rankColors: Record<number, string> = { 1: '#f5c441', 2: '#aab4cd', 3: '#d18a4d' }
+  const rankColors: Record<number, string> = {
+    1: 'var(--color-gold)',
+    2: 'var(--color-silver)',
+    3: 'var(--color-bronze)',
+  }
 
   return (
     <div className="min-h-screen bg-bg">
-      {/* Header */}
-      <header className="flex items-center justify-between px-4 pt-4 pb-3">
-        <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-lg flex items-center justify-center font-black text-sm text-black"
-            style={{ background: 'var(--color-accent)' }}>M</div>
+      {/* ── Header ── */}
+      <header className="flex items-center justify-between px-4 pt-5 pb-3">
+        <div className="flex items-center gap-2.5">
+          <SoccerBallLogo />
           <div>
-            <div className="font-extrabold text-sm text-text tracking-tight">Mondial Bets</div>
-            <div className="text-[10px] font-bold uppercase tracking-wider text-muted">USA · CAN · MEX 2026</div>
+            <div
+              style={{
+                fontFamily: 'var(--font-display)',
+                fontSize: 18,
+                fontWeight: 700,
+                letterSpacing: '0.04em',
+                color: 'var(--color-text)',
+                lineHeight: 1,
+                textTransform: 'uppercase',
+              }}
+            >
+              Mondial Bets
+            </div>
+            <div
+              style={{
+                fontFamily: 'var(--font-display)',
+                fontSize: 9,
+                letterSpacing: '0.20em',
+                textTransform: 'uppercase',
+                color: 'var(--color-muted)',
+                marginTop: 2,
+              }}
+            >
+              USA · CAN · MEX 2026
+            </div>
           </div>
         </div>
-        <div className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-black"
-          style={{ background: 'var(--color-elev)', border: '1px solid rgba(255,255,255,0.06)' }}>⚡</div>
+        {/* Host flags */}
+        <div className="flex items-center gap-1 text-base">🇺🇸🇨🇦🇲🇽</div>
       </header>
 
       <main className="px-4 pb-28 space-y-4">
-        {/* Countdown hero */}
+        {/* ── Countdown hero ── */}
         {todayDay ? (
-          <div className="rounded-[18px] p-[18px] relative overflow-hidden"
+          <div
+            className="pitch-stripes rounded-2xl p-5 relative overflow-hidden"
             style={{
-              background: 'linear-gradient(135deg, #0d1d16 0%, #0a1320 60%, #0d1d16 100%)',
-              border: '1px solid rgba(0,217,126,0.32)',
-            }}>
-            <div className="absolute -top-8 -right-8 w-36 h-36 rounded-full pointer-events-none"
-              style={{ background: 'radial-gradient(circle, rgba(0,217,126,0.25), transparent 70%)' }} />
+              background: 'var(--color-panel)',
+              border: `1px solid ${picksOpen ? 'var(--border-accent)' : 'var(--border-base)'}`,
+            }}
+          >
+            {/* Glow */}
+            <div
+              className="absolute inset-0 pointer-events-none"
+              style={{ background: 'var(--hero-glow)' }}
+            />
             <div className="relative z-10">
-              <div className="flex items-center justify-between mb-2.5">
-                <span className="text-[10px] font-bold uppercase tracking-[0.6px] px-2 py-1 rounded-full"
+              <div className="flex items-center justify-between mb-3">
+                <span
+                  className="text-[10px] px-2.5 py-1 rounded-full font-bold"
                   style={{
                     color: picksOpen ? 'var(--color-accent)' : 'var(--color-muted)',
-                    background: picksOpen ? 'rgba(0,217,126,0.14)' : 'rgba(255,255,255,0.06)',
-                    border: `1px solid ${picksOpen ? 'rgba(0,217,126,0.32)' : 'rgba(255,255,255,0.06)'}`,
-                  }}>
-                  {picksOpen ? '⏰ Picks open' : '🔒 Picks locked'}
+                    background: picksOpen ? 'var(--color-accent-soft)' : 'var(--color-elev)',
+                    border: `1px solid ${picksOpen ? 'var(--border-accent)' : 'var(--border-base)'}`,
+                    fontFamily: 'var(--font-display)',
+                    letterSpacing: '0.10em',
+                    textTransform: 'uppercase',
+                  }}
+                >
+                  {picksOpen ? '⏱ Open' : '🔒 Locked'}
                 </span>
-                <div className="text-[11px] font-semibold text-sub" style={{ fontFamily: 'var(--font-mono)' }}>
+                <span
+                  style={{
+                    fontFamily: 'var(--font-display)',
+                    fontSize: 11,
+                    letterSpacing: '0.12em',
+                    textTransform: 'uppercase',
+                    color: 'var(--color-sub)',
+                  }}
+                >
                   {STAGE_LABELS[todayDay.stage] ?? todayDay.stage}
-                </div>
+                </span>
               </div>
 
               {picksOpen ? (
                 <>
-                  <div className="text-[11px] font-semibold text-sub mb-1.5">Lock in</div>
-                  <div className="flex items-baseline gap-1">
-                    {[String(hours).padStart(2, '0'), String(mins).padStart(2, '0')].map((n, i) => (
-                      <span key={i} className="flex items-baseline gap-0.5">
-                        <span className="font-semibold leading-none"
-                          style={{ fontFamily: 'var(--font-mono)', fontSize: 34, color: 'var(--color-accent)', letterSpacing: -1.5 }}>
+                  <div
+                    style={{
+                      fontFamily: 'var(--font-display)',
+                      fontSize: 10,
+                      letterSpacing: '0.16em',
+                      textTransform: 'uppercase',
+                      color: 'var(--color-sub)',
+                      marginBottom: 4,
+                    }}
+                  >
+                    Lock in
+                  </div>
+                  <div className="flex items-baseline gap-2">
+                    {[
+                      { n: String(hours).padStart(2, '0'), unit: 'HRS' },
+                      { n: String(mins).padStart(2, '0'), unit: 'MIN' },
+                    ].map(({ n, unit }) => (
+                      <span key={unit} className="flex items-baseline gap-1">
+                        <span
+                          style={{
+                            fontFamily: 'var(--font-display)',
+                            fontSize: 42,
+                            fontWeight: 700,
+                            color: 'var(--color-accent)',
+                            letterSpacing: '-0.02em',
+                            lineHeight: 1,
+                          }}
+                        >
                           {n}
                         </span>
-                        <span className="text-[10px] font-bold tracking-wide mr-1 text-muted">
-                          {['HRS', 'MIN'][i]}
+                        <span
+                          style={{
+                            fontFamily: 'var(--font-display)',
+                            fontSize: 10,
+                            letterSpacing: '0.14em',
+                            color: 'var(--color-muted)',
+                            marginRight: 4,
+                          }}
+                        >
+                          {unit}
                         </span>
                       </span>
                     ))}
                   </div>
                 </>
               ) : (
-                <div className="text-[13px] font-semibold text-sub">Predictions locked for today</div>
+                <div
+                  style={{
+                    fontFamily: 'var(--font-display)',
+                    fontSize: 14,
+                    color: 'var(--color-sub)',
+                    letterSpacing: '0.04em',
+                  }}
+                >
+                  Predictions locked for today
+                </div>
               )}
 
-              <div className="mt-3 flex gap-2">
-                <Link href="/predict"
-                  className="flex-1 text-center font-extrabold text-[13px] rounded-[10px] py-2.5 text-black tracking-tight"
-                  style={{ background: 'var(--color-accent)' }}>
-                  {picksOpen ? 'Make picks →' : 'View picks →'}
+              <div className="mt-4 flex gap-2">
+                <Link
+                  href="/predict"
+                  className="flex-1 text-center rounded-xl py-3"
+                  style={{
+                    background: 'var(--color-accent)',
+                    color: '#000',
+                    fontFamily: 'var(--font-display)',
+                    fontSize: 14,
+                    fontWeight: 700,
+                    letterSpacing: '0.10em',
+                    textTransform: 'uppercase',
+                  }}
+                >
+                  {picksOpen ? 'Make Picks →' : 'View Picks →'}
                 </Link>
-                <div className="font-bold text-[13px] rounded-[10px] px-3.5 py-2.5 text-text"
-                  style={{ background: 'var(--color-elev)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                <div
+                  className="font-bold rounded-xl px-4 py-3"
+                  style={{
+                    background: 'var(--color-elev)',
+                    border: '1px solid var(--border-base)',
+                    fontFamily: 'var(--font-display)',
+                    fontSize: 13,
+                    letterSpacing: '0.06em',
+                    color: 'var(--color-sub)',
+                  }}
+                >
                   {todayMatches.length} matches
                 </div>
               </div>
             </div>
           </div>
         ) : (
-          <div className="rounded-[18px] p-4 text-center"
-            style={{ background: 'var(--color-panel)', border: '1px solid rgba(255,255,255,0.06)' }}>
-            <div className="font-bold text-text text-sm">No matches scheduled today</div>
+          <div
+            className="rounded-2xl p-4 text-center"
+            style={{ background: 'var(--color-panel)', border: '1px solid var(--border-base)' }}
+          >
+            <div
+              style={{
+                fontFamily: 'var(--font-display)',
+                fontSize: 14,
+                color: 'var(--color-sub)',
+                letterSpacing: '0.06em',
+              }}
+            >
+              No matches scheduled today
+            </div>
           </div>
         )}
 
-        {/* Mini leaderboard */}
+        {/* ── Mini leaderboard ── */}
         <div className="flex items-center justify-between px-0.5">
-          <span className="text-[10px] font-bold uppercase tracking-[1.2px] text-muted">
-            Leaderboard · {allEntries.length} players
+          <span
+            style={{
+              fontFamily: 'var(--font-display)',
+              fontSize: 10,
+              letterSpacing: '0.20em',
+              textTransform: 'uppercase',
+              color: 'var(--color-muted)',
+            }}
+          >
+            🏆 Standings · {allEntries.length} players
           </span>
-          <Link href="/leaderboard" className="text-[11px] font-semibold text-sub">See all →</Link>
+          <Link
+            href="/leaderboard"
+            style={{
+              fontFamily: 'var(--font-display)',
+              fontSize: 11,
+              letterSpacing: '0.08em',
+              color: 'var(--color-sub)',
+              textDecoration: 'none',
+            }}
+          >
+            See all →
+          </Link>
         </div>
-        <div className="rounded-[14px] overflow-hidden"
-          style={{ background: 'var(--color-panel)', border: '1px solid rgba(255,255,255,0.06)' }}>
+
+        <div
+          className="rounded-2xl overflow-hidden"
+          style={{ background: 'var(--color-panel)', border: '1px solid var(--border-base)' }}
+        >
           {miniEntries.map((entry, i, arr) => {
             const isMe = entry.id === user?.id
             const av = getAvatar(entry.display_name, entry.is_monkey)
+            const rankColor = rankColors[entry._rank]
             return (
-              <div key={entry.id} className="flex items-center gap-3"
+              <div
+                key={entry.id}
+                className="flex items-center gap-3"
                 style={{
                   padding: '12px 14px',
-                  background: isMe ? 'rgba(0,217,126,0.07)' : 'transparent',
-                  borderBottom: i < arr.length - 1 ? '1px solid rgba(255,255,255,0.06)' : 'none',
-                  borderLeft: isMe ? '2px solid var(--color-accent)' : '2px solid transparent',
-                }}>
-                <div className="font-bold text-[14px] w-[22px]"
-                  style={{ fontFamily: 'var(--font-mono)', color: rankColors[entry._rank] ?? (isMe ? 'var(--color-accent)' : 'var(--color-muted)') }}>
+                  background: isMe ? 'var(--color-accent-soft)' : 'transparent',
+                  borderBottom: i < arr.length - 1 ? '1px solid var(--border-subtle)' : 'none',
+                  borderLeft: isMe ? '3px solid var(--color-accent)' : '3px solid transparent',
+                }}
+              >
+                <div
+                  style={{
+                    fontFamily: 'var(--font-display)',
+                    fontSize: 15,
+                    fontWeight: 700,
+                    width: 24,
+                    color: rankColor ?? (isMe ? 'var(--color-accent)' : 'var(--color-muted)'),
+                    letterSpacing: '0.02em',
+                  }}
+                >
                   {entry._rank}
                 </div>
-                <div className="w-7 h-7 rounded-full flex items-center justify-center text-sm shrink-0"
-                  style={{ background: 'var(--color-elev)', fontSize: 14 }}>
+                <div
+                  className="flex items-center justify-center rounded-full shrink-0"
+                  style={{ width: 28, height: 28, background: 'var(--color-elev)', fontSize: 14 }}
+                >
                   {av}
                 </div>
-                <div className="flex-1 font-bold text-[13.5px]"
-                  style={{ color: isMe ? 'var(--color-accent)' : 'var(--color-text)' }}>
+                <div
+                  className="flex-1"
+                  style={{
+                    fontFamily: 'var(--font-sans)',
+                    fontSize: 13,
+                    fontWeight: 700,
+                    color: isMe ? 'var(--color-accent)' : 'var(--color-text)',
+                  }}
+                >
                   {isMe ? 'You' : entry.display_name}
                 </div>
-                <div className="font-bold text-[14px] w-12 text-right"
-                  style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-text)' }}>
+                <div
+                  style={{
+                    fontFamily: 'var(--font-mono)',
+                    fontSize: 14,
+                    fontWeight: 700,
+                    color: 'var(--color-text)',
+                  }}
+                >
                   {entry.total_points.toFixed(1)}
                 </div>
               </div>
@@ -175,26 +336,60 @@ export default async function HomePage() {
           })}
         </div>
 
-        {/* Today's matches */}
+        {/* ── Today's matches ── */}
         {todayMatches.length > 0 && (
           <>
-            <div className="text-[10px] font-bold uppercase tracking-[1.2px] px-0.5 text-muted">
-              Today · {todayMatches.length} {todayMatches.length === 1 ? 'match' : 'matches'}
+            <div
+              style={{
+                fontFamily: 'var(--font-display)',
+                fontSize: 10,
+                letterSpacing: '0.20em',
+                textTransform: 'uppercase',
+                color: 'var(--color-muted)',
+                paddingLeft: 2,
+              }}
+            >
+              ⚽ Today · {todayMatches.length} {todayMatches.length === 1 ? 'match' : 'matches'}
             </div>
             <div className="flex flex-col gap-2">
               {todayMatches.map((m, i) => (
-                <div key={i} className="flex items-center gap-2.5 rounded-xl px-3 py-2.5"
-                  style={{ background: 'var(--color-panel)', border: '1px solid rgba(255,255,255,0.06)' }}>
-                  <div className="text-[11px] font-semibold w-[38px] shrink-0 text-sub"
-                    style={{ fontFamily: 'var(--font-mono)' }}>
+                <div
+                  key={i}
+                  className="flex items-center gap-2.5 rounded-xl px-3 py-2.5"
+                  style={{ background: 'var(--color-panel)', border: '1px solid var(--border-base)' }}
+                >
+                  <div
+                    style={{
+                      fontFamily: 'var(--font-mono)',
+                      fontSize: 11,
+                      width: 40,
+                      flexShrink: 0,
+                      color: 'var(--color-sub)',
+                    }}
+                  >
                     {formatTime(m.kickoff_time)}
                   </div>
                   <span className="text-base shrink-0">{getFlag(m.home_team)}</span>
-                  <span className="text-[11px] font-bold text-muted">vs</span>
+                  <span
+                    style={{
+                      fontFamily: 'var(--font-display)',
+                      fontSize: 10,
+                      letterSpacing: '0.12em',
+                      color: 'var(--color-dim)',
+                    }}
+                  >
+                    VS
+                  </span>
                   <span className="text-base shrink-0">{getFlag(m.away_team)}</span>
                   <div className="flex-1" />
-                  <div className="text-[10px] font-semibold text-muted" style={{ fontFamily: 'var(--font-mono)' }}>
-                    {m.odds_home?.toFixed(2)} / {m.odds_draw?.toFixed(2)} / {m.odds_away?.toFixed(2)}
+                  <div
+                    style={{
+                      fontFamily: 'var(--font-mono)',
+                      fontSize: 10,
+                      color: 'var(--color-muted)',
+                    }}
+                  >
+                    {m.odds_home?.toFixed(2)} · {m.odds_draw?.toFixed(2)} · {m.odds_away?.toFixed(2)}
                   </div>
                 </div>
               ))}
@@ -208,9 +403,43 @@ export default async function HomePage() {
   )
 }
 
+function SoccerBallLogo() {
+  return (
+    <div
+      style={{
+        width: 32,
+        height: 32,
+        borderRadius: '50%',
+        background: 'var(--color-accent)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexShrink: 0,
+      }}
+    >
+      {/* Soccer ball icon */}
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+        <circle cx="12" cy="12" r="9" stroke="#000" strokeWidth="1.5" />
+        {/* Center pentagon patch */}
+        <polygon points="12,7 14.8,9 13.8,12.2 10.2,12.2 9.2,9" fill="#000" />
+        {/* Side lines to pentagon vertices */}
+        <line x1="12" y1="3" x2="12" y2="7" stroke="#000" strokeWidth="1.2" />
+        <line x1="14.8" y1="9" x2="18" y2="7.5" stroke="#000" strokeWidth="1.2" />
+        <line x1="13.8" y1="12.2" x2="16.5" y2="15" stroke="#000" strokeWidth="1.2" />
+        <line x1="10.2" y1="12.2" x2="7.5" y2="15" stroke="#000" strokeWidth="1.2" />
+        <line x1="9.2" y1="9" x2="6" y2="7.5" stroke="#000" strokeWidth="1.2" />
+      </svg>
+    </div>
+  )
+}
+
 const STAGE_LABELS: Record<string, string> = {
-  group: 'Group Stage', r16: 'Round of 16', qf: 'Quarter Finals',
-  sf: 'Semi Finals', '3rd': 'Third Place', final: 'Final',
+  group: 'Group Stage',
+  r16: 'Round of 16',
+  qf: 'Quarter Finals',
+  sf: 'Semi Finals',
+  '3rd': 'Third Place',
+  final: 'Final',
 }
 
 const AVATARS = ['🦁','🐯','🦊','🐺','🦅','🐻','🐼','🦝','🦄','🐉','🦋','🌟','🔥','⚡','🎯']
@@ -234,7 +463,5 @@ function formatTime(iso: string | null): string {
     return new Date(iso).toLocaleTimeString('he-IL', {
       hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Jerusalem',
     })
-  } catch {
-    return '—'
-  }
+  } catch { return '—' }
 }
