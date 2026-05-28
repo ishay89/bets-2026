@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { BottomNav } from '@/components/bottom-nav'
 import type { LeaderboardEntry } from '@/lib/types'
+import { PRE_TOURNAMENT_PATH, hasCompletedPreTournamentPick } from '@/lib/pre-tournament'
 
 type HomeMatchRow = {
   home_team: string
@@ -16,7 +17,7 @@ export default async function HomePage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  const [{ data: entries }, { data: todayDay }] = await Promise.all([
+  const [{ data: entries }, { data: todayDay }, { data: preTournamentPick }] = await Promise.all([
     supabase.from('leaderboard').select('*').returns<LeaderboardEntry[]>(),
     supabase
       .from('match_days')
@@ -26,9 +27,15 @@ export default async function HomePage() {
       .order('date')
       .limit(1)
       .single(),
+    supabase
+      .from('pre_tournament_picks')
+      .select('winner_team, top_scorer')
+      .eq('user_id', user!.id)
+      .maybeSingle(),
   ])
 
   const todayMatches: HomeMatchRow[] = (todayDay as { matches: HomeMatchRow[] } | null)?.matches ?? []
+  const hasEntryPick = hasCompletedPreTournamentPick(preTournamentPick)
 
   let minutesUntilLock: number | null = null
   if (todayDay?.lock_time) {
@@ -94,6 +101,36 @@ export default async function HomePage() {
       </header>
 
       <main className="px-4 pb-28 space-y-4">
+        {!hasEntryPick && (
+          <Link
+            href={PRE_TOURNAMENT_PATH}
+            className="block rounded-2xl p-4"
+            style={{
+              background: 'var(--color-panel)',
+              border: '1px solid var(--border-accent)',
+              textDecoration: 'none',
+            }}
+          >
+            <div
+              style={{
+                fontFamily: 'var(--font-display)',
+                fontSize: 10,
+                letterSpacing: '0.16em',
+                textTransform: 'uppercase',
+                color: 'var(--color-accent)',
+              }}
+            >
+              Entry required
+            </div>
+            <div className="mt-1 text-text text-base font-extrabold tracking-tight">
+              Pick champion and top scorer
+            </div>
+            <div className="mt-1 text-sub text-sm">
+              Complete these one-time picks before making daily predictions.
+            </div>
+          </Link>
+        )}
+
         {/* ── Countdown hero ── */}
         {todayDay ? (
           <div
