@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { BottomNav } from '@/components/bottom-nav'
 import type { LeaderboardEntry } from '@/lib/types'
+import { PRE_TOURNAMENT_PATH, hasCompletedPreTournamentPick } from '@/lib/pre-tournament'
 
 type HomeMatchRow = {
   home_team: string
@@ -16,7 +17,7 @@ export default async function HomePage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  const [{ data: entries }, { data: todayDay }] = await Promise.all([
+  const [{ data: entries }, { data: todayDay }, { data: preTournamentPick }] = await Promise.all([
     supabase.from('leaderboard').select('*').returns<LeaderboardEntry[]>(),
     supabase
       .from('match_days')
@@ -26,9 +27,15 @@ export default async function HomePage() {
       .order('date')
       .limit(1)
       .single(),
+    supabase
+      .from('pre_tournament_picks')
+      .select('winner_team, top_scorer')
+      .eq('user_id', user!.id)
+      .maybeSingle(),
   ])
 
   const todayMatches: HomeMatchRow[] = (todayDay as { matches: HomeMatchRow[] } | null)?.matches ?? []
+  const hasEntryPick = hasCompletedPreTournamentPick(preTournamentPick)
 
   let minutesUntilLock: number | null = null
   if (todayDay?.lock_time) {
@@ -44,13 +51,16 @@ export default async function HomePage() {
   const top3 = allEntries.slice(0, 3)
   const myEntry = allEntries.find(e => e.id === user?.id)
   const myRank = myEntry ? allEntries.indexOf(myEntry) + 1 : null
-  // Show top 3 + user if outside top 3
   const miniEntries: (LeaderboardEntry & { _rank: number })[] = [
     ...top3.map((e, i) => ({ ...e, _rank: i + 1 })),
     ...(myEntry && myRank && myRank > 3 ? [{ ...myEntry, _rank: myRank }] : []),
   ]
 
-  const rankColors: Record<number, string> = { 1: '#f5c441', 2: '#aab4cd', 3: '#d18a4d' }
+  const rankColors: Record<number, string> = {
+    1: 'var(--color-gold)',
+    2: 'var(--color-silver)',
+    3: 'var(--color-bronze)',
+  }
 
   return (
     <div className="app-shell bg-bg">
@@ -67,22 +77,57 @@ export default async function HomePage() {
       </header>
 
       <main className="px-4 pb-28 space-y-4">
-        {/* Countdown hero */}
+        {!hasEntryPick && (
+          <Link
+            href={PRE_TOURNAMENT_PATH}
+            className="block rounded-2xl p-4"
+            style={{
+              background: 'var(--color-panel)',
+              border: '1px solid var(--border-accent)',
+              textDecoration: 'none',
+            }}
+          >
+            <div
+              style={{
+                fontFamily: 'var(--font-display)',
+                fontSize: 10,
+                letterSpacing: '0.16em',
+                textTransform: 'uppercase',
+                color: 'var(--color-accent)',
+              }}
+            >
+              Entry required
+            </div>
+            <div className="mt-1 text-text text-base font-extrabold tracking-tight">
+              Pick champion and top scorer
+            </div>
+            <div className="mt-1 text-sub text-sm">
+              Complete these one-time picks before making daily predictions.
+            </div>
+          </Link>
+        )}
+
+        {/* ── Countdown hero ── */}
         {todayDay ? (
           <div className="superstar-panel p-[18px] min-h-[238px] flex items-end">
             <div className="relative z-10">
-              <div className="flex items-center justify-between mb-2.5">
-                <span className="text-[10px] font-bold uppercase tracking-[0.6px] px-2 py-1 rounded-full"
+              <div className="flex items-center justify-between mb-3">
+                <span
+                  className="text-[10px] px-2.5 py-1 rounded-full font-bold"
                   style={{
                     color: picksOpen ? 'var(--color-accent)' : 'var(--color-muted)',
-                    background: picksOpen ? 'rgba(0,217,126,0.14)' : 'rgba(255,255,255,0.06)',
-                    border: `1px solid ${picksOpen ? 'rgba(0,217,126,0.32)' : 'rgba(255,255,255,0.06)'}`,
-                  }}>
-                  {picksOpen ? '⏰ Picks open' : '🔒 Picks locked'}
+                    background: picksOpen ? 'var(--color-accent-soft)' : 'var(--color-elev)',
+                    border: `1px solid ${picksOpen ? 'var(--border-accent)' : 'var(--border-base)'}`,
+                    fontFamily: 'var(--font-display)',
+                    letterSpacing: '0.10em',
+                    textTransform: 'uppercase',
+                  }}
+                >
+                  {picksOpen ? '⏱ Open' : '🔒 Locked'}
                 </span>
                 <div className="text-[11px] font-semibold text-sub ml-3" style={{ fontFamily: 'var(--font-mono)' }}>
                   {STAGE_LABELS[todayDay.stage] ?? todayDay.stage}
-                </div>
+                </span>
               </div>
 
               {picksOpen ? (
@@ -95,15 +140,32 @@ export default async function HomePage() {
                           style={{ fontFamily: 'var(--font-mono)', fontSize: 34, color: 'var(--color-accent)', letterSpacing: 0 }}>
                           {n}
                         </span>
-                        <span className="text-[10px] font-bold tracking-wide mr-1 text-muted">
-                          {['HRS', 'MIN'][i]}
+                        <span
+                          style={{
+                            fontFamily: 'var(--font-display)',
+                            fontSize: 10,
+                            letterSpacing: '0.14em',
+                            color: 'var(--color-muted)',
+                            marginRight: 4,
+                          }}
+                        >
+                          {unit}
                         </span>
                       </span>
                     ))}
                   </div>
                 </>
               ) : (
-                <div className="text-[13px] font-semibold text-sub">Predictions locked for today</div>
+                <div
+                  style={{
+                    fontFamily: 'var(--font-display)',
+                    fontSize: 14,
+                    color: 'var(--color-sub)',
+                    letterSpacing: '0.04em',
+                  }}
+                >
+                  Predictions locked for today
+                </div>
               )}
 
               <div className="mt-3 flex gap-2">
@@ -125,19 +187,41 @@ export default async function HomePage() {
           </div>
         )}
 
-        {/* Mini leaderboard */}
+        {/* ── Mini leaderboard ── */}
         <div className="flex items-center justify-between px-0.5">
-          <span className="text-[10px] font-bold uppercase tracking-[1.2px] text-muted">
-            Leaderboard · {allEntries.length} players
+          <span
+            style={{
+              fontFamily: 'var(--font-display)',
+              fontSize: 10,
+              letterSpacing: '0.20em',
+              textTransform: 'uppercase',
+              color: 'var(--color-muted)',
+            }}
+          >
+            🏆 Standings · {allEntries.length} players
           </span>
-          <Link href="/leaderboard" className="text-[11px] font-semibold text-sub">See all →</Link>
+          <Link
+            href="/leaderboard"
+            style={{
+              fontFamily: 'var(--font-display)',
+              fontSize: 11,
+              letterSpacing: '0.08em',
+              color: 'var(--color-sub)',
+              textDecoration: 'none',
+            }}
+          >
+            See all →
+          </Link>
         </div>
         <div className="bet-card overflow-hidden">
           {miniEntries.map((entry, i, arr) => {
             const isMe = entry.id === user?.id
             const av = getAvatar(entry.display_name, entry.is_monkey)
+            const rankColor = rankColors[entry._rank]
             return (
-              <div key={entry.id} className="flex items-center gap-3"
+              <div
+                key={entry.id}
+                className="flex items-center gap-3"
                 style={{
                   padding: '12px 14px',
                   background: isMe ? 'rgba(200,240,92,0.08)' : 'transparent',
@@ -152,12 +236,25 @@ export default async function HomePage() {
                   style={{ background: 'var(--color-elev)', border: '1px solid rgba(246,248,232,0.08)', fontSize: 14 }}>
                   {av}
                 </div>
-                <div className="flex-1 font-bold text-[13.5px]"
-                  style={{ color: isMe ? 'var(--color-accent)' : 'var(--color-text)' }}>
+                <div
+                  className="flex-1"
+                  style={{
+                    fontFamily: 'var(--font-sans)',
+                    fontSize: 13,
+                    fontWeight: 700,
+                    color: isMe ? 'var(--color-accent)' : 'var(--color-text)',
+                  }}
+                >
                   {isMe ? 'You' : entry.display_name}
                 </div>
-                <div className="font-bold text-[14px] w-12 text-right"
-                  style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-text)' }}>
+                <div
+                  style={{
+                    fontFamily: 'var(--font-mono)',
+                    fontSize: 14,
+                    fontWeight: 700,
+                    color: 'var(--color-text)',
+                  }}
+                >
                   {entry.total_points.toFixed(1)}
                 </div>
               </div>
@@ -165,11 +262,20 @@ export default async function HomePage() {
           })}
         </div>
 
-        {/* Today's matches */}
+        {/* ── Today's matches ── */}
         {todayMatches.length > 0 && (
           <>
-            <div className="text-[10px] font-bold uppercase tracking-[1.2px] px-0.5 text-muted">
-              Today · {todayMatches.length} {todayMatches.length === 1 ? 'match' : 'matches'}
+            <div
+              style={{
+                fontFamily: 'var(--font-display)',
+                fontSize: 10,
+                letterSpacing: '0.20em',
+                textTransform: 'uppercase',
+                color: 'var(--color-muted)',
+                paddingLeft: 2,
+              }}
+            >
+              ⚽ Today · {todayMatches.length} {todayMatches.length === 1 ? 'match' : 'matches'}
             </div>
             <div className="flex flex-col gap-2">
               {todayMatches.map((m, i) => (
@@ -179,11 +285,26 @@ export default async function HomePage() {
                     {formatTime(m.kickoff_time)}
                   </div>
                   <span className="text-base shrink-0">{getFlag(m.home_team)}</span>
-                  <span className="text-[11px] font-bold text-muted">vs</span>
+                  <span
+                    style={{
+                      fontFamily: 'var(--font-display)',
+                      fontSize: 10,
+                      letterSpacing: '0.12em',
+                      color: 'var(--color-dim)',
+                    }}
+                  >
+                    VS
+                  </span>
                   <span className="text-base shrink-0">{getFlag(m.away_team)}</span>
                   <div className="flex-1" />
-                  <div className="text-[10px] font-semibold text-muted" style={{ fontFamily: 'var(--font-mono)' }}>
-                    {m.odds_home?.toFixed(2)} / {m.odds_draw?.toFixed(2)} / {m.odds_away?.toFixed(2)}
+                  <div
+                    style={{
+                      fontFamily: 'var(--font-mono)',
+                      fontSize: 10,
+                      color: 'var(--color-muted)',
+                    }}
+                  >
+                    {m.odds_home?.toFixed(2)} · {m.odds_draw?.toFixed(2)} · {m.odds_away?.toFixed(2)}
                   </div>
                 </div>
               ))}
@@ -197,9 +318,43 @@ export default async function HomePage() {
   )
 }
 
+function SoccerBallLogo() {
+  return (
+    <div
+      style={{
+        width: 32,
+        height: 32,
+        borderRadius: '50%',
+        background: 'var(--color-accent)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexShrink: 0,
+      }}
+    >
+      {/* Soccer ball icon */}
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+        <circle cx="12" cy="12" r="9" stroke="#000" strokeWidth="1.5" />
+        {/* Center pentagon patch */}
+        <polygon points="12,7 14.8,9 13.8,12.2 10.2,12.2 9.2,9" fill="#000" />
+        {/* Side lines to pentagon vertices */}
+        <line x1="12" y1="3" x2="12" y2="7" stroke="#000" strokeWidth="1.2" />
+        <line x1="14.8" y1="9" x2="18" y2="7.5" stroke="#000" strokeWidth="1.2" />
+        <line x1="13.8" y1="12.2" x2="16.5" y2="15" stroke="#000" strokeWidth="1.2" />
+        <line x1="10.2" y1="12.2" x2="7.5" y2="15" stroke="#000" strokeWidth="1.2" />
+        <line x1="9.2" y1="9" x2="6" y2="7.5" stroke="#000" strokeWidth="1.2" />
+      </svg>
+    </div>
+  )
+}
+
 const STAGE_LABELS: Record<string, string> = {
-  group: 'Group Stage', r16: 'Round of 16', qf: 'Quarter Finals',
-  sf: 'Semi Finals', '3rd': 'Third Place', final: 'Final',
+  group: 'Group Stage',
+  r16: 'Round of 16',
+  qf: 'Quarter Finals',
+  sf: 'Semi Finals',
+  '3rd': 'Third Place',
+  final: 'Final',
 }
 
 const AVATARS = ['🦁','🐯','🦊','🐺','🦅','🐻','🐼','🦝','🦄','🐉','🦋','🌟','🔥','⚡','🎯']
@@ -223,7 +378,5 @@ function formatTime(iso: string | null): string {
     return new Date(iso).toLocaleTimeString('he-IL', {
       hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Jerusalem',
     })
-  } catch {
-    return '—'
-  }
+  } catch { return '—' }
 }

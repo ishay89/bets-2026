@@ -4,7 +4,7 @@ import type { Pikanteria, PicanteriaOption } from '@/lib/types'
 
 interface Props {
   item: Pikanteria & { options: PicanteriaOption[] }
-  currentAnswer: string | null   // option_id of the player's current pick, or null
+  currentAnswer: string | null
   isLocked: boolean
   onSave: (picanteriaId: string, optionId: string) => Promise<void>
 }

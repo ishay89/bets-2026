@@ -1,28 +1,51 @@
 import { shouldWriteAuditEvent, writeAuditEvent, type AuditJson } from '@/lib/audit'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { redirect } from 'next/navigation'
 import { MatchCard } from '@/components/match-card'
 import { PicanteriaCard } from '@/components/pikanteria-card'
 import { LockTimer } from '@/components/lock-timer'
 import { BottomNav } from '@/components/bottom-nav'
-import type { Match, Pikanteria, PicanteriaOption, Pick } from '@/lib/types'
+import type { Match, MatchDay, Pikanteria, PicanteriaOption, Pick } from '@/lib/types'
+import {
+  PRE_TOURNAMENT_PATH,
+  hasCompletedPreTournamentPick,
+  shouldRequirePreTournamentPick,
+} from '@/lib/pre-tournament'
 
 const STAGE_LABELS: Record<string, string> = {
   group: 'Group Stage ×1', r16: 'Round of 16 ×1.5', qf: 'Quarter Finals ×1.5',
   sf: 'Semi Finals ×2', '3rd': 'Third Place ×1.5', final: 'Final ×3',
 }
 
+type FullMatchDay = MatchDay & {
+  matches: Match[]
+  pikanteria: (Pikanteria & { pikanteria_options: PicanteriaOption[] })[]
+}
+
 export default async function PredictPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
+  const [{ data: matchDaysRaw }, { data: preTournamentPick }] = await Promise.all([
+    supabase
+      .from('match_days')
+      .select('*, matches(*), pikanteria(*, pikanteria_options(*))')
+      .not('published_at', 'is', null)
+      .order('date', { ascending: true }),
+    supabase
+      .from('pre_tournament_picks')
+      .select('winner_team, top_scorer')
+      .eq('user_id', user!.id)
+      .maybeSingle(),
+  ])
+
+  if (shouldRequirePreTournamentPick('/predict', hasCompletedPreTournamentPick(preTournamentPick))) {
+    redirect(PRE_TOURNAMENT_PATH)
+  }
+
+  const matchDays = (matchDaysRaw ?? []) as FullMatchDay[]
   const today = new Date().toISOString().slice(0, 10)
-  const { data: matchDay } = await supabase
-    .from('match_days')
-    .select('*, matches(*), pikanteria(*, pikanteria_options(*))')
-    .eq('date', today)
-    .not('published_at', 'is', null)
-    .single()
 
   const [{ data: existingPredictions }, { data: existingAnswers }] = await Promise.all([
     supabase.from('predictions').select('match_id, pick').eq('user_id', user!.id),
@@ -35,8 +58,6 @@ export default async function PredictPage() {
   const answerMap = Object.fromEntries(
     (existingAnswers ?? []).map(a => [a.pikanteria_id, a.option_id as string])
   )
-
-  const isLocked = matchDay ? new Date() >= new Date(matchDay.lock_time) : false
 
   async function savePick(matchId: string, pick: Pick) {
     'use server'
@@ -174,8 +195,6 @@ export default async function PredictPage() {
     revalidatePath('/predict')
   }
 
-  const stageLabel = matchDay ? (STAGE_LABELS[matchDay.stage] ?? matchDay.stage) : ''
-
   return (
     <div className="app-shell bg-bg">
       {/* Header */}
@@ -215,50 +234,45 @@ export default async function PredictPage() {
                   🔒 Picks are locked for today
                 </span>
               </div>
-            )}
+              {sortedMatches.map(match => (
+                <MatchCard
+                  key={match.id}
+                  match={match}
+                  currentPick={predictionMap[match.id] ?? null}
+                  isLocked={isLocked}
+                  stageLabel={stageLabel}
+                  onSave={savePick}
+                />
+              ))}
 
-            {!isLocked && <LockTimer lockTime={matchDay.lock_time} />}
+              {/* Pikanteria */}
+              {pikaItems.length > 0 && (
+                <>
+                  <div className="flex items-center gap-2 pt-2">
+                    <span className="text-lg">🌶️</span>
+                    <span className="text-[10px] font-bold uppercase tracking-[1.2px]"
+                      style={{ color: 'var(--color-amber)' }}>
+                      Pikanteria · {pikaItems.length} side bets
+                    </span>
+                  </div>
+                  {pikaItems.map(item => (
+                    <PicanteriaCard
+                      key={item.id}
+                      item={{ ...item, options: [...(item.pikanteria_options ?? [])].sort((a, b) => a.sort_order - b.sort_order) }}
+                      currentAnswer={answerMap[item.id] ?? null}
+                      isLocked={isLocked}
+                      onSave={saveAnswer}
+                    />
+                  ))}
+                </>
+              )}
 
-            {/* Matches */}
-            <div className="text-[10px] font-bold uppercase tracking-[1.2px] pt-2"
-              style={{ color: 'var(--color-muted)' }}>
-              Matches · Multiplier {stageLabel.split('×')[1] ? `×${stageLabel.split('×')[1]}` : ''}
+              {idx < matchDays.length - 1 && (
+                <div className="border-t mt-2" style={{ borderColor: 'rgba(255,255,255,0.04)' }} />
+              )}
             </div>
-
-            {(matchDay.matches as Match[]).map(match => (
-              <MatchCard
-                key={match.id}
-                match={match}
-                currentPick={predictionMap[match.id] ?? null}
-                isLocked={isLocked}
-                stageLabel={stageLabel}
-                onSave={savePick}
-              />
-            ))}
-
-            {/* Pikanteria */}
-            {(matchDay.pikanteria as (Pikanteria & { pikanteria_options: PicanteriaOption[] })[]).length > 0 && (
-              <>
-                <div className="flex items-center gap-2 pt-4">
-                  <span className="text-lg">🌶️</span>
-                  <span className="text-[10px] font-bold uppercase tracking-[1.2px]"
-                    style={{ color: 'var(--color-amber)' }}>
-                    Pikanteria · {(matchDay.pikanteria as (Pikanteria & { pikanteria_options: PicanteriaOption[] })[]).length} side bets
-                  </span>
-                </div>
-                {(matchDay.pikanteria as (Pikanteria & { pikanteria_options: PicanteriaOption[] })[]).map(item => (
-                  <PicanteriaCard
-                    key={item.id}
-                    item={{ ...item, options: [...(item.pikanteria_options ?? [])].sort((a, b) => a.sort_order - b.sort_order) }}
-                    currentAnswer={answerMap[item.id] ?? null}
-                    isLocked={isLocked}
-                    onSave={saveAnswer}
-                  />
-                ))}
-              </>
-            )}
-          </>
-        )}
+          )
+        })}
       </main>
 
       <BottomNav />
