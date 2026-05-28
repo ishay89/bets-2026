@@ -4,7 +4,7 @@ import { MatchCard } from '@/components/match-card'
 import { PicanteriaCard } from '@/components/pikanteria-card'
 import { LockTimer } from '@/components/lock-timer'
 import { BottomNav } from '@/components/bottom-nav'
-import type { Match, Pikanteria, Pick } from '@/lib/types'
+import type { Match, Pikanteria, PicanteriaOption, Pick } from '@/lib/types'
 
 const STAGE_LABELS: Record<string, string> = {
   group: 'Group Stage ×1', r16: 'Round of 16 ×1.5', qf: 'Quarter Finals ×1.5',
@@ -18,21 +18,21 @@ export default async function PredictPage() {
   const today = new Date().toISOString().slice(0, 10)
   const { data: matchDay } = await supabase
     .from('match_days')
-    .select('*, matches(*), pikanteria(*)')
+    .select('*, matches(*), pikanteria(*, pikanteria_options(*))')
     .eq('date', today)
     .not('published_at', 'is', null)
     .single()
 
   const [{ data: existingPredictions }, { data: existingAnswers }] = await Promise.all([
     supabase.from('predictions').select('match_id, pick').eq('user_id', user!.id),
-    supabase.from('pikanteria_answers').select('pikanteria_id, answer').eq('user_id', user!.id),
+    supabase.from('pikanteria_answers').select('pikanteria_id, option_id').eq('user_id', user!.id),
   ])
 
   const predictionMap = Object.fromEntries(
     (existingPredictions ?? []).map(p => [p.match_id, p.pick as Pick])
   )
   const answerMap = Object.fromEntries(
-    (existingAnswers ?? []).map(a => [a.pikanteria_id, a.answer as boolean])
+    (existingAnswers ?? []).map(a => [a.pikanteria_id, a.option_id as string])
   )
 
   const isLocked = matchDay ? new Date() >= new Date(matchDay.lock_time) : false
@@ -48,12 +48,12 @@ export default async function PredictPage() {
     revalidatePath('/predict')
   }
 
-  async function saveAnswer(picanteriaId: string, answer: boolean) {
+  async function saveAnswer(picanteriaId: string, optionId: string) {
     'use server'
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
     await supabase.from('pikanteria_answers').upsert(
-      { user_id: user!.id, pikanteria_id: picanteriaId, answer },
+      { user_id: user!.id, pikanteria_id: picanteriaId, option_id: optionId },
       { onConflict: 'user_id,pikanteria_id' }
     )
     revalidatePath('/predict')
@@ -122,19 +122,19 @@ export default async function PredictPage() {
             ))}
 
             {/* Pikanteria */}
-            {(matchDay.pikanteria as Pikanteria[]).length > 0 && (
+            {(matchDay.pikanteria as (Pikanteria & { pikanteria_options: PicanteriaOption[] })[]).length > 0 && (
               <>
                 <div className="flex items-center gap-2 pt-4">
                   <span className="text-lg">🌶️</span>
                   <span className="text-[10px] font-bold uppercase tracking-[1.2px]"
                     style={{ color: 'var(--color-amber)' }}>
-                    Pikanteria · {(matchDay.pikanteria as Pikanteria[]).length} side bets
+                    Pikanteria · {(matchDay.pikanteria as (Pikanteria & { pikanteria_options: PicanteriaOption[] })[]).length} side bets
                   </span>
                 </div>
-                {(matchDay.pikanteria as Pikanteria[]).map(item => (
+                {(matchDay.pikanteria as (Pikanteria & { pikanteria_options: PicanteriaOption[] })[]).map(item => (
                   <PicanteriaCard
                     key={item.id}
-                    item={item}
+                    item={{ ...item, options: [...(item.pikanteria_options ?? [])].sort((a, b) => a.sort_order - b.sort_order) }}
                     currentAnswer={answerMap[item.id] ?? null}
                     isLocked={isLocked}
                     onSave={saveAnswer}

@@ -1,4 +1,5 @@
 import { createServerClient } from '@supabase/ssr'
+import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
 
 export async function createClient() {
@@ -16,6 +17,17 @@ export async function createClient() {
         },
       },
     }
+  )
+}
+
+// True service-role client — uses the service role key as the Authorization
+// token directly, bypassing RLS entirely. Use for admin operations that need
+// to read or write rows that regular users cannot see (e.g. draft match days).
+export function createAdminClient() {
+  return createSupabaseClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { autoRefreshToken: false, persistSession: false } }
   )
 }
 

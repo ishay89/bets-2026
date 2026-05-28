@@ -31,13 +31,21 @@ export interface Match {
   result: Pick | null
 }
 
+export interface PicanteriaOption {
+  id: string
+  pikanteria_id: string
+  label: string
+  odds: number
+  is_correct: boolean
+  sort_order: number
+}
+
 export interface Pikanteria {
   id: string
   match_day_id: string
   question: string
-  odds_yes: number
-  odds_no: number
-  result: boolean | null
+  created_at: string
+  options?: PicanteriaOption[]
 }
 
 export interface Prediction {
@@ -52,7 +60,7 @@ export interface PicanteriaAnswer {
   id: string
   user_id: string
   pikanteria_id: string
-  answer: boolean
+  option_id: string
   points: number | null
 }
 

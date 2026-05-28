@@ -1,11 +1,12 @@
-import { createServiceClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/server'
 import { monkeyMatchPick, monkeyPikanteriaPick } from '@/lib/monkey'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
+import { PicanteriaBuilder } from '@/components/pikanteria-builder'
 
 async function publishMatchDay(formData: FormData) {
   'use server'
-  const supabase = await createServiceClient()
+  const supabase = createAdminClient()
 
   const matchDayId = formData.get('match_day_id') as string
   const date = formData.get('date') as string
@@ -38,28 +39,45 @@ async function publishMatchDay(formData: FormData) {
     lock_time: lockTime,
   }).eq('id', matchDayId)
 
-  // Insert pikanteria questions (if provided)
-  const pikanteria: { question: string; odds_yes: number; odds_no: number }[] = []
+  // Insert pikanteria questions with N options each
+  const insertedPika: { id: string; optionIds: string[] }[] = []
+
   for (let i = 1; i <= 3; i++) {
     const q = (formData.get(`pik_q_${i}`) as string | null)?.trim()
     if (!q) continue
-    pikanteria.push({
-      question: q,
-      odds_yes: parseFloat(formData.get(`pik_yes_${i}`) as string),
-      odds_no: parseFloat(formData.get(`pik_no_${i}`) as string),
-    })
-  }
 
-  const insertedPika: { id: string }[] = []
-  if (pikanteria.length > 0) {
-    const { data } = await supabase
+    const count = parseInt(formData.get(`pik_opt_count_${i}`) as string || '0')
+    if (count < 2) continue
+
+    const { data: pika } = await supabase
       .from('pikanteria')
-      .insert(pikanteria.map(p => ({ ...p, match_day_id: matchDayId })))
-      .select()
-    if (data) insertedPika.push(...data)
+      .insert({ question: q, match_day_id: matchDayId })
+      .select('id')
+      .single()
+    if (!pika) continue
+
+    const optionRows = []
+    for (let j = 1; j <= count; j++) {
+      const label = (formData.get(`pik_opt_label_${i}_${j}`) as string | null)?.trim()
+      const odds = parseFloat(formData.get(`pik_opt_odds_${i}_${j}`) as string)
+      if (!label || isNaN(odds)) continue
+      optionRows.push({ pikanteria_id: pika.id, label, odds, sort_order: j - 1 })
+    }
+
+    if (optionRows.length < 2) continue
+
+    const { data: insertedOptions } = await supabase
+      .from('pikanteria_options')
+      .insert(optionRows)
+      .select('id')
+
+    // Skip monkey pick if options failed to insert (guard against empty optionIds)
+    if (!insertedOptions?.length) continue
+
+    insertedPika.push({ id: pika.id, optionIds: insertedOptions.map(o => o.id) })
   }
 
-  // Monkey picks for matches + pikanteria
+  // Monkey picks
   const { data: monkey } = await supabase.from('users').select('id').eq('is_monkey', true).single()
   if (monkey) {
     const { data: allMatches } = await supabase
@@ -74,7 +92,9 @@ async function publishMatchDay(formData: FormData) {
     if (insertedPika.length) {
       await supabase.from('pikanteria_answers').insert(
         insertedPika.map(p => ({
-          user_id: monkey.id, pikanteria_id: p.id, answer: monkeyPikanteriaPick(p.id, date),
+          user_id: monkey.id,
+          pikanteria_id: p.id,
+          option_id: monkeyPikanteriaPick(p.id, date, p.optionIds),
         }))
       )
     }
@@ -110,7 +130,7 @@ export default async function PublishPage({
   let matches: DraftMatch[] = []
 
   if (date) {
-    const supabase = await createServiceClient()
+    const supabase = createAdminClient()
     const { data: matchDay } = await supabase
       .from('match_days')
       .select('id, stage, date')
@@ -155,14 +175,12 @@ export default async function PublishPage({
         </div>
       </form>
 
-      {/* No date selected yet */}
       {!date && (
         <div className="text-center py-8 text-muted text-sm">
           Pick a date and click Load to see the scheduled matches
         </div>
       )}
 
-      {/* Date selected but no draft found */}
       {date && !draft && (
         <div className="rounded-xl p-4"
           style={{ background: 'rgba(245,166,35,0.08)', border: '1px solid rgba(245,166,35,0.25)' }}>
@@ -175,7 +193,6 @@ export default async function PublishPage({
         </div>
       )}
 
-      {/* Draft loaded — show publish form */}
       {draft && (
         <form action={publishMatchDay} className="space-y-6">
           <input type="hidden" name="match_day_id" value={draft.id} />
@@ -238,20 +255,7 @@ export default async function PublishPage({
                 <input type="text" name={`pik_q_${i}`} placeholder="e.g. Will Mbappé score?"
                   style={inputBase} className={cls} />
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <label className="text-muted text-xs">Yes Odds</label>
-                  <input type="number" step="0.01" name={`pik_yes_${i}`} placeholder="1.80"
-                    style={{ ...inputBase, color: 'var(--color-amber)', fontFamily: 'var(--font-mono)' }}
-                    className={cls} />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-muted text-xs">No Odds</label>
-                  <input type="number" step="0.01" name={`pik_no_${i}`} placeholder="2.10"
-                    style={{ ...inputBase, color: 'var(--color-amber)', fontFamily: 'var(--font-mono)' }}
-                    className={cls} />
-                </div>
-              </div>
+              <PicanteriaBuilder questionIndex={i} />
             </div>
           ))}
 

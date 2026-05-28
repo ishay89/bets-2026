@@ -1,11 +1,12 @@
 import { createClient } from '@/lib/supabase/server'
 import { BottomNav } from '@/components/bottom-nav'
-import type { Match, Pikanteria, Pick } from '@/lib/types'
+import type { Pick } from '@/lib/types'
 
 type PredRow = { pick: Pick; points: number | null; user_id: string }
-type MatchWithPreds = Match & { predictions: PredRow[] }
-type PikaAnswerRow = { answer: boolean; points: number | null; user_id: string }
-type PikaWithAnswers = Pikanteria & { pikanteria_answers: PikaAnswerRow[] }
+type MatchWithPreds = { id: string; home_team: string; away_team: string; result: Pick | null; predictions: PredRow[] }
+type PikaOptionRow = { id: string; label: string; is_correct: boolean }
+type PikaAnswerRow = { option_id: string; points: number | null; user_id: string }
+type PikaWithAnswers = { id: string; question: string; pikanteria_options: PikaOptionRow[]; pikanteria_answers: PikaAnswerRow[] }
 type DayRow = { id: string; date: string; stage: string; matches: MatchWithPreds[]; pikanteria: PikaWithAnswers[] }
 
 const STAGE_LABELS: Record<string, string> = {
@@ -24,14 +25,14 @@ export default async function HistoryPage() {
       matches(id, home_team, away_team, result,
         predictions(pick, points, user_id)
       ),
-      pikanteria(id, question, result,
-        pikanteria_answers(answer, points, user_id)
+      pikanteria(id, question,
+        pikanteria_options(id, label, is_correct),
+        pikanteria_answers(option_id, points, user_id)
       )
     `)
     .not('published_at', 'is', null)
     .order('date', { ascending: false })
 
-  // Collect last-15 picks for streak grid
   const allPicks: ('W' | 'L' | null)[] = []
   for (const day of ((matchDays ?? []) as DayRow[]).slice(0, 10)) {
     for (const m of day.matches) {
@@ -56,7 +57,6 @@ export default async function HistoryPage() {
       </div>
 
       <main className="px-4 pb-28 space-y-4">
-        {/* Streak grid */}
         {streak.length > 0 && (
           <div className="rounded-[14px] p-4" style={{ background: 'var(--color-panel)', border: '1px solid rgba(255,255,255,0.06)' }}>
             <div className="flex items-center justify-between mb-3">
@@ -82,7 +82,6 @@ export default async function HistoryPage() {
           </div>
         )}
 
-        {/* Day cards */}
         <div className="text-[10px] font-bold uppercase tracking-[1.2px] px-0.5 text-muted">By day</div>
         {(matchDays ?? []).length === 0 && (
           <div className="text-center py-10">
@@ -96,10 +95,14 @@ export default async function HistoryPage() {
             ...m,
             myPick: m.predictions.find(p => p.user_id === user!.id),
           }))
-          const myPikaAnswers = day.pikanteria.map(p => ({
-            ...p,
-            myAnswer: p.pikanteria_answers.find(a => a.user_id === user!.id),
-          }))
+          const myPikaAnswers = day.pikanteria.map(p => {
+            const myAnswer = p.pikanteria_answers.find(a => a.user_id === user!.id)
+            const myOption = myAnswer
+              ? p.pikanteria_options.find(o => o.id === myAnswer.option_id) ?? null
+              : null
+            const correctOption = p.pikanteria_options.find(o => o.is_correct) ?? null
+            return { ...p, myAnswer, myOption, correctOption }
+          })
           const dayPoints = [
             ...myMatchPreds.map(m => m.myPick?.points ?? 0),
             ...myPikaAnswers.map(p => p.myAnswer?.points ?? 0),
@@ -152,12 +155,14 @@ export default async function HistoryPage() {
                 {myPikaAnswers.filter((p): p is typeof p & { myAnswer: PikaAnswerRow } => p.myAnswer !== undefined).map((p) => (
                   <div key={p.id} className="flex items-center gap-2 py-1.5"
                     style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}>
-                    <span className="text-[11px] flex-1" style={{ color: 'var(--color-amber)' }}>🌶️ {p.question}</span>
-                    <span className="text-[11px] text-text">{p.myAnswer.answer ? 'Yes' : 'No'}</span>
-                    {p.result !== null && (
+                    <span className="text-[11px] flex-1" style={{ color: 'var(--color-amber)' }}>
+                      🌶️ {p.question}
+                    </span>
+                    <span className="text-[11px] text-text">{p.myOption?.label ?? '?'}</span>
+                    {p.correctOption && (
                       <span className="text-[10px] font-extrabold w-4 text-center"
-                        style={{ color: p.myAnswer.answer === p.result ? 'var(--color-accent)' : 'var(--color-danger)' }}>
-                        {p.myAnswer.answer === p.result ? '✓' : '✗'}
+                        style={{ color: p.myAnswer.option_id === p.correctOption.id ? 'var(--color-accent)' : 'var(--color-danger)' }}>
+                        {p.myAnswer.option_id === p.correctOption.id ? '✓' : '✗'}
                       </span>
                     )}
                   </div>
