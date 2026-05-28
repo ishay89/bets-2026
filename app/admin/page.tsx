@@ -2,6 +2,7 @@ import Link from 'next/link'
 
 const sections = [
   { href: '/admin/publish', icon: '📋', label: 'Publish Match Day', desc: "Add today's matches and pikanteria" },
+  { href: '/admin/edit', icon: '✏️', label: 'Edit Published Day', desc: 'Update odds for an already-published day' },
   { href: '/admin/results', icon: '✅', label: 'Enter Results', desc: 'Record outcomes and trigger scoring' },
   { href: '/admin/tournament', icon: '🏆', label: 'Tournament End', desc: 'Set winner and top scorer' },
   { href: '/admin/players', icon: '👥', label: 'Manage Players', desc: 'View players and admin roles' },
