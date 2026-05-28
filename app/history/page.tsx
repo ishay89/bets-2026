@@ -149,7 +149,7 @@ export default async function HistoryPage() {
                     </div>
                   </div>
                 ))}
-                {myPikaAnswers.filter(p => p.myAnswer).map((p) => (
+                {myPikaAnswers.filter((p): p is typeof p & { myAnswer: PikaAnswerRow } => p.myAnswer !== undefined).map((p) => (
                   <div key={p.id} className="flex items-center gap-2 py-1.5"
                     style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}>
                     <span className="text-[11px] flex-1" style={{ color: 'var(--color-amber)' }}>🌶️ {p.question}</span>
