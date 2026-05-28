@@ -6,6 +6,7 @@ const sections = [
   { href: '/admin/tournament', icon: '🏆', label: 'Tournament End', desc: 'Set winner and top scorer' },
   { href: '/admin/players', icon: '👥', label: 'Manage Players', desc: 'View players and admin roles' },
   { href: '/admin/scores', icon: '📊', label: 'Score Snapshots', desc: 'Per-day breakdown and validation audit' },
+  { href: '/admin/audit', icon: '🧾', label: 'User Audit', desc: 'Track user prediction commits and changes' },
 ]
 
 export default function AdminHome() {
