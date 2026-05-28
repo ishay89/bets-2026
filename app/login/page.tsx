@@ -25,7 +25,7 @@ export default function LoginPage() {
         Sign in with Google
       </button>
       <p className="text-muted text-xs mt-4 text-center">
-        First time? You'll be added automatically.
+        First time? You&apos;ll be added automatically.
       </p>
     </div>
   )

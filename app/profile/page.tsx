@@ -22,27 +22,12 @@ export default async function ProfilePage() {
   const preScorer = pick?.top_scorer_points ?? 0
   const total = matchPoints + pikaPoints + preWinner + preScorer
 
-  const { data: lbEntry } = await supabase
-    .from('leaderboard')
-    .select('*')
-    .eq('id', user!.id)
-    .single()
-
   const { data: allEntries } = await supabase.from('leaderboard').select('id')
   const rank = (allEntries ?? []).findIndex(e => e.id === user!.id) + 1
 
   const name = profile?.display_name ?? 'You'
   const av = AVATARS[name.charCodeAt(0) % AVATARS.length]
 
-  const breakdown = [
-    { label: 'Group stage (×1)', value: 0, color: 'var(--color-text)' },
-    { label: 'Round of 16 (×1.5)', value: 0, color: 'var(--color-text)' },
-    { label: 'QF / SF / Finals', value: matchPoints, color: 'var(--color-accent)' },
-    { label: '🌶️ Pikanteria (×1)', value: pikaPoints, color: 'var(--color-amber)' },
-    { label: '🏆 Pre-tournament bonus', value: preWinner + preScorer, color: 'var(--color-gold)' },
-  ].filter(r => r.value > 0 || r.label.includes('stage'))
-
-  // Simplified: show total match points vs pika vs bonus
   const rows = [
     { label: 'Match predictions', value: matchPoints, color: 'var(--color-text)' },
     { label: '🌶️ Pikanteria', value: pikaPoints, color: 'var(--color-amber)' },

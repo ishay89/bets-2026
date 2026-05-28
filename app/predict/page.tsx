@@ -69,7 +69,7 @@ export default async function PredictPage() {
           <div className="text-[10px] font-bold uppercase tracking-wide" style={{ color: 'var(--color-accent)' }}>
             {stageLabel}
           </div>
-          <div className="text-[22px] font-extrabold text-text tracking-tight leading-tight">Today's picks</div>
+          <div className="text-[22px] font-extrabold text-text tracking-tight leading-tight">Today&apos;s picks</div>
         </div>
         {matchDay && !isLocked && (
           <div className="flex flex-col items-end rounded-[10px] px-2.5 py-1.5"
@@ -87,7 +87,7 @@ export default async function PredictPage() {
           <div className="text-center py-16">
             <div className="text-4xl mb-3">📋</div>
             <div className="text-text font-semibold">No matches today</div>
-            <div className="text-muted text-sm mt-1">The admin hasn't published today's form yet</div>
+            <div className="text-muted text-sm mt-1">The admin hasn&apos;t published today&apos;s form yet</div>
           </div>
         )}
 
