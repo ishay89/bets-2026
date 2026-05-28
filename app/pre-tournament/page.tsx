@@ -1,4 +1,5 @@
-import { createClient } from '@/lib/supabase/server'
+import { shouldWriteAuditEvent, writeAuditEvent, type AuditJson } from '@/lib/audit'
+import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { BottomNav } from '@/components/bottom-nav'
 
@@ -35,6 +36,7 @@ async function savePreTournamentPick(formData: FormData) {
   'use server'
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('Unauthorized')
 
   const winnerName = formData.get('winner') as string
   const scorerName = formData.get('scorer') as string
@@ -42,13 +44,63 @@ async function savePreTournamentPick(formData: FormData) {
   const scorer = SCORERS.find(s => s.name === scorerName)
   if (!winner || !scorer) return
 
-  await supabase.from('pre_tournament_picks').upsert({
-    user_id: user!.id,
+  const service = await createServiceClient()
+  const [{ data: existing }, { data: firstDay }] = await Promise.all([
+    service
+      .from('pre_tournament_picks')
+      .select('id, winner_team, winner_odds, top_scorer, top_scorer_odds')
+      .eq('user_id', user.id)
+      .maybeSingle(),
+    service
+      .from('match_days')
+      .select('lock_time')
+      .not('published_at', 'is', null)
+      .order('date', { ascending: true })
+      .limit(1)
+      .maybeSingle(),
+  ])
+
+  if (firstDay && new Date() >= new Date(firstDay.lock_time)) {
+    throw new Error('Pre-tournament picks are locked')
+  }
+
+  const oldValue: AuditJson | null = existing ? {
+    winner_team: existing.winner_team,
+    winner_odds: existing.winner_odds,
+    top_scorer: existing.top_scorer,
+    top_scorer_odds: existing.top_scorer_odds,
+  } : null
+  const newValue: AuditJson = {
     winner_team: winner.name,
     winner_odds: winner.odds,
     top_scorer: scorer.name,
     top_scorer_odds: scorer.odds,
-  }, { onConflict: 'user_id' })
+  }
+  const shouldAudit = shouldWriteAuditEvent(oldValue, newValue)
+
+  const { data: savedPick, error } = await service.from('pre_tournament_picks').upsert({
+    user_id: user.id,
+    winner_team: winner.name,
+    winner_odds: winner.odds,
+    top_scorer: scorer.name,
+    top_scorer_odds: scorer.odds,
+  }, { onConflict: 'user_id' }).select('id').single()
+  if (error) throw error
+
+  if (shouldAudit) {
+    await writeAuditEvent(service, {
+      user_id: user.id,
+      event_type: 'pre_tournament_pick',
+      action: existing ? 'update' : 'create',
+      entity_id: savedPick.id,
+      entity_ref: 'pre_tournament',
+      old_value: oldValue,
+      new_value: newValue,
+      metadata: {
+        label: 'Pre-tournament',
+      },
+    })
+  }
 
   revalidatePath('/pre-tournament')
 }
@@ -73,17 +125,17 @@ export default async function PreTournamentPage() {
   const cls = 'rounded-lg px-3 py-2 text-sm w-full'
 
   return (
-    <div className="min-h-screen bg-bg">
-      <div className="px-4 pt-4 pb-3">
+    <div className="app-shell bg-bg">
+      <div className="stadium-header px-4 pt-4 pb-4">
         <div className="text-[10px] font-bold uppercase tracking-wide" style={{ color: 'var(--color-accent)' }}>
           One-time picks
         </div>
-        <div className="text-[22px] font-extrabold text-text tracking-tight">Pre-tournament</div>
+        <div className="brand-wordmark text-[24px]">Pre-tournament futures</div>
       </div>
 
       <main className="px-4 pb-28 space-y-6">
         {isLocked && (
-          <div className="rounded-xl px-4 py-3"
+          <div className="rounded-lg px-4 py-3"
             style={{ background: 'rgba(239,79,91,0.08)', border: '1px solid rgba(239,79,91,0.25)' }}>
             <span className="text-[12px] font-bold" style={{ color: 'var(--color-danger)' }}>
               🔒 Pre-tournament picks are locked
@@ -98,13 +150,7 @@ export default async function PreTournamentPage() {
             <div>
               <div className="text-[10px] font-bold uppercase tracking-[1.2px] mb-2 px-0.5"
                 style={{ color: 'var(--color-muted)' }}>Your champion · 1.5× bonus</div>
-              <div className="rounded-2xl p-[18px] relative overflow-hidden"
-                style={{
-                  background: 'linear-gradient(135deg, #261d09, #1a1408 60%, #14110b)',
-                  border: '1px solid rgba(245,196,65,0.3)',
-                }}>
-                <div className="absolute -top-10 -right-10 w-40 h-40 rounded-full pointer-events-none"
-                  style={{ background: 'radial-gradient(circle, rgba(245,196,65,0.2), transparent 70%)' }} />
+              <div className="superstar-panel p-[18px]">
                 <div className="relative flex items-center gap-4">
                   <div className="w-14 h-14 rounded-full flex items-center justify-center text-3xl"
                     style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}>
@@ -131,11 +177,9 @@ export default async function PreTournamentPage() {
             <div>
               <div className="text-[10px] font-bold uppercase tracking-[1.2px] mb-2 px-0.5"
                 style={{ color: 'var(--color-muted)' }}>Top scorer · fixed bonus</div>
-              <div className="rounded-[14px] p-4"
-                style={{ background: 'var(--color-panel)', border: '1px solid rgba(255,255,255,0.06)' }}>
+              <div className="bet-card p-4">
                 <div className="flex items-center gap-4">
-                  <div className="w-16 h-16 rounded-2xl flex items-center justify-center text-3xl"
-                    style={{ background: 'var(--color-elev)', border: '1px solid rgba(255,255,255,0.06)' }}>⚽</div>
+                  <div className="ball-mark w-16 h-16 rounded-lg shrink-0" aria-hidden="true" />
                   <div className="flex-1">
                     <div className="text-[18px] font-extrabold tracking-tight text-text">{pick.top_scorer}</div>
                     <div className="text-[11px] text-sub mt-1">
@@ -160,8 +204,7 @@ export default async function PreTournamentPage() {
         <div>
           <div className="text-[10px] font-bold uppercase tracking-[1.2px] mb-2 px-0.5"
             style={{ color: 'var(--color-muted)' }}>The pot</div>
-          <div className="rounded-[14px] p-4"
-            style={{ background: 'var(--color-panel)', border: '1px solid rgba(255,255,255,0.06)' }}>
+          <div className="ticket-card p-4">
             <div className="flex items-baseline justify-between">
               <div>
                 <div className="text-[11px] font-semibold text-muted">Entry fee</div>
@@ -189,8 +232,7 @@ export default async function PreTournamentPage() {
               {pick ? 'Update your picks' : 'Make your picks'}
             </div>
 
-            <div className="rounded-xl p-4 space-y-2"
-              style={{ background: 'var(--color-panel)', border: '1px solid rgba(255,255,255,0.06)' }}>
+            <div className="bet-card p-4 space-y-2">
               <label className="text-sm font-semibold text-text block">🏆 Tournament Winner</label>
               <select name="winner" defaultValue={pick?.winner_team ?? ''} required style={inputStyle} className={cls}>
                 <option value="">Select a team...</option>
@@ -203,8 +245,7 @@ export default async function PreTournamentPage() {
               <p className="text-muted text-xs">Win: odds ×1.5 · Runner-up: odds ×0.75</p>
             </div>
 
-            <div className="rounded-xl p-4 space-y-2"
-              style={{ background: 'var(--color-panel)', border: '1px solid rgba(255,255,255,0.06)' }}>
+            <div className="bet-card p-4 space-y-2">
               <label className="text-sm font-semibold text-text block">⚽ Top Scorer</label>
               <select name="scorer" defaultValue={pick?.top_scorer ?? ''} required style={inputStyle} className={cls}>
                 <option value="">Select a player...</option>
@@ -215,7 +256,7 @@ export default async function PreTournamentPage() {
             </div>
 
             <button type="submit"
-              className="w-full py-3 rounded-xl font-black text-sm"
+              className="w-full py-3 rounded-lg font-black text-sm"
               style={{ background: 'var(--color-accent)', color: '#000' }}>
               {pick ? 'Update Picks ✓' : 'Save Picks ✓'}
             </button>

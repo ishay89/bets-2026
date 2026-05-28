@@ -1,4 +1,5 @@
-import { createClient } from '@/lib/supabase/server'
+import { shouldWriteAuditEvent, writeAuditEvent, type AuditJson } from '@/lib/audit'
+import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { MatchCard } from '@/components/match-card'
 import { PicanteriaCard } from '@/components/pikanteria-card'
@@ -45,10 +46,61 @@ export default async function PredictPage() {
     'use server'
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
-    await supabase.from('predictions').upsert(
+    if (!user) throw new Error('Unauthorized')
+
+    const service = await createServiceClient()
+    const [{ data: match }, { data: existing }] = await Promise.all([
+      service
+        .from('matches')
+        .select('id, match_day_id, home_team, away_team, kickoff_time, odds_home, odds_draw, odds_away, match_days(id, date, lock_time, stage)')
+        .eq('id', matchId)
+        .single(),
+      service
+        .from('predictions')
+        .select('id, pick')
+        .eq('user_id', user.id)
+        .eq('match_id', matchId)
+        .maybeSingle(),
+    ])
+
+    const matchDay = Array.isArray(match?.match_days) ? match.match_days[0] : match?.match_days
+    if (!match || !matchDay) throw new Error('Match not found')
+    if (new Date() >= new Date(matchDay.lock_time)) throw new Error('Picks are locked')
+
+    const oldValue: AuditJson | null = existing ? { pick: existing.pick } : null
+    const newValue: AuditJson = { pick }
+    const shouldAudit = shouldWriteAuditEvent(oldValue, newValue)
+
+    const { data: savedPrediction, error } = await service.from('predictions').upsert(
       { user_id: user!.id, match_id: matchId, pick },
       { onConflict: 'user_id,match_id' }
-    )
+    ).select('id').single()
+    if (error) throw error
+
+    if (shouldAudit) {
+      await writeAuditEvent(service, {
+        user_id: user.id,
+        event_type: 'match_prediction',
+        action: existing ? 'update' : 'create',
+        entity_id: savedPrediction.id,
+        entity_ref: matchId,
+        old_value: oldValue,
+        new_value: newValue,
+        metadata: {
+          match_id: match.id,
+          match_day_id: match.match_day_id,
+          date: matchDay.date,
+          stage: matchDay.stage,
+          home_team: match.home_team,
+          away_team: match.away_team,
+          kickoff_time: match.kickoff_time,
+          odds_home: match.odds_home,
+          odds_draw: match.odds_draw,
+          odds_away: match.odds_away,
+        },
+      })
+    }
+
     revalidatePath('/predict')
   }
 
@@ -56,10 +108,73 @@ export default async function PredictPage() {
     'use server'
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
-    await supabase.from('pikanteria_answers').upsert(
+    if (!user) throw new Error('Unauthorized')
+
+    const service = await createServiceClient()
+    const [{ data: item }, { data: selectedOption }, { data: existing }] = await Promise.all([
+      service
+        .from('pikanteria')
+        .select('id, question, match_day_id, match_days(id, date, lock_time, stage)')
+        .eq('id', picanteriaId)
+        .single(),
+      service
+        .from('pikanteria_options')
+        .select('id, label, odds')
+        .eq('id', optionId)
+        .eq('pikanteria_id', picanteriaId)
+        .single(),
+      service
+        .from('pikanteria_answers')
+        .select('id, option_id, pikanteria_options(id, label, odds)')
+        .eq('user_id', user.id)
+        .eq('pikanteria_id', picanteriaId)
+        .maybeSingle(),
+    ])
+
+    const matchDay = Array.isArray(item?.match_days) ? item.match_days[0] : item?.match_days
+    if (!item || !matchDay || !selectedOption) throw new Error('Pikanteria option not found')
+    if (new Date() >= new Date(matchDay.lock_time)) throw new Error('Pikanteria answers are locked')
+
+    const previousOption = Array.isArray(existing?.pikanteria_options)
+      ? existing?.pikanteria_options[0]
+      : existing?.pikanteria_options
+    const oldValue: AuditJson | null = existing ? {
+      option_id: existing.option_id,
+      label: previousOption?.label ?? null,
+      odds: previousOption?.odds ?? null,
+    } : null
+    const newValue: AuditJson = {
+      option_id: selectedOption.id,
+      label: selectedOption.label,
+      odds: selectedOption.odds,
+    }
+    const shouldAudit = shouldWriteAuditEvent(oldValue, newValue)
+
+    const { data: savedAnswer, error } = await service.from('pikanteria_answers').upsert(
       { user_id: user!.id, pikanteria_id: picanteriaId, option_id: optionId },
       { onConflict: 'user_id,pikanteria_id' }
-    )
+    ).select('id').single()
+    if (error) throw error
+
+    if (shouldAudit) {
+      await writeAuditEvent(service, {
+        user_id: user.id,
+        event_type: 'pikanteria_answer',
+        action: existing ? 'update' : 'create',
+        entity_id: savedAnswer.id,
+        entity_ref: picanteriaId,
+        old_value: oldValue,
+        new_value: newValue,
+        metadata: {
+          pikanteria_id: item.id,
+          question: item.question,
+          match_day_id: item.match_day_id,
+          date: matchDay.date,
+          stage: matchDay.stage,
+        },
+      })
+    }
+
     revalidatePath('/predict')
   }
 
