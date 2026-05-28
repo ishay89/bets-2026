@@ -53,31 +53,23 @@ export default async function HomePage() {
   const rankColors: Record<number, string> = { 1: '#f5c441', 2: '#aab4cd', 3: '#d18a4d' }
 
   return (
-    <div className="min-h-screen bg-bg">
+    <div className="app-shell bg-bg">
       {/* Header */}
-      <header className="flex items-center justify-between px-4 pt-4 pb-3">
+      <header className="stadium-header flex items-center justify-between px-4 pt-4 pb-4">
         <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-lg flex items-center justify-center font-black text-sm text-black"
-            style={{ background: 'var(--color-accent)' }}>M</div>
+          <div className="ball-mark w-9 h-9 rounded-lg shrink-0" aria-hidden="true" />
           <div>
-            <div className="font-extrabold text-sm text-text tracking-tight">Mondial Bets</div>
-            <div className="text-[10px] font-bold uppercase tracking-wider text-muted">USA · CAN · MEX 2026</div>
+            <div className="brand-wordmark text-[15px] leading-none">Mondial Bets</div>
+            <div className="text-[10px] font-bold uppercase text-sub">Friends pool · World Cup 2026</div>
           </div>
         </div>
-        <div className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-black"
-          style={{ background: 'var(--color-elev)', border: '1px solid rgba(255,255,255,0.06)' }}>⚡</div>
+        <div className="odds-chip px-2.5 py-1 text-[11px]">LIVE SLIP</div>
       </header>
 
       <main className="px-4 pb-28 space-y-4">
         {/* Countdown hero */}
         {todayDay ? (
-          <div className="rounded-[18px] p-[18px] relative overflow-hidden"
-            style={{
-              background: 'linear-gradient(135deg, #0d1d16 0%, #0a1320 60%, #0d1d16 100%)',
-              border: '1px solid rgba(0,217,126,0.32)',
-            }}>
-            <div className="absolute -top-8 -right-8 w-36 h-36 rounded-full pointer-events-none"
-              style={{ background: 'radial-gradient(circle, rgba(0,217,126,0.25), transparent 70%)' }} />
+          <div className="superstar-panel p-[18px] min-h-[238px] flex items-end">
             <div className="relative z-10">
               <div className="flex items-center justify-between mb-2.5">
                 <span className="text-[10px] font-bold uppercase tracking-[0.6px] px-2 py-1 rounded-full"
@@ -88,19 +80,19 @@ export default async function HomePage() {
                   }}>
                   {picksOpen ? '⏰ Picks open' : '🔒 Picks locked'}
                 </span>
-                <div className="text-[11px] font-semibold text-sub" style={{ fontFamily: 'var(--font-mono)' }}>
+                <div className="text-[11px] font-semibold text-sub ml-3" style={{ fontFamily: 'var(--font-mono)' }}>
                   {STAGE_LABELS[todayDay.stage] ?? todayDay.stage}
                 </div>
               </div>
 
               {picksOpen ? (
                 <>
-                  <div className="text-[11px] font-semibold text-sub mb-1.5">Lock in</div>
+                  <div className="text-[11px] font-semibold text-sub mb-1.5">Group chat deadline</div>
                   <div className="flex items-baseline gap-1">
                     {[String(hours).padStart(2, '0'), String(mins).padStart(2, '0')].map((n, i) => (
                       <span key={i} className="flex items-baseline gap-0.5">
                         <span className="font-semibold leading-none"
-                          style={{ fontFamily: 'var(--font-mono)', fontSize: 34, color: 'var(--color-accent)', letterSpacing: -1.5 }}>
+                          style={{ fontFamily: 'var(--font-mono)', fontSize: 34, color: 'var(--color-accent)', letterSpacing: 0 }}>
                           {n}
                         </span>
                         <span className="text-[10px] font-bold tracking-wide mr-1 text-muted">
@@ -116,20 +108,19 @@ export default async function HomePage() {
 
               <div className="mt-3 flex gap-2">
                 <Link href="/predict"
-                  className="flex-1 text-center font-extrabold text-[13px] rounded-[10px] py-2.5 text-black tracking-tight"
+                  className="flex-1 text-center font-extrabold text-[13px] rounded-lg py-2.5 text-black"
                   style={{ background: 'var(--color-accent)' }}>
-                  {picksOpen ? 'Make picks →' : 'View picks →'}
+                  {picksOpen ? 'Build my slip' : 'View my slip'}
                 </Link>
-                <div className="font-bold text-[13px] rounded-[10px] px-3.5 py-2.5 text-text"
-                  style={{ background: 'var(--color-elev)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                <div className="font-bold text-[13px] rounded-lg px-3.5 py-2.5 text-text"
+                  style={{ background: 'rgba(6,16,10,0.82)', border: '1px solid rgba(246,248,232,0.12)' }}>
                   {todayMatches.length} matches
                 </div>
               </div>
             </div>
           </div>
         ) : (
-          <div className="rounded-[18px] p-4 text-center"
-            style={{ background: 'var(--color-panel)', border: '1px solid rgba(255,255,255,0.06)' }}>
+          <div className="bet-card p-4 text-center">
             <div className="font-bold text-text text-sm">No matches scheduled today</div>
           </div>
         )}
@@ -141,8 +132,7 @@ export default async function HomePage() {
           </span>
           <Link href="/leaderboard" className="text-[11px] font-semibold text-sub">See all →</Link>
         </div>
-        <div className="rounded-[14px] overflow-hidden"
-          style={{ background: 'var(--color-panel)', border: '1px solid rgba(255,255,255,0.06)' }}>
+        <div className="bet-card overflow-hidden">
           {miniEntries.map((entry, i, arr) => {
             const isMe = entry.id === user?.id
             const av = getAvatar(entry.display_name, entry.is_monkey)
@@ -150,8 +140,8 @@ export default async function HomePage() {
               <div key={entry.id} className="flex items-center gap-3"
                 style={{
                   padding: '12px 14px',
-                  background: isMe ? 'rgba(0,217,126,0.07)' : 'transparent',
-                  borderBottom: i < arr.length - 1 ? '1px solid rgba(255,255,255,0.06)' : 'none',
+                  background: isMe ? 'rgba(200,240,92,0.08)' : 'transparent',
+                  borderBottom: i < arr.length - 1 ? '1px solid rgba(246,248,232,0.08)' : 'none',
                   borderLeft: isMe ? '2px solid var(--color-accent)' : '2px solid transparent',
                 }}>
                 <div className="font-bold text-[14px] w-[22px]"
@@ -159,7 +149,7 @@ export default async function HomePage() {
                   {entry._rank}
                 </div>
                 <div className="w-7 h-7 rounded-full flex items-center justify-center text-sm shrink-0"
-                  style={{ background: 'var(--color-elev)', fontSize: 14 }}>
+                  style={{ background: 'var(--color-elev)', border: '1px solid rgba(246,248,232,0.08)', fontSize: 14 }}>
                   {av}
                 </div>
                 <div className="flex-1 font-bold text-[13.5px]"
@@ -183,8 +173,7 @@ export default async function HomePage() {
             </div>
             <div className="flex flex-col gap-2">
               {todayMatches.map((m, i) => (
-                <div key={i} className="flex items-center gap-2.5 rounded-xl px-3 py-2.5"
-                  style={{ background: 'var(--color-panel)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                <div key={i} className="bet-card flex items-center gap-2.5 px-3 py-2.5">
                   <div className="text-[11px] font-semibold w-[38px] shrink-0 text-sub"
                     style={{ fontFamily: 'var(--font-mono)' }}>
                     {formatTime(m.kickoff_time)}

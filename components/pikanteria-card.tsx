@@ -20,8 +20,7 @@ export function PicanteriaCard({ item, currentAnswer, isLocked, onSave }: Props)
   }
 
   return (
-    <div className="rounded-xl p-4"
-      style={{ background: 'var(--color-panel)', border: '1px solid rgba(255,255,255,0.06)' }}>
+    <div className="bet-card p-4">
       <p className="text-[13px] font-semibold text-text mb-3">{item.question}</p>
       <div className="flex gap-1.5 flex-wrap">
         {item.options.map(opt => {
@@ -35,7 +34,7 @@ export function PicanteriaCard({ item, currentAnswer, isLocked, onSave }: Props)
               style={{
                 background: sel ? 'var(--color-amber)' : 'var(--color-elev)',
                 color: sel ? '#000' : 'var(--color-text)',
-                border: sel ? 'none' : '1px solid rgba(255,255,255,0.06)',
+                border: sel ? 'none' : '1px solid rgba(246,248,232,0.09)',
                 opacity: isLocked ? 0.5 : 1,
                 cursor: isLocked ? 'not-allowed' : 'pointer',
               }}

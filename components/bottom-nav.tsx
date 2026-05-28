@@ -36,10 +36,11 @@ export function BottomNav() {
     <nav
       className="fixed bottom-0 left-0 right-0 flex border-t border-white/[0.06] z-10"
       style={{
-        background: 'rgba(7,9,15,0.85)',
+        background: 'rgba(6,16,10,0.88)',
         backdropFilter: 'blur(20px)',
         WebkitBackdropFilter: 'blur(20px)',
         paddingBottom: 'env(safe-area-inset-bottom, 8px)',
+        boxShadow: '0 -14px 30px rgba(0,0,0,0.32)',
       }}
     >
       {tabs.map(({ href, label, path }) => {

@@ -13,15 +13,15 @@ export default async function LeaderboardPage() {
     .returns<LeaderboardEntry[]>()
 
   return (
-    <div className="min-h-screen bg-bg">
-      <div className="px-4 pt-4 pb-3 flex items-center justify-between">
+    <div className="app-shell bg-bg">
+      <div className="stadium-header px-4 pt-4 pb-4 flex items-center justify-between">
         <div>
           <div className="text-[10px] font-bold uppercase tracking-wide" style={{ color: 'var(--color-accent)' }}>
             Live rankings
           </div>
-          <div className="text-[22px] font-extrabold text-text tracking-tight">Leaderboard</div>
+          <div className="brand-wordmark text-[24px]">Friend table</div>
         </div>
-        <div className="text-[11px] font-semibold text-sub">{entries?.length ?? 0} players</div>
+        <div className="odds-chip px-2.5 py-1 text-[11px]">{entries?.length ?? 0} players</div>
       </div>
 
       <main className="pb-24">

@@ -23,7 +23,7 @@ export function LockTimer({ lockTime }: { lockTime: string }) {
   const locked = remaining <= 0
   return (
     <div
-      className="rounded-xl px-4 py-3 flex items-center justify-between"
+      className="rounded-lg px-4 py-3 flex items-center justify-between"
       style={{
         background: locked ? 'rgba(239,79,91,0.08)' : 'rgba(245,166,35,0.08)',
         border: `1px solid ${locked ? 'rgba(239,79,91,0.25)' : 'rgba(245,166,35,0.25)'}`,

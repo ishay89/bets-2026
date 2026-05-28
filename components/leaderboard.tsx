@@ -42,7 +42,7 @@ export function Leaderboard({ entries, currentUserId }: Props) {
       <div className="flex justify-center mb-5 mt-1">
         <div
           className="relative flex rounded-full p-[3px]"
-          style={{ background: 'var(--color-elev)', border: '1px solid rgba(255,255,255,0.08)' }}
+          style={{ background: 'var(--color-elev)', border: '1px solid rgba(246,248,232,0.1)' }}
         >
           {/* sliding pill */}
           <div
@@ -75,7 +75,7 @@ export function Leaderboard({ entries, currentUserId }: Props) {
 
       {/* Podium */}
       {top3.length > 0 && (
-        <div className="flex items-end justify-center gap-2 mb-5 mt-2">
+        <div className="stadium-panel flex items-end justify-center gap-2 mb-5 mt-2 px-3 pt-5">
           {podiumOrder.map(({ idx, color, height }) => {
             const entry = top3[idx]
             if (!entry) return null
@@ -102,7 +102,7 @@ export function Leaderboard({ entries, currentUserId }: Props) {
       )}
 
       {/* Full list */}
-      <div className="mb-3">
+      <div className="bet-card mb-3 overflow-hidden">
         {rest.map((entry, i) => {
           const rank = i + 4
           const isMe = entry.id === currentUserId
@@ -114,7 +114,7 @@ export function Leaderboard({ entries, currentUserId }: Props) {
               style={{
                 padding: '10px 12px',
                 background: isMe ? 'rgba(0,217,126,0.06)' : 'transparent',
-                borderBottom: '1px solid rgba(255,255,255,0.06)',
+                borderBottom: '1px solid rgba(246,248,232,0.08)',
                 borderLeft: isMe ? '2px solid var(--color-accent)' : '2px solid transparent',
                 opacity: entry.is_monkey ? 0.6 : 1,
                 fontStyle: entry.is_monkey ? 'italic' : 'normal',
@@ -151,7 +151,7 @@ export function Leaderboard({ entries, currentUserId }: Props) {
       {/* Danger zone */}
       {entries.length >= 2 && (
         <div
-          className="rounded-xl p-3"
+          className="rounded-lg p-3"
           style={{ background: 'rgba(239,79,91,0.08)', border: '1px solid rgba(239,79,91,0.25)' }}
         >
           <div className="flex items-center gap-1.5 mb-2">

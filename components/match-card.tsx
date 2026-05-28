@@ -39,8 +39,7 @@ export function MatchCard({ match, currentPick, isLocked, stageLabel, onSave }: 
   ]
 
   return (
-    <div className="rounded-[14px] p-4"
-      style={{ background: 'var(--color-panel)', border: '1px solid rgba(255,255,255,0.06)' }}>
+    <div className="bet-card p-4">
       {/* Header */}
       <div className="flex items-center justify-between mb-3">
         <div className="text-[10px] font-bold uppercase tracking-wide"
@@ -63,7 +62,7 @@ export function MatchCard({ match, currentPick, isLocked, stageLabel, onSave }: 
       <div className="flex items-center justify-around mb-4">
         <div className="flex flex-col items-center gap-1.5 min-w-[56px]">
           <div className="w-11 h-11 rounded-full flex items-center justify-center text-2xl"
-            style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}>
+            style={{ background: 'rgba(246,248,232,0.06)', border: '1px solid rgba(246,248,232,0.1)' }}>
             <span style={{ transform: 'scale(1.2)', display: 'block' }}>
               {FLAGS[match.home_team] ?? '🏳️'}
             </span>
@@ -72,10 +71,10 @@ export function MatchCard({ match, currentPick, isLocked, stageLabel, onSave }: 
             {match.home_team.slice(0, 3).toUpperCase()}
           </div>
         </div>
-        <div className="text-[14px] font-bold" style={{ color: 'var(--color-dim)', letterSpacing: 1 }}>VS</div>
+        <div className="ball-mark w-10 h-10 rounded-lg shrink-0" aria-label="versus" />
         <div className="flex flex-col items-center gap-1.5 min-w-[56px]">
           <div className="w-11 h-11 rounded-full flex items-center justify-center text-2xl"
-            style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}>
+            style={{ background: 'rgba(246,248,232,0.06)', border: '1px solid rgba(246,248,232,0.1)' }}>
             <span style={{ transform: 'scale(1.2)', display: 'block' }}>
               {FLAGS[match.away_team] ?? '🏳️'}
             </span>
@@ -99,7 +98,7 @@ export function MatchCard({ match, currentPick, isLocked, stageLabel, onSave }: 
               style={{
                 background: sel ? 'var(--color-accent)' : 'var(--color-elev)',
                 color: sel ? '#000' : 'var(--color-text)',
-                border: sel ? 'none' : '1px solid rgba(255,255,255,0.06)',
+                border: sel ? 'none' : '1px solid rgba(246,248,232,0.09)',
                 opacity: isLocked ? 0.5 : 1,
                 cursor: isLocked ? 'not-allowed' : 'pointer',
               }}

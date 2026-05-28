@@ -2,38 +2,153 @@
 
 @theme {
   /* Backgrounds */
-  --color-bg: #07090f;
-  --color-panel: #0d1222;
-  --color-panel2: #11172a;
-  --color-elev: #171e36;
-  --color-elev2: #1f2748;
+  --color-bg: #06100a;
+  --color-panel: #101711;
+  --color-panel2: #142017;
+  --color-elev: #1d2a1d;
+  --color-elev2: #283724;
 
   /* Text */
-  --color-text: #eaedf5;
-  --color-sub: #8d99b5;
-  --color-muted: #5a6485;
-  --color-dim: #3a4366;
+  --color-text: #f6f8e8;
+  --color-sub: #b9c7a8;
+  --color-muted: #738365;
+  --color-dim: #46543c;
 
   /* Accents */
-  --color-accent: #00d97e;
-  --color-accent-soft: rgba(0, 217, 126, 0.14);
-  --color-accent-line: rgba(0, 217, 126, 0.32);
+  --color-accent: #c8f05c;
+  --color-accent-soft: rgba(200, 240, 92, 0.15);
+  --color-accent-line: rgba(200, 240, 92, 0.36);
 
-  --color-amber: #f5a623;
-  --color-amber-soft: rgba(245, 166, 35, 0.13);
+  --color-amber: #f5c441;
+  --color-amber-soft: rgba(245, 196, 65, 0.16);
 
-  --color-danger: #ef4f5b;
-  --color-danger-soft: rgba(239, 79, 91, 0.13);
+  --color-danger: #ff5b4d;
+  --color-danger-soft: rgba(255, 91, 77, 0.14);
 
   --color-gold: #f5c441;
-  --color-silver: #aab4cd;
-  --color-bronze: #d18a4d;
+  --color-silver: #d7ddd0;
+  --color-bronze: #d88a3d;
 
   /* Legacy aliases for existing code */
-  --color-surface: #0d1222;
-  --color-warn: #f5a623;
+  --color-surface: #101711;
+  --color-warn: #f5c441;
 
   /* Fonts */
-  --font-sans: Inter, -apple-system, "SF Pro Text", system-ui, sans-serif;
+  --font-sans: Inter, "Aptos", -apple-system, "SF Pro Text", system-ui, sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, "JetBrains Mono", monospace;
+}
+
+:root {
+  --line-soft: rgba(246, 248, 232, 0.08);
+  --line-strong: rgba(200, 240, 92, 0.36);
+  --grass: #174f2b;
+  --grass-dark: #0a1b10;
+  --ticket: #f6f8e8;
+  --ink: #07100b;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  background:
+    linear-gradient(90deg, rgba(246, 248, 232, 0.025) 1px, transparent 1px),
+    linear-gradient(180deg, rgba(246, 248, 232, 0.018) 1px, transparent 1px),
+    radial-gradient(ellipse at 50% 0%, rgba(245, 196, 65, 0.11), transparent 34%),
+    linear-gradient(180deg, #0a1b10 0%, #06100a 54%, #030604 100%);
+  background-size: 36px 36px, 36px 36px, auto, auto;
+}
+
+.app-shell {
+  min-height: 100vh;
+  background:
+    linear-gradient(90deg, rgba(200, 240, 92, 0.04) 1px, transparent 1px),
+    linear-gradient(180deg, rgba(200, 240, 92, 0.03) 1px, transparent 1px);
+  background-size: 38px 38px;
+}
+
+.stadium-header {
+  position: relative;
+  overflow: hidden;
+  border-bottom: 1px solid var(--line-soft);
+  background:
+    linear-gradient(180deg, rgba(6, 16, 10, 0.58), rgba(6, 16, 10, 0.95)),
+    url("/stadium-lights.svg") center top / cover no-repeat;
+}
+
+.stadium-panel {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(200, 240, 92, 0.28);
+  border-radius: 8px;
+  background:
+    linear-gradient(135deg, rgba(16, 54, 28, 0.94), rgba(6, 16, 10, 0.98) 62%),
+    url("/stadium-lights.svg") center / cover no-repeat;
+  box-shadow: 0 22px 42px rgba(0, 0, 0, 0.32), inset 0 1px 0 rgba(246, 248, 232, 0.08);
+}
+
+.superstar-panel {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(245, 196, 65, 0.38);
+  border-radius: 8px;
+  background:
+    linear-gradient(90deg, rgba(6, 16, 10, 0.12), rgba(6, 16, 10, 0.78) 55%, rgba(6, 16, 10, 0.98)),
+    url("/superstar-striker.svg") left center / cover no-repeat;
+  box-shadow: 0 22px 44px rgba(0, 0, 0, 0.34);
+}
+
+.bet-card {
+  border: 1px solid var(--line-soft);
+  border-radius: 8px;
+  background:
+    linear-gradient(180deg, rgba(246, 248, 232, 0.045), rgba(246, 248, 232, 0.018)),
+    var(--color-panel);
+  box-shadow: inset 0 1px 0 rgba(246, 248, 232, 0.05);
+}
+
+.ticket-card {
+  border: 1px dashed rgba(7, 16, 11, 0.3);
+  border-radius: 8px;
+  background:
+    linear-gradient(90deg, transparent 0 10px, rgba(7, 16, 11, 0.06) 10px 11px, transparent 11px 22px),
+    var(--ticket);
+  color: var(--ink);
+  box-shadow: 0 18px 34px rgba(0, 0, 0, 0.26);
+}
+
+.ticket-card .text-muted,
+.ticket-card .text-sub,
+.ticket-card .text-text {
+  color: var(--ink);
+}
+
+.section-kicker {
+  color: var(--color-amber);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.brand-wordmark {
+  color: var(--color-text);
+  font-weight: 950;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.odds-chip {
+  border: 1px solid rgba(200, 240, 92, 0.34);
+  border-radius: 8px;
+  background: rgba(200, 240, 92, 0.12);
+  color: var(--color-accent);
+  font-family: var(--font-mono);
+  font-weight: 800;
+}
+
+.ball-mark {
+  background: #f6f8e8 url("/soccer-ball.svg") center / 78% no-repeat;
 }
