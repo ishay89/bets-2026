@@ -14,6 +14,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <Link href="/admin/results" className="text-muted hover:text-amber transition-colors">Results</Link>
           <Link href="/admin/tournament" className="text-muted hover:text-amber transition-colors">Tournament</Link>
           <Link href="/admin/players" className="text-muted hover:text-amber transition-colors">Players</Link>
+          <Link href="/admin/audit" className="text-muted hover:text-amber transition-colors">Audit</Link>
           <Link href="/" className="text-muted hover:text-accent transition-colors">← App</Link>
         </nav>
       </header>
