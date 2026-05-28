@@ -1,11 +1,17 @@
 import { shouldWriteAuditEvent, writeAuditEvent, type AuditJson } from '@/lib/audit'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { redirect } from 'next/navigation'
 import { MatchCard } from '@/components/match-card'
 import { PicanteriaCard } from '@/components/pikanteria-card'
 import { LockTimer } from '@/components/lock-timer'
 import { BottomNav } from '@/components/bottom-nav'
 import type { Match, MatchDay, Pikanteria, PicanteriaOption, Pick } from '@/lib/types'
+import {
+  PRE_TOURNAMENT_PATH,
+  hasCompletedPreTournamentPick,
+  shouldRequirePreTournamentPick,
+} from '@/lib/pre-tournament'
 
 const STAGE_LABELS: Record<string, string> = {
   group: 'Group Stage ×1', r16: 'Round of 16 ×1.5', qf: 'Quarter Finals ×1.5',
@@ -21,11 +27,22 @@ export default async function PredictPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  const { data: matchDaysRaw } = await supabase
-    .from('match_days')
-    .select('*, matches(*), pikanteria(*, pikanteria_options(*))')
-    .not('published_at', 'is', null)
-    .order('date', { ascending: true })
+  const [{ data: matchDaysRaw }, { data: preTournamentPick }] = await Promise.all([
+    supabase
+      .from('match_days')
+      .select('*, matches(*), pikanteria(*, pikanteria_options(*))')
+      .not('published_at', 'is', null)
+      .order('date', { ascending: true }),
+    supabase
+      .from('pre_tournament_picks')
+      .select('winner_team, top_scorer')
+      .eq('user_id', user!.id)
+      .maybeSingle(),
+  ])
+
+  if (shouldRequirePreTournamentPick('/predict', hasCompletedPreTournamentPick(preTournamentPick))) {
+    redirect(PRE_TOURNAMENT_PATH)
+  }
 
   const matchDays = (matchDaysRaw ?? []) as FullMatchDay[]
   const today = new Date().toISOString().slice(0, 10)
