@@ -128,7 +128,7 @@ export default async function PredictPage() {
                   <span className="text-lg">🌶️</span>
                   <span className="text-[10px] font-bold uppercase tracking-[1.2px]"
                     style={{ color: 'var(--color-amber)' }}>
-                    Pikanteria · {(matchDay.pikanteria as any[]).length} side bets
+                    Pikanteria · {(matchDay.pikanteria as (Pikanteria & { pikanteria_options: PicanteriaOption[] })[]).length} side bets
                   </span>
                 </div>
                 {(matchDay.pikanteria as (Pikanteria & { pikanteria_options: PicanteriaOption[] })[]).map(item => (
