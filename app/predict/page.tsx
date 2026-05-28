@@ -4,24 +4,30 @@ import { MatchCard } from '@/components/match-card'
 import { PicanteriaCard } from '@/components/pikanteria-card'
 import { LockTimer } from '@/components/lock-timer'
 import { BottomNav } from '@/components/bottom-nav'
-import type { Match, Pikanteria, PicanteriaOption, Pick } from '@/lib/types'
+import type { Match, MatchDay, Pikanteria, PicanteriaOption, Pick } from '@/lib/types'
 
 const STAGE_LABELS: Record<string, string> = {
   group: 'Group Stage ×1', r16: 'Round of 16 ×1.5', qf: 'Quarter Finals ×1.5',
   sf: 'Semi Finals ×2', '3rd': 'Third Place ×1.5', final: 'Final ×3',
 }
 
+type FullMatchDay = MatchDay & {
+  matches: Match[]
+  pikanteria: (Pikanteria & { pikanteria_options: PicanteriaOption[] })[]
+}
+
 export default async function PredictPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  const today = new Date().toISOString().slice(0, 10)
-  const { data: matchDay } = await supabase
+  const { data: matchDaysRaw } = await supabase
     .from('match_days')
     .select('*, matches(*), pikanteria(*, pikanteria_options(*))')
-    .eq('date', today)
     .not('published_at', 'is', null)
-    .single()
+    .order('date', { ascending: true })
+
+  const matchDays = (matchDaysRaw ?? []) as FullMatchDay[]
+  const today = new Date().toISOString().slice(0, 10)
 
   const [{ data: existingPredictions }, { data: existingAnswers }] = await Promise.all([
     supabase.from('predictions').select('match_id, pick').eq('user_id', user!.id),
@@ -34,8 +40,6 @@ export default async function PredictPage() {
   const answerMap = Object.fromEntries(
     (existingAnswers ?? []).map(a => [a.pikanteria_id, a.option_id as string])
   )
-
-  const isLocked = matchDay ? new Date() >= new Date(matchDay.lock_time) : false
 
   async function savePick(matchId: string, pick: Pick) {
     'use server'
@@ -59,91 +63,113 @@ export default async function PredictPage() {
     revalidatePath('/predict')
   }
 
-  const stageLabel = matchDay ? (STAGE_LABELS[matchDay.stage] ?? matchDay.stage) : ''
-
   return (
     <div className="min-h-screen bg-bg">
-      {/* Header */}
-      <div className="flex items-center justify-between px-4 pt-4 pb-2">
-        <div>
-          <div className="text-[10px] font-bold uppercase tracking-wide" style={{ color: 'var(--color-accent)' }}>
-            {stageLabel}
-          </div>
-          <div className="text-[22px] font-extrabold text-text tracking-tight leading-tight">Today&apos;s picks</div>
-        </div>
-        {matchDay && !isLocked && (
-          <div className="flex flex-col items-end rounded-[10px] px-2.5 py-1.5"
-            style={{ background: 'rgba(245,166,35,0.13)', border: '1px solid rgba(245,166,35,0.3)' }}>
-            <div className="text-[9px] font-bold uppercase tracking-wide" style={{ color: 'var(--color-amber)' }}>Locks</div>
-            <div className="text-[13px] font-bold" style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-amber)' }}>
-              <LockTimer lockTime={matchDay.lock_time} />
-            </div>
-          </div>
-        )}
+      <div className="px-4 pt-4 pb-2">
+        <div className="text-[22px] font-extrabold text-text tracking-tight leading-tight">Today&apos;s picks</div>
       </div>
 
-      <main className="px-4 pb-28 space-y-3 mt-2">
-        {!matchDay && (
+      <main className="px-4 pb-28 space-y-6 mt-2">
+        {matchDays.length === 0 && (
           <div className="text-center py-16">
             <div className="text-4xl mb-3">📋</div>
-            <div className="text-text font-semibold">No matches today</div>
-            <div className="text-muted text-sm mt-1">The admin hasn&apos;t published today&apos;s form yet</div>
+            <div className="text-text font-semibold">No matches published yet</div>
+            <div className="text-muted text-sm mt-1">The admin hasn&apos;t published any matches yet</div>
           </div>
         )}
 
-        {matchDay && (
-          <>
-            {isLocked && (
-              <div className="rounded-xl px-4 py-3"
-                style={{ background: 'rgba(239,79,91,0.08)', border: '1px solid rgba(239,79,91,0.25)' }}>
-                <span className="text-[12px] font-bold" style={{ color: 'var(--color-danger)' }}>
-                  🔒 Picks are locked for today
-                </span>
-              </div>
-            )}
+        {matchDays.map((matchDay, idx) => {
+          const isLocked = new Date() >= new Date(matchDay.lock_time)
+          const isToday = matchDay.date === today
+          const stageLabel = STAGE_LABELS[matchDay.stage] ?? matchDay.stage
+          const multiplier = stageLabel.includes('×') ? `×${stageLabel.split('×')[1]}` : ''
+          const pikaItems = matchDay.pikanteria
+          const sortedMatches = [...matchDay.matches].sort(
+            (a, b) => new Date(a.kickoff_time).getTime() - new Date(b.kickoff_time).getTime()
+          )
+          const dateLabel = new Date(matchDay.date + 'T12:00:00Z').toLocaleDateString('en-US', {
+            weekday: 'short', month: 'short', day: 'numeric',
+          })
 
-            {!isLocked && <LockTimer lockTime={matchDay.lock_time} />}
-
-            {/* Matches */}
-            <div className="text-[10px] font-bold uppercase tracking-[1.2px] pt-2"
-              style={{ color: 'var(--color-muted)' }}>
-              Matches · Multiplier {stageLabel.split('×')[1] ? `×${stageLabel.split('×')[1]}` : ''}
-            </div>
-
-            {(matchDay.matches as Match[]).map(match => (
-              <MatchCard
-                key={match.id}
-                match={match}
-                currentPick={predictionMap[match.id] ?? null}
-                isLocked={isLocked}
-                stageLabel={stageLabel}
-                onSave={savePick}
-              />
-            ))}
-
-            {/* Pikanteria */}
-            {(matchDay.pikanteria as (Pikanteria & { pikanteria_options: PicanteriaOption[] })[]).length > 0 && (
-              <>
-                <div className="flex items-center gap-2 pt-4">
-                  <span className="text-lg">🌶️</span>
-                  <span className="text-[10px] font-bold uppercase tracking-[1.2px]"
-                    style={{ color: 'var(--color-amber)' }}>
-                    Pikanteria · {(matchDay.pikanteria as (Pikanteria & { pikanteria_options: PicanteriaOption[] })[]).length} side bets
-                  </span>
+          return (
+            <div key={matchDay.id} className="space-y-3">
+              {/* Day header */}
+              <div className="flex items-center justify-between pt-1">
+                <div>
+                  <div className="text-[10px] font-bold uppercase tracking-wide" style={{ color: 'var(--color-accent)' }}>
+                    {stageLabel}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-bold text-text">{dateLabel}</span>
+                    {isToday && (
+                      <span className="text-[9px] font-black px-1.5 py-0.5 rounded-full"
+                        style={{ background: 'var(--color-accent)', color: '#000' }}>
+                        TODAY
+                      </span>
+                    )}
+                  </div>
                 </div>
-                {(matchDay.pikanteria as (Pikanteria & { pikanteria_options: PicanteriaOption[] })[]).map(item => (
-                  <PicanteriaCard
-                    key={item.id}
-                    item={{ ...item, options: [...(item.pikanteria_options ?? [])].sort((a, b) => a.sort_order - b.sort_order) }}
-                    currentAnswer={answerMap[item.id] ?? null}
-                    isLocked={isLocked}
-                    onSave={saveAnswer}
-                  />
-                ))}
-              </>
-            )}
-          </>
-        )}
+
+                {isLocked ? (
+                  <div className="text-[10px] font-bold px-2.5 py-1 rounded-full"
+                    style={{ background: 'rgba(239,79,91,0.08)', color: 'var(--color-danger)', border: '1px solid rgba(239,79,91,0.25)' }}>
+                    🔒 Locked
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-end rounded-[10px] px-2.5 py-1.5"
+                    style={{ background: 'rgba(245,166,35,0.13)', border: '1px solid rgba(245,166,35,0.3)' }}>
+                    <div className="text-[9px] font-bold uppercase tracking-wide" style={{ color: 'var(--color-amber)' }}>Locks</div>
+                    <div className="text-[13px] font-bold" style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-amber)' }}>
+                      <LockTimer lockTime={matchDay.lock_time} />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Matches */}
+              <div className="text-[10px] font-bold uppercase tracking-[1.2px]"
+                style={{ color: 'var(--color-muted)' }}>
+                Matches{multiplier ? ` · Multiplier ${multiplier}` : ''}
+              </div>
+              {sortedMatches.map(match => (
+                <MatchCard
+                  key={match.id}
+                  match={match}
+                  currentPick={predictionMap[match.id] ?? null}
+                  isLocked={isLocked}
+                  stageLabel={stageLabel}
+                  onSave={savePick}
+                />
+              ))}
+
+              {/* Pikanteria */}
+              {pikaItems.length > 0 && (
+                <>
+                  <div className="flex items-center gap-2 pt-2">
+                    <span className="text-lg">🌶️</span>
+                    <span className="text-[10px] font-bold uppercase tracking-[1.2px]"
+                      style={{ color: 'var(--color-amber)' }}>
+                      Pikanteria · {pikaItems.length} side bets
+                    </span>
+                  </div>
+                  {pikaItems.map(item => (
+                    <PicanteriaCard
+                      key={item.id}
+                      item={{ ...item, options: [...(item.pikanteria_options ?? [])].sort((a, b) => a.sort_order - b.sort_order) }}
+                      currentAnswer={answerMap[item.id] ?? null}
+                      isLocked={isLocked}
+                      onSave={saveAnswer}
+                    />
+                  ))}
+                </>
+              )}
+
+              {idx < matchDays.length - 1 && (
+                <div className="border-t mt-2" style={{ borderColor: 'rgba(255,255,255,0.04)' }} />
+              )}
+            </div>
+          )
+        })}
       </main>
 
       <BottomNav />
