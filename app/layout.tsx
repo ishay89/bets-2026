@@ -47,7 +47,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   }
 
   const cookieStore = await cookies()
-  const theme = (cookieStore.get('theme')?.value === 'light' ? 'light' : 'dark') as 'dark' | 'light'
+  const theme = (cookieStore.get('theme')?.value === 'dark' ? 'dark' : 'light') as 'dark' | 'light'
 
   const teamTheme = getTeamTheme(winningTeam)
   const teamThemeStyle = getTeamThemeCssVariables(winningTeam) as React.CSSProperties
@@ -65,7 +65,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         {/* Prevent flash of wrong theme on load */}
         <script
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{var t=localStorage.getItem('theme')||'dark';document.documentElement.setAttribute('data-theme',t);}catch(e){}})();`,
+            __html: `(function(){try{var t=localStorage.getItem('theme')||'light';document.documentElement.setAttribute('data-theme',t);}catch(e){}})();`,
           }}
         />
       </head>

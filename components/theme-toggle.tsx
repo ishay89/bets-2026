@@ -5,7 +5,7 @@ function readTheme(): 'dark' | 'light' {
   if (typeof window === 'undefined') return 'dark'
   return (localStorage.getItem('theme') ??
     document.documentElement.getAttribute('data-theme') ??
-    'dark') as 'dark' | 'light'
+    'light') as 'dark' | 'light'
 }
 
 function persistTheme(theme: 'dark' | 'light') {
