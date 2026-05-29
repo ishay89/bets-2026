@@ -1,5 +1,6 @@
 export type Stage = 'group' | 'r32' | 'r16' | 'qf' | 'sf' | '3rd' | 'final'
 export type Pick = '1' | 'X' | '2'
+export type AutomationStrategy = 'monkey' | 'max' | 'mid' | 'min'
 
 export interface User {
   id: string
@@ -7,6 +8,7 @@ export interface User {
   display_name: string
   is_admin: boolean
   is_monkey: boolean
+  automation_strategy: AutomationStrategy | null
   created_at: string
 }
 
@@ -81,6 +83,7 @@ export interface LeaderboardEntry {
   id: string
   display_name: string
   is_monkey: boolean
+  automation_strategy: AutomationStrategy | null
   total_points: number
   today_points: number
 }

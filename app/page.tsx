@@ -316,7 +316,7 @@ export default async function HomePage() {
         >
           {miniEntries.map((entry, i, arr) => {
             const isMe = entry.id === user?.id
-            const av = getAvatar(entry.display_name, entry.is_monkey)
+            const av = getAvatar(entry)
             const rankColor = rankColors[entry._rank]
             return (
               <div
@@ -480,9 +480,12 @@ const STAGE_LABELS: Record<string, string> = {
 }
 
 const AVATARS = ['🦁','🐯','🦊','🐺','🦅','🐻','🐼','🦝','🦄','🐉','🦋','🌟','🔥','⚡','🎯']
-function getAvatar(name: string, isMonkey: boolean): string {
-  if (isMonkey) return '🐒'
-  return AVATARS[name.charCodeAt(0) % AVATARS.length]
+function getAvatar(entry: LeaderboardEntry): string {
+  if (entry.automation_strategy === 'max') return '▲'
+  if (entry.automation_strategy === 'mid') return '◆'
+  if (entry.automation_strategy === 'min') return '▼'
+  if (entry.is_monkey) return '🐒'
+  return AVATARS[entry.display_name.charCodeAt(0) % AVATARS.length]
 }
 
 const FLAGS: Record<string, string> = {
