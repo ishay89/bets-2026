@@ -54,7 +54,7 @@ function ValidationBadge({ snapshot }: { snapshot: SnapshotRow }) {
 export default async function ScoresPage() {
   const supabase = await createClient()
 
-  const { data: rawSnapshots } = await supabase
+  const { data: rawSnapshots, error: snapshotsError } = await supabase
     .from('score_snapshots')
     .select(`
       *,
@@ -62,6 +62,7 @@ export default async function ScoresPage() {
       match_days(date, stage)
     `)
     .order('calculated_at', { ascending: false })
+  if (snapshotsError) throw snapshotsError
 
   const snapshots = (rawSnapshots ?? []) as SnapshotRow[]
 

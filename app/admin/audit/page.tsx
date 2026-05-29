@@ -69,11 +69,12 @@ function formatTimestamp(value: string) {
 export default async function AuditPage() {
   await assertAdmin()
   const supabase = createAdminClient()
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('user_prediction_audit_events')
     .select('*, users(display_name, email, is_monkey)')
     .order('committed_at', { ascending: false })
     .limit(200)
+  if (error) throw error
 
   const events = (data ?? []) as AuditRow[]
 
