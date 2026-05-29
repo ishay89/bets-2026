@@ -83,8 +83,9 @@ async function getSnapshotSum(
     .eq('user_id', userId)
 
   if (excludeMatchDayId !== null) {
-    // exclude the row we're about to upsert
-    query.neq('match_day_id', excludeMatchDayId)
+    // Exclude the current match day's row but keep the pre-tournament row (match_day_id IS NULL).
+    // Plain .neq() would silently drop NULL rows due to SQL NULL semantics, understating the sum.
+    query.or(`match_day_id.neq.${excludeMatchDayId},match_day_id.is.null`)
   } else {
     // pre-tournament: exclude the null row (the one we're about to upsert)
     query.not('match_day_id', 'is', null)
