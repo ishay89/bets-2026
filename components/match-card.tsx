@@ -1,6 +1,8 @@
 'use client'
 import { useState, useTransition } from 'react'
 import type { Match, Pick } from '@/lib/types'
+import type { CrowdPct, Insight } from '@/lib/crowd'
+import { CrowdInsight } from './crowd-insight'
 
 const FLAGS: Record<string, string> = {
   France: '🇫🇷', Spain: '🇪🇸', Brazil: '🇧🇷', England: '🏴󠁧󠁢󠁥󠁮󠁧󠁿',
@@ -16,11 +18,18 @@ interface Props {
   isLocked: boolean
   stageLabel: string
   onSave: (matchId: string, pick: Pick) => Promise<void>
+  /** Crowd-pick percentages, revealed only once the match is locked. */
+  crowd?: CrowdPct | null
+  crowdTotal?: number
+  insight?: Insight | null
 }
 
 const PICK_LABELS: Record<Pick, string> = { '1': 'Home', X: 'Draw', '2': 'Away' }
+const SEG_COLOR: Record<Pick, string> = {
+  '1': 'var(--color-accent)', X: 'var(--color-dim)', '2': 'var(--color-amber)',
+}
 
-export function MatchCard({ match, currentPick, isLocked, stageLabel, onSave }: Props) {
+export function MatchCard({ match, currentPick, isLocked, stageLabel, onSave, crowd, crowdTotal = 0, insight }: Props) {
   const [selected, setSelected] = useState<Pick | null>(currentPick)
   const [pending, startTransition] = useTransition()
 
@@ -184,6 +193,73 @@ export function MatchCard({ match, currentPick, isLocked, stageLabel, onSave }: 
           )
         })}
       </div>
+
+      {/* Crowd picks — revealed only after lock */}
+      {isLocked && crowd && crowdTotal > 0 ? (
+        <div className="px-4 pb-4" style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: 12 }}>
+          <div className="flex items-center justify-between mb-2 gap-2">
+            <span
+              style={{
+                fontFamily: 'var(--font-display)',
+                fontSize: 9,
+                letterSpacing: '0.16em',
+                textTransform: 'uppercase',
+                color: 'var(--color-muted)',
+              }}
+            >
+              Crowd · {crowdTotal} {crowdTotal === 1 ? 'pick' : 'picks'}
+            </span>
+            {insight && <CrowdInsight insight={insight} />}
+          </div>
+
+          <div
+            className="flex w-full rounded-full overflow-hidden"
+            style={{ height: 8, background: 'var(--color-elev)' }}
+          >
+            {options.map(([pick]) =>
+              crowd[pick] > 0 ? (
+                <div
+                  key={pick}
+                  style={{
+                    width: `${crowd[pick]}%`,
+                    background: SEG_COLOR[pick],
+                    opacity: selected === pick ? 1 : 0.8,
+                  }}
+                />
+              ) : null
+            )}
+          </div>
+
+          <div className="flex justify-between mt-1.5">
+            {options.map(([pick]) => (
+              <span
+                key={pick}
+                style={{
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: 11,
+                  color: selected === pick ? 'var(--color-accent)' : 'var(--color-muted)',
+                  fontWeight: selected === pick ? 700 : 400,
+                }}
+              >
+                {crowd[pick]}% · {pick}
+              </span>
+            ))}
+          </div>
+        </div>
+      ) : !isLocked ? (
+        <div
+          className="px-4 pb-3"
+          style={{
+            fontFamily: 'var(--font-display)',
+            fontSize: 9,
+            letterSpacing: '0.16em',
+            textTransform: 'uppercase',
+            color: 'var(--color-muted)',
+          }}
+        >
+          Crowd revealed at lock
+        </div>
+      ) : null}
     </div>
   )
 }
