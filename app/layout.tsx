@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import { Oswald, Barlow, IBM_Plex_Mono } from 'next/font/google'
+import { cookies } from 'next/headers'
 import './globals.css'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { createClient } from '@/lib/supabase/server'
@@ -45,22 +46,26 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     winningTeam = pick?.winner_team ?? null
   }
 
+  const cookieStore = await cookies()
+  const theme = (cookieStore.get('theme')?.value === 'dark' ? 'dark' : 'light') as 'dark' | 'light'
+
   const teamTheme = getTeamTheme(winningTeam)
   const teamThemeStyle = getTeamThemeCssVariables(winningTeam) as React.CSSProperties
 
   return (
     <html
       lang="en"
-      data-theme="dark"
+      data-theme={theme}
       data-team={teamTheme.slug}
       style={teamThemeStyle}
+      suppressHydrationWarning
       className={`${barlow.variable} ${oswald.variable} ${ibmPlexMono.variable}`}
     >
       <head>
         {/* Prevent flash of wrong theme on load */}
         <script
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{var t=localStorage.getItem('theme')||'dark';document.documentElement.setAttribute('data-theme',t);}catch(e){}})();`,
+            __html: `(function(){try{var t=localStorage.getItem('theme')||'light';document.documentElement.setAttribute('data-theme',t);}catch(e){}})();`,
           }}
         />
       </head>
