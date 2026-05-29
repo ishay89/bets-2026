@@ -8,6 +8,11 @@ function readTheme(): 'dark' | 'light' {
     'dark') as 'dark' | 'light'
 }
 
+function persistTheme(theme: 'dark' | 'light') {
+  try { localStorage.setItem('theme', theme) } catch {}
+  try { document.cookie = `theme=${theme}; path=/; max-age=31536000; SameSite=Lax` } catch {}
+}
+
 export function ThemeToggle() {
   const [theme, setTheme] = useState<'dark' | 'light'>(readTheme)
 
@@ -15,7 +20,7 @@ export function ThemeToggle() {
     const next = theme === 'dark' ? 'light' : 'dark'
     setTheme(next)
     document.documentElement.setAttribute('data-theme', next)
-    try { localStorage.setItem('theme', next) } catch {}
+    persistTheme(next)
   }
 
   return (
