@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { BottomNav } from '@/components/bottom-nav'
 
@@ -7,13 +8,14 @@ const AVATARS = ['🦁','🐯','🦊','🐺','🦅','🐻','🐼','🦝','🦄',
 export default async function ProfilePage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
 
   const [{ data: profile }, { data: pick }, { data: predictions }, { data: pikaAnswers }] =
     await Promise.all([
-      supabase.from('users').select('display_name, is_admin').eq('id', user!.id).single(),
-      supabase.from('pre_tournament_picks').select('*').eq('user_id', user!.id).single(),
-      supabase.from('predictions').select('points').eq('user_id', user!.id),
-      supabase.from('pikanteria_answers').select('points').eq('user_id', user!.id),
+      supabase.from('users').select('display_name, is_admin').eq('id', user.id).single(),
+      supabase.from('pre_tournament_picks').select('*').eq('user_id', user.id).single(),
+      supabase.from('predictions').select('points').eq('user_id', user.id),
+      supabase.from('pikanteria_answers').select('points').eq('user_id', user.id),
     ])
 
   const matchPoints = (predictions ?? []).reduce((s, p) => s + (p.points ?? 0), 0)
@@ -23,7 +25,7 @@ export default async function ProfilePage() {
   const total = matchPoints + pikaPoints + preWinner + preScorer
 
   const { data: allEntries } = await supabase.from('leaderboard').select('id')
-  const rank = (allEntries ?? []).findIndex(e => e.id === user!.id) + 1
+  const rank = (allEntries ?? []).findIndex(e => e.id === user.id) + 1
 
   const name = profile?.display_name ?? 'You'
   const av = AVATARS[name.charCodeAt(0) % AVATARS.length]

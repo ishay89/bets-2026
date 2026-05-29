@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { BottomNav } from '@/components/bottom-nav'
 import type { LeaderboardEntry } from '@/lib/types'
@@ -16,6 +17,7 @@ type HomeMatchRow = {
 export default async function HomePage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
 
   const [{ data: entries }, { data: todayDay }, { data: preTournamentPick }] = await Promise.all([
     supabase.from('leaderboard').select('*').returns<LeaderboardEntry[]>(),
@@ -30,7 +32,7 @@ export default async function HomePage() {
     supabase
       .from('pre_tournament_picks')
       .select('winner_team, top_scorer')
-      .eq('user_id', user!.id)
+      .eq('user_id', user.id)
       .maybeSingle(),
   ])
 
