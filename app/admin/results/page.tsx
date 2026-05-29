@@ -87,7 +87,7 @@ async function enterResults(formData: FormData) {
   revalidatePath('/')
   revalidatePath('/leaderboard')
   revalidatePath('/admin/scores')
-  redirect('/admin')
+  redirect('/admin/results')
 }
 
 const inputStyle = {
@@ -103,15 +103,13 @@ export default async function ResultsPage() {
     .from('match_days')
     .select('*, matches(*), pikanteria(*, pikanteria_options(*))')
     .not('published_at', 'is', null)
-    .order('date', { ascending: false })
-    .limit(5)
+    .order('date', { ascending: true })
 
-  // Find first day with at least one unscored match
-  const matchDay = ((matchDays ?? []) as MatchDayRow[]).find(d =>
+  const unscoredDays = ((matchDays ?? []) as MatchDayRow[]).filter(d =>
     d.matches.some(m => m.result === null)
-  ) ?? (matchDays as MatchDayRow[] | null)?.[0]
+  )
 
-  if (!matchDay) {
+  if (unscoredDays.length === 0) {
     return (
       <div className="text-center py-16">
         <div className="text-4xl mb-3">✅</div>
@@ -122,119 +120,116 @@ export default async function ResultsPage() {
   }
 
   return (
-    <div className="max-w-2xl mx-auto space-y-6 pb-10">
+    <div className="max-w-2xl mx-auto space-y-10 pb-10">
       <div>
         <div className="font-black text-lg" style={{ color: 'var(--color-amber)' }}>
           ✅ Enter Results
         </div>
-        <div className="text-muted text-xs">{matchDay.date} · {matchDay.stage}</div>
+        <div className="text-muted text-xs">{unscoredDays.length} match day{unscoredDays.length > 1 ? 's' : ''} with pending results</div>
       </div>
 
-      {(() => {
+      {unscoredDays.map(matchDay => {
         const total = matchDay.matches.length
         const done = matchDay.matches.filter(m => m.result !== null).length
+
         return (
-          <div className="rounded-xl p-3 flex items-center gap-3"
-            style={{ background: 'rgba(245,166,35,0.08)', border: '1px solid rgba(245,166,35,0.25)' }}>
-            <div className="text-lg">⏳</div>
-            <div>
-              <div className="text-sm font-bold" style={{ color: 'var(--color-amber)' }}>
-                {done} of {total} matches scored
-              </div>
-              <div className="text-xs text-muted">Submit to update leaderboard</div>
-            </div>
-          </div>
-        )
-      })()}
-
-      <form action={enterResults} className="space-y-4">
-        <input type="hidden" name="match_day_id" value={matchDay.id} />
-
-        {/* Matches */}
-        {matchDay.matches.map(match => (
-          <div key={match.id} className="rounded-xl p-4 space-y-3"
-            style={{
-              background: 'var(--color-panel)',
-              border: `1px solid ${match.result ? 'rgba(0,217,126,0.3)' : 'rgba(255,255,255,0.06)'}`,
-            }}>
+          <div key={matchDay.id} className="space-y-4">
             <div className="flex items-center justify-between">
-              <span className="text-sm font-bold text-text">
-                {match.home_team} vs {match.away_team}
-              </span>
-              {match.result && (
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full"
-                  style={{ color: 'var(--color-accent)', background: 'var(--color-accent-soft)', border: '1px solid var(--color-accent-line)' }}>
-                  ✓ {match.result} scored
-                </span>
-              )}
+              <div>
+                <div className="font-bold text-sm text-text">{matchDay.date} · {matchDay.stage}</div>
+              </div>
+              <div className="rounded-xl px-3 py-1 text-xs font-bold"
+                style={{ background: 'rgba(245,166,35,0.08)', border: '1px solid rgba(245,166,35,0.25)', color: 'var(--color-amber)' }}>
+                {done}/{total} scored
+              </div>
             </div>
-            <div className="flex gap-2">
-              {[
-                { value: '1', label: `1 — ${match.home_team}` },
-                { value: 'X', label: 'X — Draw' },
-                { value: '2', label: `2 — ${match.away_team}` },
-              ].map(({ value, label }) => (
-                <label key={value}
-                  className="flex-1 flex items-center gap-1.5 rounded-lg p-2 cursor-pointer"
-                  style={inputStyle}>
-                  <input
-                    type="radio"
-                    name={`result_${match.id}`}
-                    value={value}
-                    defaultChecked={match.result === value}
-                  />
-                  <span className="text-xs text-text font-medium">{label}</span>
-                </label>
-              ))}
-            </div>
-          </div>
-        ))}
 
-        {/* Pikanteria */}
-        {matchDay.pikanteria.length > 0 && (
-          <>
-            <div className="font-bold text-xs uppercase tracking-wider mt-2" style={{ color: 'var(--color-amber)' }}>
-              🌶️ Pikanteria Results
-            </div>
-            {matchDay.pikanteria.map(pika => {
-              const options = [...pika.pikanteria_options].sort(
-                (a, b) => a.sort_order - b.sort_order
-              )
-              const correctOption = options.find(o => o.is_correct)
-              return (
-                <div key={pika.id} className="rounded-xl p-4 space-y-3"
-                  style={{ background: 'var(--color-panel)', border: '1px solid rgba(255,255,255,0.06)' }}>
-                  <p className="text-sm font-semibold text-text">{pika.question}</p>
-                  <div className="flex gap-2 flex-wrap">
-                    {options.map(opt => (
-                      <label key={opt.id}
-                        className="flex-1 flex items-center gap-1.5 rounded-lg p-2 cursor-pointer min-w-[80px]"
+            <form action={enterResults} className="space-y-4">
+              <input type="hidden" name="match_day_id" value={matchDay.id} />
+
+              {/* Unscored matches only */}
+              {matchDay.matches.filter(m => m.result === null).map(match => (
+                <div key={match.id} className="rounded-xl p-4 space-y-3"
+                  style={{
+                    background: 'var(--color-panel)',
+                    border: '1px solid rgba(255,255,255,0.06)',
+                  }}>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-bold text-text">
+                      {match.home_team} vs {match.away_team}
+                    </span>
+                  </div>
+                  <div className="flex gap-2">
+                    {[
+                      { value: '1', label: `1 — ${match.home_team}` },
+                      { value: 'X', label: 'X — Draw' },
+                      { value: '2', label: `2 — ${match.away_team}` },
+                    ].map(({ value, label }) => (
+                      <label key={value}
+                        className="flex-1 flex items-center gap-1.5 rounded-lg p-2 cursor-pointer"
                         style={inputStyle}>
                         <input
                           type="radio"
-                          name={`pik_${pika.id}`}
-                          value={opt.id}
-                          defaultChecked={correctOption?.id === opt.id}
+                          name={`result_${match.id}`}
+                          value={value}
                         />
-                        <span className="text-xs text-text font-medium">{opt.label}</span>
-                        <span className="text-[10px] text-muted" style={{ fontFamily: 'var(--font-mono)' }}>
-                          {opt.odds.toFixed(2)}
-                        </span>
+                        <span className="text-xs text-text font-medium">{label}</span>
                       </label>
                     ))}
                   </div>
                 </div>
-              )
-            })}
-          </>
-        )}
+              ))}
 
-        <button type="submit"
-          className="w-full py-3 rounded-xl font-black text-sm"
-          style={{ background: 'var(--color-accent)', color: '#000' }}>
-          ⚡ Submit Results & Score All
-        </button>
-      </form>
+              {/* Pikanteria without a correct answer */}
+              {matchDay.pikanteria.filter(p => !p.pikanteria_options.some(o => o.is_correct)).length > 0 && (
+                <>
+                  <div className="font-bold text-xs uppercase tracking-wider mt-2" style={{ color: 'var(--color-amber)' }}>
+                    🌶️ Pikanteria Results
+                  </div>
+                  {matchDay.pikanteria
+                    .filter(p => !p.pikanteria_options.some(o => o.is_correct))
+                    .map(pika => {
+                      const options = [...pika.pikanteria_options].sort(
+                        (a, b) => a.sort_order - b.sort_order
+                      )
+                      return (
+                        <div key={pika.id} className="rounded-xl p-4 space-y-3"
+                          style={{ background: 'var(--color-panel)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                          <p className="text-sm font-semibold text-text">{pika.question}</p>
+                          <div className="flex gap-2 flex-wrap">
+                            {options.map(opt => (
+                              <label key={opt.id}
+                                className="flex-1 flex items-center gap-1.5 rounded-lg p-2 cursor-pointer min-w-[80px]"
+                                style={inputStyle}>
+                                <input
+                                  type="radio"
+                                  name={`pik_${pika.id}`}
+                                  value={opt.id}
+                                />
+                                <span className="text-xs text-text font-medium">{opt.label}</span>
+                                <span className="text-[10px] text-muted" style={{ fontFamily: 'var(--font-mono)' }}>
+                                  {opt.odds.toFixed(2)}
+                                </span>
+                              </label>
+                            ))}
+                          </div>
+                        </div>
+                      )
+                    })}
+                </>
+              )}
+
+              <button type="submit"
+                className="w-full py-3 rounded-xl font-black text-sm"
+                style={{ background: 'var(--color-accent)', color: '#000' }}>
+                ⚡ Submit Results & Score All
+              </button>
+            </form>
+
+            <hr style={{ borderColor: 'rgba(255,255,255,0.06)' }} />
+          </div>
+        )
+      })}
     </div>
   )
 }
