@@ -1,5 +1,6 @@
 'use client'
 import { useState } from 'react'
+import Link from 'next/link'
 import type { LeaderboardEntry } from '@/lib/types'
 
 interface Props {
@@ -159,6 +160,24 @@ export function Leaderboard({ entries, currentUserId }: Props) {
                   </span>
                 )}
               </div>
+              {!isMe && (
+                <Link
+                  href={`/h2h/${entry.id}`}
+                  className="px-2 py-0.5 rounded-full not-italic shrink-0"
+                  style={{
+                    fontFamily: 'var(--font-display)',
+                    fontSize: 9,
+                    fontWeight: 700,
+                    letterSpacing: '0.08em',
+                    color: 'var(--color-sub)',
+                    background: 'var(--color-elev)',
+                    border: '1px solid var(--border-base)',
+                    textDecoration: 'none',
+                  }}
+                >
+                  VS
+                </Link>
+              )}
               <div
                 className="font-bold text-[13px]"
                 style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-text)' }}

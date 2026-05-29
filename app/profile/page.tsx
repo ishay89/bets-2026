@@ -79,6 +79,14 @@ export default async function ProfilePage() {
           </div>
         </div>
 
+        {/* Head-to-head entry */}
+        <Link href="/h2h"
+          className="flex items-center justify-between rounded-[14px] px-4 py-3"
+          style={{ background: 'var(--color-panel)', border: '1px solid var(--border-base)', textDecoration: 'none' }}>
+          <span className="text-[13px] font-bold text-text">⚔️ Compare vs a friend</span>
+          <span className="text-[13px] font-bold" style={{ color: 'var(--color-accent)' }}>→</span>
+        </Link>
+
         {/* Points breakdown */}
         <div className="text-[10px] font-bold uppercase tracking-[1.2px] px-0.5 text-muted">
           Where your points came from
