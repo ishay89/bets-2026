@@ -1,4 +1,4 @@
-import { createServiceClient } from '@/lib/supabase/server'
+import { createAdminClient, assertAdmin } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { isMatchLocked } from '@/lib/lock'
@@ -40,7 +40,8 @@ export default async function PlayerDetailPage({
   params: Promise<{ userId: string }>
 }) {
   const { userId } = await params
-  const supabase = await createServiceClient()
+  await assertAdmin()
+  const supabase = createAdminClient()
 
   const [{ data: userRow }, { data: matchDaysRaw }, { data: predictions }, { data: answers }] =
     await Promise.all([

@@ -1,4 +1,4 @@
-import { createServiceClient } from '@/lib/supabase/server'
+import { createAdminClient, assertAdmin } from '@/lib/supabase/server'
 
 type AuditValue = Record<string, unknown> | null
 
@@ -67,7 +67,8 @@ function formatTimestamp(value: string) {
 }
 
 export default async function AuditPage() {
-  const supabase = await createServiceClient()
+  await assertAdmin()
+  const supabase = createAdminClient()
   const { data } = await supabase
     .from('user_prediction_audit_events')
     .select('*, users(display_name, email, is_monkey)')

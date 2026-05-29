@@ -1,11 +1,12 @@
-import { createClient, createServiceClient } from '@/lib/supabase/server'
+import { createClient, createAdminClient, assertAdmin } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { recalculateAllSnapshots } from '@/lib/score-validation'
 
 async function revalidateAll() {
   'use server'
-  const supabase = await createServiceClient()
+  await assertAdmin()
+  const supabase = createAdminClient()
   await recalculateAllSnapshots(supabase)
   revalidatePath('/admin/scores')
   redirect('/admin/scores')
