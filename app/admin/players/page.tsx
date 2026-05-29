@@ -1,5 +1,6 @@
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import Link from 'next/link'
 import type { User } from '@/lib/types'
 
 async function toggleAdmin(formData: FormData) {
@@ -36,9 +37,9 @@ export default async function PlayersPage() {
           <div key={player.id}
             className="flex items-center justify-between rounded-xl px-4 py-3"
             style={{ background: 'var(--color-panel)', border: '1px solid rgba(255,255,255,0.06)' }}>
-            <div className="flex-1 min-w-0">
+            <Link href={`/admin/players/${player.id}`} className="flex-1 min-w-0 group">
               <div className="flex items-center gap-2">
-                <span className="font-semibold text-[13px] text-text truncate">{player.display_name}</span>
+                <span className="font-semibold text-[13px] text-text truncate group-hover:text-amber transition-colors">{player.display_name}</span>
                 {player.is_admin && (
                   <span className="text-[9px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full shrink-0"
                     style={{ color: 'var(--color-amber)', background: 'rgba(245,166,35,0.13)', border: '1px solid rgba(245,166,35,0.3)' }}>
@@ -47,7 +48,7 @@ export default async function PlayersPage() {
                 )}
               </div>
               <div className="text-muted text-[11px] mt-0.5 truncate">{player.email}</div>
-            </div>
+            </Link>
             <form action={toggleAdmin} className="shrink-0 ml-3">
               <input type="hidden" name="user_id" value={player.id} />
               <input type="hidden" name="is_admin" value={String(player.is_admin)} />
