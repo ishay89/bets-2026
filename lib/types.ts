@@ -15,6 +15,7 @@ export interface MatchDay {
   date: string
   stage: Stage
   lock_time: string
+  locked: boolean
   published_at: string | null
   created_at: string
 }
@@ -29,6 +30,7 @@ export interface Match {
   odds_draw: number
   odds_away: number
   result: Pick | null
+  locked: boolean
 }
 
 export interface PicanteriaOption {
