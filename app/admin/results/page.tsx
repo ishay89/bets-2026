@@ -1,8 +1,13 @@
 import { createClient, createServiceClient, assertAdmin } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
-import { calcMatchPoints, calcPicanteriaPoints } from '@/lib/scoring'
 import { snapshotMatchDay } from '@/lib/score-validation'
+import {
+  buildMatchScoringPayload,
+  buildPikanteriaScoringPayload,
+  type ScoredMatchInput,
+  type PikanteriaInput,
+} from '@/lib/scoring-writes'
 import type { Stage, Pick, Match, Pikanteria, PicanteriaOption, MatchDay } from '@/lib/types'
 
 type PikanteriaRow = Pikanteria & { pikanteria_options: PicanteriaOption[] }
@@ -22,66 +27,101 @@ async function enterResults(formData: FormData) {
 
   const stage = matchDay!.stage as Stage
 
+  // ── Gather the matches being scored from this submission ──────────────────
   const { data: matches } = await supabase
     .from('matches')
     .select('id, odds_home, odds_draw, odds_away')
     .eq('match_day_id', matchDayId)
 
-  for (const match of matches ?? []) {
-    const result = formData.get(`result_${match.id}`) as Pick | null
-    if (!result) continue
+  const scoredMatches = (matches ?? [])
+    .map(m => ({ ...m, result: formData.get(`result_${m.id}`) as Pick | null }))
+    .filter((m): m is typeof m & { result: Pick } => m.result !== null)
 
-    await supabase.from('matches').update({ result }).eq('id', match.id)
+  // Fetch all predictions for the scored matches in one query, then group.
+  const matchIds = scoredMatches.map(m => m.id)
+  const { data: predictions } = matchIds.length
+    ? await supabase
+        .from('predictions')
+        .select('id, match_id, pick')
+        .in('match_id', matchIds)
+    : { data: [] }
 
-    const { data: predictions } = await supabase
-      .from('predictions')
-      .select('id, pick')
-      .eq('match_id', match.id)
-
-    const oddsForResult = result === '1' ? match.odds_home
-      : result === 'X' ? match.odds_draw
-      : match.odds_away
-
-    for (const pred of predictions ?? []) {
-      const points = calcMatchPoints(oddsForResult, stage, pred.pick === result)
-      await supabase.from('predictions').update({ points }).eq('id', pred.id)
-    }
+  const predsByMatch = new Map<string, { id: string; pick: Pick }[]>()
+  for (const p of (predictions ?? []) as { id: string; match_id: string; pick: Pick }[]) {
+    const list = predsByMatch.get(p.match_id) ?? []
+    list.push({ id: p.id, pick: p.pick })
+    predsByMatch.set(p.match_id, list)
   }
 
-  // Score pikanteria using n-option structure
+  const matchInputs: ScoredMatchInput[] = scoredMatches.map(m => ({
+    id: m.id,
+    odds_home: m.odds_home,
+    odds_draw: m.odds_draw,
+    odds_away: m.odds_away,
+    result: m.result,
+    predictions: predsByMatch.get(m.id) ?? [],
+  }))
+
+  const { matchResults, predictionPoints } = buildMatchScoringPayload(matchInputs, stage)
+
+  // ── Gather the pikanteria being resolved from this submission ─────────────
   const { data: pikaItems } = await supabase
     .from('pikanteria')
     .select('id, pikanteria_options(id, odds)')
     .eq('match_day_id', matchDayId)
 
+  const pikInputs: PikanteriaInput[] = []
   for (const pika of pikaItems ?? []) {
     const winningOptionId = formData.get(`pik_${pika.id}`) as string | null
     if (!winningOptionId) continue
-
-    // Clear any previously marked correct option before setting the new winner
-    await supabase.from('pikanteria_options')
-      .update({ is_correct: false })
-      .eq('pikanteria_id', pika.id)
-
-    await supabase.from('pikanteria_options')
-      .update({ is_correct: true })
-      .eq('id', winningOptionId)
 
     const winningOption = (pika.pikanteria_options as { id: string; odds: number }[])
       .find(o => o.id === winningOptionId)
     if (!winningOption) continue
 
-    const { data: answers } = await supabase
-      .from('pikanteria_answers')
-      .select('id, option_id')
-      .eq('pikanteria_id', pika.id)
-
-    for (const ans of answers ?? []) {
-      const points = calcPicanteriaPoints(winningOption.odds, ans.option_id === winningOptionId)
-      await supabase.from('pikanteria_answers').update({ points }).eq('id', ans.id)
-    }
+    pikInputs.push({
+      id: pika.id,
+      winningOptionId,
+      winningOdds: Number(winningOption.odds),
+      answers: [],
+    })
   }
 
+  const pikIds = pikInputs.map(p => p.id)
+  const { data: answers } = pikIds.length
+    ? await supabase
+        .from('pikanteria_answers')
+        .select('id, pikanteria_id, option_id')
+        .in('pikanteria_id', pikIds)
+    : { data: [] }
+
+  const ansByPik = new Map<string, { id: string; option_id: string }[]>()
+  for (const a of (answers ?? []) as { id: string; pikanteria_id: string; option_id: string }[]) {
+    const list = ansByPik.get(a.pikanteria_id) ?? []
+    list.push({ id: a.id, option_id: a.option_id })
+    ansByPik.set(a.pikanteria_id, list)
+  }
+  for (const input of pikInputs) {
+    input.answers = ansByPik.get(input.id) ?? []
+  }
+
+  const { winners, answerPoints } = buildPikanteriaScoringPayload(pikInputs)
+
+  // ── Single atomic write: all-or-nothing inside one Postgres transaction ───
+  const { error } = await supabase.rpc('enter_match_day_results', {
+    p_match_day_id: matchDayId,
+    p_match_results: matchResults,
+    p_prediction_points: predictionPoints,
+    p_pikanteria_winners: winners,
+    p_answer_points: answerPoints,
+  })
+  if (error) {
+    // The transaction rolled back; the match day is left exactly as it was.
+    throw new Error(`Scoring failed and was rolled back: ${error.message}`)
+  }
+
+  // Snapshots are derived/recoverable data (rebuildable via recalculate), so
+  // they stay outside the scoring transaction.
   await snapshotMatchDay(supabase, matchDayId)
 
   revalidatePath('/')

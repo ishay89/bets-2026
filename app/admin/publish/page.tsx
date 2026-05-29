@@ -61,34 +61,32 @@ async function publishMatchDay(formData: FormData) {
     const count = parseInt(formData.get(`pik_opt_count_${i}`) as string || '0')
     if (count < 2) continue
 
-    const { data: pika } = await supabase
-      .from('pikanteria')
-      .insert({ question: q, match_day_id: matchDayId })
-      .select('id')
-      .single()
-    if (!pika) continue
-
-    const optionRows = []
+    const optionRows: { label: string; odds: number; sort_order: number }[] = []
     for (let j = 1; j <= count; j++) {
       const label = (formData.get(`pik_opt_label_${i}_${j}`) as string | null)?.trim()
       const odds = parseFloat(formData.get(`pik_opt_odds_${i}_${j}`) as string)
       if (!label || isNaN(odds)) continue
-      optionRows.push({ pikanteria_id: pika.id, label, odds, sort_order: j - 1 })
+      optionRows.push({ label, odds, sort_order: j - 1 })
     }
 
     if (optionRows.length < 2) continue
 
-    const { data: insertedOptions } = await supabase
-      .from('pikanteria_options')
-      .insert(optionRows)
-      .select('id, odds, sort_order')
+    // Insert the question and its options atomically so a failure can never
+    // leave an orphaned question with no options.
+    const { data: pikaResult, error: pikaError } = await supabase.rpc(
+      'insert_pikanteria_with_options',
+      { p_match_day_id: matchDayId, p_question: q, p_options: optionRows },
+    )
+    if (pikaError || !pikaResult) continue
 
-    // Skip monkey pick if options failed to insert (guard against empty optionIds)
-    if (!insertedOptions?.length) continue
+    const inserted = pikaResult as {
+      id: string
+      options: { id: string; odds: number; sort_order: number }[]
+    }
 
     insertedPika.push({
-      id: pika.id,
-      options: insertedOptions.map(o => ({
+      id: inserted.id,
+      options: inserted.options.map(o => ({
         id: o.id,
         odds: Number(o.odds),
         sort_order: o.sort_order,
