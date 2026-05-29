@@ -175,6 +175,7 @@ lib/
     └── client.ts       # Browser-side Supabase client
 
 supabase/
+├── config.toml                 # Supabase CLI project config (fill in project_id)
 └── migrations/
     ├── 001_schema.sql              # Create all tables and leaderboard view
     ├── 002_rls.sql                 # Enable RLS policies
@@ -184,8 +185,9 @@ supabase/
     ├── 006_pikanteria_options.sql  # N-option pikanteria support
     ├── 007_user_prediction_audit_events.sql
     ├── 008_automated_marker_users.sql
-    ├── 008_match_locking.sql       # Per-match lock flag
-    └── 009_crowd_picks.sql         # Crowd pick RPCs
+    ├── 009_match_locking.sql       # Per-match lock flag
+    ├── 010_crowd_picks.sql         # Crowd pick RPCs
+    └── 011_atomic_scoring.sql      # Atomic scoring write path
 
 public/                 # Static assets
 
@@ -235,19 +237,17 @@ npm test -- lib/scoring.test.ts
 ## Database Setup
 
 1. Create Supabase project (free tier works)
-2. Run migrations in SQL Editor:
-   ```sql
-   -- First run 001_schema.sql (creates tables + leaderboard view)
-   -- Then run 002_rls.sql (enables row level security)
+2. Fill in `project_id` in `supabase/config.toml` (Supabase Dashboard → Settings → General)
+3. Apply all migrations via the Supabase CLI:
+   ```bash
+   npm install -g supabase   # install CLI once
+   supabase login
+   supabase db push          # applies 001 → 011 in order
    ```
-3. Insert Monkey player for AI baseline:
-   ```sql
-   insert into auth.users (id, email, role, email_confirmed_at) values
-     ('00000000-0000-0000-0000-000000000001', 'monkey@mondial2026.local', 'authenticated', now());
-   insert into public.users (id, email, display_name, is_monkey) values
-     ('00000000-0000-0000-0000-000000000001', 'monkey@mondial2026.local', '🐒 Monkey', true);
-   ```
+   Migrations include automated benchmark users (Monkey, Always Max, Always Mid, Always Min) — no manual seed needed.
 4. Set environment variables in `.env.local` (see Supabase dashboard)
+
+> **Manual fallback**: if the CLI is unavailable, run each file in `supabase/migrations/` in numeric order (001 → 011) via Supabase Dashboard → SQL Editor.
 
 ## Development Workflow
 
