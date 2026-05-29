@@ -18,8 +18,9 @@ export default async function PlayersPage() {
     .select('*')
     .order('display_name')
 
-  const realPlayers = ((players ?? []) as User[]).filter(p => !p.is_monkey)
-  const monkey = ((players ?? []) as User[]).find(p => p.is_monkey)
+  const allPlayers = (players ?? []) as User[]
+  const realPlayers = allPlayers.filter(p => !p.is_monkey)
+  const automatedPlayers = allPlayers.filter(p => p.is_monkey)
 
   return (
     <div className="max-w-lg mx-auto space-y-4 pb-10">
@@ -64,19 +65,38 @@ export default async function PlayersPage() {
         ))}
       </div>
 
-      {/* Monkey */}
-      {monkey && (
-        <div className="rounded-xl px-4 py-3 opacity-60"
-          style={{ background: 'var(--color-panel)', border: '1px solid rgba(255,255,255,0.06)' }}>
-          <div className="flex items-center gap-2">
-            <span className="text-lg">🐒</span>
-            <div>
-              <div className="font-semibold text-[13px] text-text">{monkey.display_name}</div>
-              <div className="text-muted text-[11px]">Shadow player · not eligible for prizes</div>
+      {automatedPlayers.length > 0 && (
+        <div className="space-y-2">
+          {automatedPlayers.map(player => (
+            <div key={player.id} className="rounded-xl px-4 py-3 opacity-60"
+              style={{ background: 'var(--color-panel)', border: '1px solid rgba(255,255,255,0.06)' }}>
+              <div className="flex items-center gap-2">
+                <span className="text-lg">{automationIcon(player)}</span>
+                <div>
+                  <div className="font-semibold text-[13px] text-text">{player.display_name}</div>
+                  <div className="text-muted text-[11px]">
+                    {automationLabel(player)} · not eligible for prizes
+                  </div>
+                </div>
+              </div>
             </div>
-          </div>
+          ))}
         </div>
       )}
     </div>
   )
+}
+
+function automationIcon(player: User): string {
+  if (player.automation_strategy === 'max') return '▲'
+  if (player.automation_strategy === 'mid') return '◆'
+  if (player.automation_strategy === 'min') return '▼'
+  return '🐒'
+}
+
+function automationLabel(player: User): string {
+  if (player.automation_strategy === 'max') return 'Highest-odds marker'
+  if (player.automation_strategy === 'mid') return 'Median-odds marker'
+  if (player.automation_strategy === 'min') return 'Lowest-odds marker'
+  return 'Shadow player'
 }

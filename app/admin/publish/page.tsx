@@ -1,9 +1,16 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import { LOCK_LEAD_MS } from '@/lib/lock'
-import { monkeyMatchPick, monkeyPikanteriaPick } from '@/lib/monkey'
+import {
+  automatedMatchPick,
+  automatedPikanteriaPick,
+  monkeyMatchPick,
+  monkeyPikanteriaPick,
+  type AutomationStrategy,
+} from '@/lib/monkey'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { PicanteriaBuilder } from '@/components/pikanteria-builder'
+import type { Pick } from '@/lib/types'
 
 async function publishMatchDay(formData: FormData) {
   'use server'
@@ -41,7 +48,10 @@ async function publishMatchDay(formData: FormData) {
   }).eq('id', matchDayId)
 
   // Insert pikanteria questions with N options each
-  const insertedPika: { id: string; optionIds: string[] }[] = []
+  const insertedPika: {
+    id: string
+    options: { id: string; odds: number; sort_order: number }[]
+  }[] = []
 
   for (let i = 1; i <= 3; i++) {
     const q = (formData.get(`pik_q_${i}`) as string | null)?.trim()
@@ -70,35 +80,61 @@ async function publishMatchDay(formData: FormData) {
     const { data: insertedOptions } = await supabase
       .from('pikanteria_options')
       .insert(optionRows)
-      .select('id')
+      .select('id, odds, sort_order')
 
     // Skip monkey pick if options failed to insert (guard against empty optionIds)
     if (!insertedOptions?.length) continue
 
-    insertedPika.push({ id: pika.id, optionIds: insertedOptions.map(o => o.id) })
+    insertedPika.push({
+      id: pika.id,
+      options: insertedOptions.map(o => ({
+        id: o.id,
+        odds: Number(o.odds),
+        sort_order: o.sort_order,
+      })),
+    })
   }
 
-  // Monkey picks
-  const { data: monkey } = await supabase.from('users').select('id').eq('is_monkey', true).single()
-  if (monkey) {
-    const { data: allMatches } = await supabase
-      .from('matches').select('id').eq('match_day_id', matchDayId)
-    if (allMatches?.length) {
-      await supabase.from('predictions').insert(
-        allMatches.map((m: { id: string }) => ({
-          user_id: monkey.id, match_id: m.id, pick: monkeyMatchPick(m.id, date),
-        }))
-      )
-    }
-    if (insertedPika.length) {
-      await supabase.from('pikanteria_answers').insert(
-        insertedPika.map(p => ({
-          user_id: monkey.id,
-          pikanteria_id: p.id,
-          option_id: monkeyPikanteriaPick(p.id, date, p.optionIds),
-        }))
-      )
-    }
+  // Automated benchmark picks
+  const { data: automatedUsers } = await supabase
+    .from('users')
+    .select('id, automation_strategy')
+    .not('automation_strategy', 'is', null)
+    .returns<{ id: string; automation_strategy: AutomationStrategy }[]>()
+
+  const { data: allMatches } = await supabase
+    .from('matches')
+    .select('id, odds_home, odds_draw, odds_away')
+    .eq('match_day_id', matchDayId)
+
+  if (automatedUsers?.length && allMatches?.length) {
+    const predictionRows = automatedUsers.flatMap(user =>
+      allMatches.map(match => {
+        const pick: Pick = user.automation_strategy === 'monkey'
+          ? monkeyMatchPick(match.id, date)
+          : automatedMatchPick(match, user.automation_strategy)
+
+        return { user_id: user.id, match_id: match.id, pick }
+      })
+    )
+
+    await supabase.from('predictions').upsert(predictionRows, { onConflict: 'user_id,match_id' })
+  }
+
+  if (automatedUsers?.length && insertedPika.length) {
+    const pikanteriaRows = automatedUsers.flatMap(user =>
+      insertedPika.map(pika => {
+        const option_id = user.automation_strategy === 'monkey'
+          ? monkeyPikanteriaPick(pika.id, date, pika.options.map(option => option.id))
+          : automatedPikanteriaPick(pika.options, user.automation_strategy)
+
+        return { user_id: user.id, pikanteria_id: pika.id, option_id }
+      })
+    )
+
+    await supabase.from('pikanteria_answers').upsert(pikanteriaRows, {
+      onConflict: 'user_id,pikanteria_id',
+    })
   }
 
   revalidatePath('/predict')

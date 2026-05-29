@@ -8,8 +8,27 @@ interface Props {
 }
 
 const AVATARS = ['🦁','🐯','🦊','🐺','🦅','🐻','🐼','🦝','🦄','🐉','🦋','🌟','🔥','⚡','🎯']
-function getAvatar(name: string, isMonkey: boolean): string {
-  if (isMonkey) return '🐒'
+function getAvatar(entry: LeaderboardEntry): string {
+  if (entry.automation_strategy === 'max') return '▲'
+  if (entry.automation_strategy === 'mid') return '◆'
+  if (entry.automation_strategy === 'min') return '▼'
+  if (entry.is_monkey) return '🐒'
+  return AVATARS[entry.display_name.charCodeAt(0) % AVATARS.length]
+}
+
+function getAutomationLabel(entry: LeaderboardEntry): string | null {
+  if (entry.automation_strategy === 'max') return 'max marker'
+  if (entry.automation_strategy === 'mid') return 'mid marker'
+  if (entry.automation_strategy === 'min') return 'min marker'
+  if (entry.automation_strategy === 'monkey' || entry.is_monkey) return 'shadow'
+  return null
+}
+
+function isAutomated(entry: LeaderboardEntry): boolean {
+  return Boolean(entry.automation_strategy || entry.is_monkey)
+}
+
+function getAvatarFromName(name: string): string {
   return AVATARS[name.charCodeAt(0) % AVATARS.length]
 }
 
@@ -80,7 +99,7 @@ export function Leaderboard({ entries, currentUserId }: Props) {
             const entry = top3[idx]
             if (!entry) return null
             const rank = idx + 1
-            const av = getAvatar(entry.display_name, entry.is_monkey)
+            const av = getAvatar(entry)
             return (
               <div key={entry.id} style={{ width: idx === 0 ? '36%' : '32%', textAlign: 'center' }}>
                 <div
@@ -106,7 +125,8 @@ export function Leaderboard({ entries, currentUserId }: Props) {
         {rest.map((entry, i) => {
           const rank = i + 4
           const isMe = entry.id === currentUserId
-          const av = getAvatar(entry.display_name, entry.is_monkey)
+          const av = getAvatar(entry)
+          const automationLabel = getAutomationLabel(entry)
           return (
             <div
               key={entry.id}
@@ -116,8 +136,8 @@ export function Leaderboard({ entries, currentUserId }: Props) {
                 background: isMe ? 'rgba(0,217,126,0.06)' : 'transparent',
                 borderBottom: '1px solid rgba(255,255,255,0.06)',
                 borderLeft: isMe ? '2px solid var(--color-accent)' : '2px solid transparent',
-                opacity: entry.is_monkey ? 0.6 : 1,
-                fontStyle: entry.is_monkey ? 'italic' : 'normal',
+                opacity: isAutomated(entry) ? 0.6 : 1,
+                fontStyle: isAutomated(entry) ? 'italic' : 'normal',
               }}
             >
               <div
@@ -133,8 +153,10 @@ export function Leaderboard({ entries, currentUserId }: Props) {
                 style={{ color: isMe ? 'var(--color-accent)' : 'var(--color-text)' }}
               >
                 {entry.display_name}
-                {entry.is_monkey && (
-                  <span className="ml-1 text-[9px] not-italic" style={{ color: 'var(--color-muted)' }}>· shadow</span>
+                {automationLabel && (
+                  <span className="ml-1 text-[9px] not-italic" style={{ color: 'var(--color-muted)' }}>
+                    · {automationLabel}
+                  </span>
                 )}
               </div>
               <div
@@ -164,7 +186,7 @@ export function Leaderboard({ entries, currentUserId }: Props) {
           {dangerZone.map((e, i) => {
             const rank = sorted.length - 1 + i
             const fine = i === 0 ? '+₪200' : '+₪100'
-            const av = getAvatar(e.display_name, e.is_monkey)
+            const av = e.is_monkey ? getAvatar(e) : getAvatarFromName(e.display_name)
             return (
               <div
                 key={e.id}
