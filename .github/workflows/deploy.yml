@@ -1,6 +1,7 @@
 name: Deploy to Vercel
 
 on:
+  workflow-dispatch
   push:
     branches: [main]
 
