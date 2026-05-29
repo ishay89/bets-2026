@@ -24,7 +24,10 @@ async function savePreTournamentPick(formData: FormData) {
   const scorer = SCORERS.find(s => s.name === scorerName)!
 
   const service = await createServiceClient()
-  const [{ data: existing }, { data: firstDay }] = await Promise.all([
+  const [
+    { data: existing, error: existingError },
+    { data: firstDay, error: firstDayError },
+  ] = await Promise.all([
     service
       .from('pre_tournament_picks')
       .select('id, winner_team, winner_odds, top_scorer, top_scorer_odds')
@@ -39,6 +42,8 @@ async function savePreTournamentPick(formData: FormData) {
       .maybeSingle(),
   ])
 
+  if (existingError) throw existingError
+  if (firstDayError) throw firstDayError
   if (firstDay && new Date() >= new Date(firstDay.lock_time)) {
     throw new Error('Pre-tournament picks are locked')
   }
@@ -90,12 +95,17 @@ export default async function PreTournamentPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const [{ data: pick }, { data: firstDay }] = await Promise.all([
-    supabase.from('pre_tournament_picks').select('*').eq('user_id', user.id).single(),
+  const [
+    { data: pick, error: pickError },
+    { data: firstDay, error: firstDayError },
+  ] = await Promise.all([
+    supabase.from('pre_tournament_picks').select('*').eq('user_id', user.id).maybeSingle(),
     supabase.from('match_days').select('lock_time').not('published_at', 'is', null)
-      .order('date', { ascending: true }).limit(1).single(),
+      .order('date', { ascending: true }).limit(1).maybeSingle(),
   ])
 
+  if (pickError) throw pickError
+  if (firstDayError) throw firstDayError
   const isLocked = firstDay ? new Date() >= new Date(firstDay.lock_time) : false
 
   const inputStyle = {

@@ -20,20 +20,21 @@ async function enterResults(formData: FormData) {
   const supabase = await createServiceClient()
 
   const matchDayId = parseUUID(formData.get('match_day_id'), 'match_day_id')
-  const { data: matchDay } = await supabase
+  const { data: matchDay, error: matchDayError } = await supabase
     .from('match_days')
     .select('stage')
     .eq('id', matchDayId)
     .single()
-
+  if (matchDayError) throw matchDayError
   if (!matchDay) throw new Error('Match day not found')
   const stage = matchDay.stage as Stage
 
   // ── Gather the matches being scored from this submission ──────────────────
-  const { data: matches } = await supabase
+  const { data: matches, error: matchesError } = await supabase
     .from('matches')
     .select('id, odds_home, odds_draw, odds_away')
     .eq('match_day_id', matchDayId)
+  if (matchesError) throw matchesError
 
   const scoredMatches = (matches ?? [])
     .flatMap(m => {
@@ -44,12 +45,13 @@ async function enterResults(formData: FormData) {
 
   // Fetch all predictions for the scored matches in one query, then group.
   const matchIds = scoredMatches.map(m => m.id)
-  const { data: predictions } = matchIds.length
+  const { data: predictions, error: predsError } = matchIds.length
     ? await supabase
         .from('predictions')
         .select('id, match_id, pick')
         .in('match_id', matchIds)
-    : { data: [] }
+    : { data: [], error: null }
+  if (predsError) throw predsError
 
   const predsByMatch = new Map<string, { id: string; pick: Pick }[]>()
   for (const p of (predictions ?? []) as { id: string; match_id: string; pick: Pick }[]) {
@@ -70,10 +72,11 @@ async function enterResults(formData: FormData) {
   const { matchResults, predictionPoints } = buildMatchScoringPayload(matchInputs, stage)
 
   // ── Gather the pikanteria being resolved from this submission ─────────────
-  const { data: pikaItems } = await supabase
+  const { data: pikaItems, error: pikaError } = await supabase
     .from('pikanteria')
     .select('id, pikanteria_options(id, odds)')
     .eq('match_day_id', matchDayId)
+  if (pikaError) throw pikaError
 
   const pikInputs: PikanteriaInput[] = []
   for (const pika of pikaItems ?? []) {
@@ -94,12 +97,13 @@ async function enterResults(formData: FormData) {
   }
 
   const pikIds = pikInputs.map(p => p.id)
-  const { data: answers } = pikIds.length
+  const { data: answers, error: answersError } = pikIds.length
     ? await supabase
         .from('pikanteria_answers')
         .select('id, pikanteria_id, option_id')
         .in('pikanteria_id', pikIds)
-    : { data: [] }
+    : { data: [], error: null }
+  if (answersError) throw answersError
 
   const ansByPik = new Map<string, { id: string; option_id: string }[]>()
   for (const a of (answers ?? []) as { id: string; pikanteria_id: string; option_id: string }[]) {
@@ -145,11 +149,12 @@ const inputStyle = {
 export default async function ResultsPage() {
   const supabase = await createClient()
 
-  const { data: matchDays } = await supabase
+  const { data: matchDays, error: matchDaysError } = await supabase
     .from('match_days')
     .select('*, matches(*), pikanteria(*, pikanteria_options(*))')
     .not('published_at', 'is', null)
     .order('date', { ascending: true })
+  if (matchDaysError) throw matchDaysError
 
   const unscoredDays = ((matchDays ?? []) as MatchDayRow[]).filter(d =>
     d.matches.some(m => m.result === null)

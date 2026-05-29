@@ -15,9 +15,10 @@ async function scoreTournamentEnd(formData: FormData) {
   const runnerUp = parseNonEmpty(formData.get('runner_up'), 'runner_up')
   const topScorer = parseScorerName(formData.get('top_scorer'))
 
-  const { data: picks } = await supabase
+  const { data: picks, error: picksError } = await supabase
     .from('pre_tournament_picks')
     .select('id, user_id, winner_team, winner_odds, top_scorer, top_scorer_odds')
+  if (picksError) throw picksError
 
   const pickPoints = buildTournamentScoringPayload(picks ?? [], winner, runnerUp, topScorer)
 

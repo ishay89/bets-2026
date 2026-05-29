@@ -31,7 +31,10 @@ export default async function PredictPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const [{ data: matchDaysRaw }, { data: preTournamentPick }] = await Promise.all([
+  const [
+    { data: matchDaysRaw, error: matchDaysError },
+    { data: preTournamentPick, error: preTournamentError },
+  ] = await Promise.all([
     supabase
       .from('match_days')
       .select('*, matches(*), pikanteria(*, pikanteria_options(*))')
@@ -43,6 +46,8 @@ export default async function PredictPage() {
       .eq('user_id', user.id)
       .maybeSingle(),
   ])
+  if (matchDaysError) throw matchDaysError
+  if (preTournamentError) throw preTournamentError
 
   if (shouldRequirePreTournamentPick('/predict', hasCompletedPreTournamentPick(preTournamentPick))) {
     redirect(PRE_TOURNAMENT_PATH)
@@ -52,16 +57,20 @@ export default async function PredictPage() {
   const today = new Date().toISOString().slice(0, 10)
 
   const [
-    { data: existingPredictions },
-    { data: existingAnswers },
-    { data: crowdMatchRows },
-    { data: crowdPikRows },
+    { data: existingPredictions, error: predsError },
+    { data: existingAnswers, error: answersError },
+    { data: crowdMatchRows, error: crowdMatchError },
+    { data: crowdPikRows, error: crowdPikError },
   ] = await Promise.all([
     supabase.from('predictions').select('match_id, pick').eq('user_id', user.id),
     supabase.from('pikanteria_answers').select('pikanteria_id, option_id').eq('user_id', user.id),
     supabase.rpc('crowd_match_picks'),
     supabase.rpc('crowd_pikanteria_picks'),
   ])
+  if (predsError) throw predsError
+  if (answersError) throw answersError
+  if (crowdMatchError) throw crowdMatchError
+  if (crowdPikError) throw crowdPikError
 
   const predictionMap = Object.fromEntries(
     (existingPredictions ?? []).map(p => [p.match_id, p.pick as Pick])
