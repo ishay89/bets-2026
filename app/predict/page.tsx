@@ -8,6 +8,7 @@ import { LockTimer } from '@/components/lock-timer'
 import { BottomNav } from '@/components/bottom-nav'
 import type { Match, MatchDay, Pikanteria, PicanteriaOption, Pick } from '@/lib/types'
 import { isMatchLocked, matchLockMs } from '@/lib/lock'
+import { toPct, matchInsight, type CrowdTally } from '@/lib/crowd'
 import {
   PRE_TOURNAMENT_PATH,
   hasCompletedPreTournamentPick,
@@ -48,9 +49,16 @@ export default async function PredictPage() {
   const matchDays = (matchDaysRaw ?? []) as FullMatchDay[]
   const today = new Date().toISOString().slice(0, 10)
 
-  const [{ data: existingPredictions }, { data: existingAnswers }] = await Promise.all([
+  const [
+    { data: existingPredictions },
+    { data: existingAnswers },
+    { data: crowdMatchRows },
+    { data: crowdPikRows },
+  ] = await Promise.all([
     supabase.from('predictions').select('match_id, pick').eq('user_id', user!.id),
     supabase.from('pikanteria_answers').select('pikanteria_id, option_id').eq('user_id', user!.id),
+    supabase.rpc('crowd_match_picks'),
+    supabase.rpc('crowd_pikanteria_picks'),
   ])
 
   const predictionMap = Object.fromEntries(
@@ -59,6 +67,20 @@ export default async function PredictPage() {
   const answerMap = Object.fromEntries(
     (existingAnswers ?? []).map(a => [a.pikanteria_id, a.option_id as string])
   )
+
+  // Aggregate crowd picks (counts only; revealed by the RPCs only after lock).
+  const crowdTally: Record<string, CrowdTally> = {}
+  for (const r of (crowdMatchRows ?? []) as { match_id: string; pick: Pick; cnt: number }[]) {
+    const t = (crowdTally[r.match_id] ??= { '1': 0, X: 0, '2': 0, total: 0 })
+    t[r.pick] = r.cnt
+    t.total += r.cnt
+  }
+  const crowdPik: Record<string, { counts: Record<string, number>; total: number }> = {}
+  for (const r of (crowdPikRows ?? []) as { pikanteria_id: string; option_id: string; cnt: number }[]) {
+    const e = (crowdPik[r.pikanteria_id] ??= { counts: {}, total: 0 })
+    e.counts[r.option_id] = r.cnt
+    e.total += r.cnt
+  }
 
   async function savePick(matchId: string, pick: Pick) {
     'use server'
@@ -281,16 +303,26 @@ export default async function PredictPage() {
                 style={{ color: 'var(--color-muted)' }}>
                 Matches{multiplier ? ` · Multiplier ${multiplier}` : ''}
               </div>
-              {sortedMatches.map(match => (
-                <MatchCard
-                  key={match.id}
-                  match={match}
-                  currentPick={predictionMap[match.id] ?? null}
-                  isLocked={isMatchLocked(match, dayManuallyLocked)}
-                  stageLabel={stageLabel}
-                  onSave={savePick}
-                />
-              ))}
+              {sortedMatches.map(match => {
+                const tally = crowdTally[match.id] ?? { '1': 0, X: 0, '2': 0, total: 0 }
+                return (
+                  <MatchCard
+                    key={match.id}
+                    match={match}
+                    currentPick={predictionMap[match.id] ?? null}
+                    isLocked={isMatchLocked(match, dayManuallyLocked)}
+                    stageLabel={stageLabel}
+                    onSave={savePick}
+                    crowd={toPct(tally)}
+                    crowdTotal={tally.total}
+                    insight={matchInsight({
+                      tally,
+                      odds: { '1': match.odds_home, X: match.odds_draw, '2': match.odds_away },
+                      myPick: predictionMap[match.id] ?? null,
+                    })}
+                  />
+                )
+              })}
 
               {/* Pikanteria */}
               {pikaItems.length > 0 && (
@@ -309,6 +341,8 @@ export default async function PredictPage() {
                       currentAnswer={answerMap[item.id] ?? null}
                       isLocked={isDayLocked}
                       onSave={saveAnswer}
+                      crowd={crowdPik[item.id]?.counts ?? null}
+                      crowdTotal={crowdPik[item.id]?.total ?? 0}
                     />
                   ))}
                 </>

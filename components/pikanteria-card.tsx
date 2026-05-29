@@ -1,15 +1,22 @@
 'use client'
 import { useState, useTransition } from 'react'
 import type { Pikanteria, PicanteriaOption } from '@/lib/types'
+import { largestRemainder } from '@/lib/crowd'
 
 interface Props {
   item: Pikanteria & { options: PicanteriaOption[] }
   currentAnswer: string | null
   isLocked: boolean
   onSave: (picanteriaId: string, optionId: string) => Promise<void>
+  /** Per-option crowd counts, revealed only once the day is locked. */
+  crowd?: Record<string, number> | null
+  crowdTotal?: number
 }
 
-export function PicanteriaCard({ item, currentAnswer, isLocked, onSave }: Props) {
+// Distinct segment colours cycled across N options (amber-led to stay on-theme).
+const SEG_COLORS = ['var(--color-amber)', 'var(--color-accent)', 'var(--color-dim)', 'var(--color-silver)', 'var(--color-sub)']
+
+export function PicanteriaCard({ item, currentAnswer, isLocked, onSave, crowd, crowdTotal = 0 }: Props) {
   const [selected, setSelected] = useState<string | null>(currentAnswer)
   const [pending, startTransition] = useTransition()
 
@@ -18,6 +25,9 @@ export function PicanteriaCard({ item, currentAnswer, isLocked, onSave }: Props)
     setSelected(optionId)
     startTransition(() => onSave(item.id, optionId))
   }
+
+  const showCrowd = isLocked && crowd && crowdTotal > 0
+  const crowdPct = showCrowd ? largestRemainder(item.options.map(o => crowd[o.id] ?? 0)) : []
 
   return (
     <div
@@ -108,6 +118,58 @@ export function PicanteriaCard({ item, currentAnswer, isLocked, onSave }: Props)
             )
           })}
         </div>
+
+        {/* Crowd picks — revealed only after lock */}
+        {showCrowd && (
+          <div style={{ borderTop: '1px solid var(--border-subtle)', marginTop: 12, paddingTop: 12 }}>
+            <div
+              className="mb-2"
+              style={{
+                fontFamily: 'var(--font-display)',
+                fontSize: 9,
+                letterSpacing: '0.16em',
+                textTransform: 'uppercase',
+                color: 'var(--color-muted)',
+              }}
+            >
+              Crowd · {crowdTotal} {crowdTotal === 1 ? 'pick' : 'picks'}
+            </div>
+
+            <div
+              className="flex w-full rounded-full overflow-hidden"
+              style={{ height: 8, background: 'var(--color-elev)' }}
+            >
+              {item.options.map((opt, i) =>
+                crowdPct[i] > 0 ? (
+                  <div
+                    key={opt.id}
+                    style={{
+                      width: `${crowdPct[i]}%`,
+                      background: SEG_COLORS[i % SEG_COLORS.length],
+                      opacity: selected === opt.id ? 1 : 0.8,
+                    }}
+                  />
+                ) : null
+              )}
+            </div>
+
+            <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1.5">
+              {item.options.map((opt, i) => (
+                <span
+                  key={opt.id}
+                  style={{
+                    fontFamily: 'var(--font-mono)',
+                    fontSize: 11,
+                    color: selected === opt.id ? 'var(--color-amber)' : 'var(--color-muted)',
+                    fontWeight: selected === opt.id ? 700 : 400,
+                  }}
+                >
+                  {crowdPct[i]}% {opt.label}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
