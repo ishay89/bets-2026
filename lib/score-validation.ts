@@ -2,6 +2,110 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 
 export const SNAPSHOT_EPSILON = 0.005
 
+interface SnapshotPayload {
+  user_id: string
+  match_day_id: string
+  stage: string
+  match_points: number
+  pikanteria_points: number
+  pre_tournament_winner_pts: number
+  pre_tournament_scorer_pts: number
+  day_points: number
+  cumulative_points: number
+  is_valid: boolean
+  discrepancy: number | null
+  calculated_at: string
+}
+
+function sumByUserId(rows: { user_id: string; points: number | null }[]): Map<string, number> {
+  const map = new Map<string, number>()
+  for (const r of rows) {
+    map.set(r.user_id, (map.get(r.user_id) ?? 0) + Number(r.points ?? 0))
+  }
+  return map
+}
+
+export function buildMatchDaySnapshotPayloads(params: {
+  users: { id: string }[]
+  matchDayId: string
+  stage: string
+  matchPredRows: { user_id: string; points: number | null }[]
+  pikAnswerRows: { user_id: string; points: number | null }[]
+  allPredRows: { user_id: string; points: number | null }[]
+  allPikaRows: { user_id: string; points: number | null }[]
+  preTournRows: { user_id: string; winner_points: number | null; top_scorer_points: number | null }[]
+  existingSnapshots: { id: string; user_id: string; match_day_id: string | null; day_points: number }[]
+  now: string
+}): { toInsert: SnapshotPayload[]; toUpdate: (SnapshotPayload & { id: string })[] } {
+  const { users, matchDayId, stage, matchPredRows, pikAnswerRows, allPredRows, allPikaRows, preTournRows, existingSnapshots, now } = params
+
+  const matchDayPts = sumByUserId(matchPredRows)
+  const pikanteriaDayPts = sumByUserId(pikAnswerRows)
+  const cumulativePredPts = sumByUserId(allPredRows)
+  const cumulativePikaPts = sumByUserId(allPikaRows)
+
+  const preTournMap = new Map<string, { winner: number; scorer: number }>()
+  for (const r of preTournRows) {
+    preTournMap.set(r.user_id, {
+      winner: Number(r.winner_points ?? 0),
+      scorer: Number(r.top_scorer_points ?? 0),
+    })
+  }
+
+  const otherDaysSumByUser = new Map<string, number>()
+  const existingIdByUser = new Map<string, string>()
+  for (const snap of existingSnapshots) {
+    if (snap.match_day_id === matchDayId) {
+      existingIdByUser.set(snap.user_id, snap.id)
+    } else {
+      otherDaysSumByUser.set(snap.user_id, (otherDaysSumByUser.get(snap.user_id) ?? 0) + Number(snap.day_points))
+    }
+  }
+
+  const toInsert: SnapshotPayload[] = []
+  const toUpdate: (SnapshotPayload & { id: string })[] = []
+
+  for (const u of users) {
+    const matchPts = matchDayPts.get(u.id) ?? 0
+    const pikPts = pikanteriaDayPts.get(u.id) ?? 0
+    const dayPoints = matchPts + pikPts
+
+    const preTournament = preTournMap.get(u.id) ?? { winner: 0, scorer: 0 }
+    const freshCumulative =
+      (cumulativePredPts.get(u.id) ?? 0) +
+      (cumulativePikaPts.get(u.id) ?? 0) +
+      preTournament.winner +
+      preTournament.scorer
+
+    const otherDaysSum = otherDaysSumByUser.get(u.id) ?? 0
+    const { isValid, discrepancy } = computeSnapshotValidity(freshCumulative, dayPoints, otherDaysSum)
+
+    const payload: SnapshotPayload = {
+      user_id: u.id,
+      match_day_id: matchDayId,
+      stage,
+      match_points: matchPts,
+      pikanteria_points: pikPts,
+      pre_tournament_winner_pts: 0,
+      pre_tournament_scorer_pts: 0,
+      day_points: dayPoints,
+      cumulative_points: freshCumulative,
+      is_valid: isValid,
+      discrepancy,
+      calculated_at: now,
+    }
+
+    const existingId = existingIdByUser.get(u.id)
+    if (existingId) {
+      toUpdate.push({ ...payload, id: existingId })
+    } else {
+      toInsert.push(payload)
+    }
+  }
+
+  return { toInsert, toUpdate }
+}
+
 /**
  * Pure helper: given fresh cumulative points from raw rows, the day's points,
  * and the sum of *other* snapshot rows, returns the is_valid flag and discrepancy
@@ -203,16 +307,53 @@ export async function snapshotMatchDay(
   supabase: SupabaseClient,
   matchDayId: string,
 ): Promise<void> {
-  const [{ data: users }, { data: matchDay }] = await Promise.all([
+  const [
+    { data: users },
+    { data: matchDay },
+    { data: matchPredRows },
+    { data: pikAnswerRows },
+    { data: allPredRows },
+    { data: allPikaRows },
+    { data: preTournRows },
+    { data: existingSnapshots },
+  ] = await Promise.all([
     supabase.from('users').select('id'),
     supabase.from('match_days').select('stage').eq('id', matchDayId).single(),
+    supabase
+      .from('predictions')
+      .select('user_id, points, matches!inner(match_day_id)')
+      .eq('matches.match_day_id', matchDayId)
+      .not('points', 'is', null),
+    supabase
+      .from('pikanteria_answers')
+      .select('user_id, points, pikanteria!inner(match_day_id)')
+      .eq('pikanteria.match_day_id', matchDayId)
+      .not('points', 'is', null),
+    supabase.from('predictions').select('user_id, points').not('points', 'is', null),
+    supabase.from('pikanteria_answers').select('user_id, points').not('points', 'is', null),
+    supabase.from('pre_tournament_picks').select('user_id, winner_points, top_scorer_points'),
+    supabase.from('score_snapshots').select('id, user_id, match_day_id, day_points'),
   ])
 
   const stage = (matchDay as { stage: string } | null)?.stage ?? 'group'
 
-  await Promise.all(
-    (users ?? []).map((u: { id: string }) => upsertMatchDaySnapshot(supabase, u.id, matchDayId, stage))
-  )
+  const { toInsert, toUpdate } = buildMatchDaySnapshotPayloads({
+    users: (users ?? []) as { id: string }[],
+    matchDayId,
+    stage,
+    matchPredRows: (matchPredRows ?? []) as { user_id: string; points: number | null }[],
+    pikAnswerRows: (pikAnswerRows ?? []) as { user_id: string; points: number | null }[],
+    allPredRows: (allPredRows ?? []) as { user_id: string; points: number | null }[],
+    allPikaRows: (allPikaRows ?? []) as { user_id: string; points: number | null }[],
+    preTournRows: (preTournRows ?? []) as { user_id: string; winner_points: number | null; top_scorer_points: number | null }[],
+    existingSnapshots: (existingSnapshots ?? []) as { id: string; user_id: string; match_day_id: string | null; day_points: number }[],
+    now: new Date().toISOString(),
+  })
+
+  await Promise.all([
+    toUpdate.length > 0 ? supabase.from('score_snapshots').upsert(toUpdate) : Promise.resolve(),
+    toInsert.length > 0 ? supabase.from('score_snapshots').insert(toInsert) : Promise.resolve(),
+  ])
 }
 
 export async function recalculateAllSnapshots(
