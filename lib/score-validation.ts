@@ -1,6 +1,22 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 
-const EPSILON = 0.005
+export const SNAPSHOT_EPSILON = 0.005
+
+/**
+ * Pure helper: given fresh cumulative points from raw rows, the day's points,
+ * and the sum of *other* snapshot rows, returns the is_valid flag and discrepancy
+ * (null when valid, rounded to 2dp otherwise).
+ */
+export function computeSnapshotValidity(
+  freshCumulative: number,
+  dayPoints: number,
+  otherDaysSum: number,
+): { isValid: boolean; discrepancy: number | null } {
+  const snapshotSum = otherDaysSum + dayPoints
+  const isValid = Math.abs(freshCumulative - snapshotSum) < SNAPSHOT_EPSILON
+  const discrepancy = isValid ? null : Math.round((freshCumulative - snapshotSum) * 100) / 100
+  return { isValid, discrepancy }
+}
 
 export async function computeMatchPoints(
   supabase: SupabaseClient,
@@ -109,10 +125,7 @@ export async function upsertMatchDaySnapshot(
 
   const dayPoints = matchPts + pikanteriaPts
   const otherDaysSum = await getSnapshotSum(supabase, userId, matchDayId)
-  const snapshotSum = otherDaysSum + dayPoints
-
-  const isValid = Math.abs(freshCumulative - snapshotSum) < EPSILON
-  const discrepancy = isValid ? null : Math.round((freshCumulative - snapshotSum) * 100) / 100
+  const { isValid, discrepancy } = computeSnapshotValidity(freshCumulative, dayPoints, otherDaysSum)
 
   const payload = {
     user_id: userId,
@@ -155,10 +168,7 @@ export async function upsertPreTournamentSnapshot(
 
   const dayPoints = winnerPts + scorerPts
   const otherDaysSum = await getSnapshotSum(supabase, userId, null)
-  const snapshotSum = otherDaysSum + dayPoints
-
-  const isValid = Math.abs(freshCumulative - snapshotSum) < EPSILON
-  const discrepancy = isValid ? null : Math.round((freshCumulative - snapshotSum) * 100) / 100
+  const { isValid, discrepancy } = computeSnapshotValidity(freshCumulative, dayPoints, otherDaysSum)
 
   const payload = {
     user_id: userId,
