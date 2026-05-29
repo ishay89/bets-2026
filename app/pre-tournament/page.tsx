@@ -102,6 +102,7 @@ async function savePreTournamentPick(formData: FormData) {
     })
   }
 
+  revalidatePath('/', 'layout')
   revalidatePath('/pre-tournament')
 }
 

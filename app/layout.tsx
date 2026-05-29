@@ -2,6 +2,8 @@ import type { Metadata } from 'next'
 import { Oswald, Barlow, IBM_Plex_Mono } from 'next/font/google'
 import './globals.css'
 import { ThemeToggle } from '@/components/theme-toggle'
+import { createClient } from '@/lib/supabase/server'
+import { getTeamTheme, getTeamThemeCssVariables } from '@/lib/team-theme'
 
 const barlow = Barlow({
   subsets: ['latin'],
@@ -29,11 +31,29 @@ export const metadata: Metadata = {
   description: 'FIFA World Cup 2026 — USA · CAN · MEX',
 }
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  let winningTeam: string | null = null
+
+  if (user) {
+    const { data: pick } = await supabase
+      .from('pre_tournament_picks')
+      .select('winner_team')
+      .eq('user_id', user.id)
+      .maybeSingle()
+    winningTeam = pick?.winner_team ?? null
+  }
+
+  const teamTheme = getTeamTheme(winningTeam)
+  const teamThemeStyle = getTeamThemeCssVariables(winningTeam) as React.CSSProperties
+
   return (
     <html
       lang="en"
       data-theme="dark"
+      data-team={teamTheme.slug}
+      style={teamThemeStyle}
       className={`${barlow.variable} ${oswald.variable} ${ibmPlexMono.variable}`}
     >
       <head>
