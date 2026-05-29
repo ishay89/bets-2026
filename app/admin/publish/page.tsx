@@ -1,4 +1,5 @@
 import { createAdminClient } from '@/lib/supabase/server'
+import { LOCK_LEAD_MS } from '@/lib/lock'
 import { monkeyMatchPick, monkeyPikanteriaPick } from '@/lib/monkey'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
@@ -31,7 +32,7 @@ async function publishMatchDay(formData: FormData) {
   const earliest = Math.min(
     ...kickoffRows.map((m: { kickoff_time: string }) => new Date(m.kickoff_time).getTime())
   )
-  const lockTime = new Date(earliest - 30 * 60 * 1000).toISOString()
+  const lockTime = new Date(earliest - LOCK_LEAD_MS).toISOString()
 
   // Publish the match day
   await supabase.from('match_days').update({

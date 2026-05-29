@@ -7,6 +7,7 @@ import { PicanteriaCard } from '@/components/pikanteria-card'
 import { LockTimer } from '@/components/lock-timer'
 import { BottomNav } from '@/components/bottom-nav'
 import type { Match, MatchDay, Pikanteria, PicanteriaOption, Pick } from '@/lib/types'
+import { isMatchLocked, matchLockMs } from '@/lib/lock'
 import {
   PRE_TOURNAMENT_PATH,
   hasCompletedPreTournamentPick,
@@ -69,7 +70,7 @@ export default async function PredictPage() {
     const [{ data: match }, { data: existing }] = await Promise.all([
       service
         .from('matches')
-        .select('id, match_day_id, home_team, away_team, kickoff_time, odds_home, odds_draw, odds_away, match_days(id, date, lock_time, stage)')
+        .select('id, match_day_id, home_team, away_team, kickoff_time, locked, odds_home, odds_draw, odds_away, match_days(id, date, lock_time, locked, stage)')
         .eq('id', matchId)
         .single(),
       service
@@ -82,7 +83,15 @@ export default async function PredictPage() {
 
     const matchDay = Array.isArray(match?.match_days) ? match.match_days[0] : match?.match_days
     if (!match || !matchDay) throw new Error('Match not found')
-    if (new Date() >= new Date(matchDay.lock_time)) throw new Error('Picks are locked')
+
+    const wasAlreadyLocked = match.locked || matchDay.locked
+    if (isMatchLocked(match, matchDay.locked)) {
+      // Persist the time-based lock to the DB so it applies to all users going forward.
+      if (!wasAlreadyLocked) {
+        await service.from('matches').update({ locked: true }).eq('id', matchId)
+      }
+      throw new Error('Match is locked')
+    }
 
     const oldValue: AuditJson | null = existing ? { pick: existing.pick } : null
     const newValue: AuditJson = { pick }
@@ -131,7 +140,7 @@ export default async function PredictPage() {
     const [{ data: item }, { data: selectedOption }, { data: existing }] = await Promise.all([
       service
         .from('pikanteria')
-        .select('id, question, match_day_id, match_days(id, date, lock_time, stage)')
+        .select('id, question, match_day_id, match_days(id, date, lock_time, locked, stage)')
         .eq('id', picanteriaId)
         .single(),
       service
@@ -150,7 +159,7 @@ export default async function PredictPage() {
 
     const matchDay = Array.isArray(item?.match_days) ? item.match_days[0] : item?.match_days
     if (!item || !matchDay || !selectedOption) throw new Error('Pikanteria option not found')
-    if (new Date() >= new Date(matchDay.lock_time)) throw new Error('Pikanteria answers are locked')
+    if (matchDay.locked || new Date() >= new Date(matchDay.lock_time)) throw new Error('Pikanteria answers are locked')
 
     const previousOption = Array.isArray(existing?.pikanteria_options)
       ? existing?.pikanteria_options[0]
@@ -211,7 +220,6 @@ export default async function PredictPage() {
         )}
 
         {matchDays.map((matchDay, idx) => {
-          const isLocked = new Date() >= new Date(matchDay.lock_time)
           const isToday = matchDay.date === today
           const stageLabel = STAGE_LABELS[matchDay.stage] ?? matchDay.stage
           const multiplier = stageLabel.includes('×') ? `×${stageLabel.split('×')[1]}` : ''
@@ -222,6 +230,16 @@ export default async function PredictPage() {
           const dateLabel = new Date(matchDay.date + 'T12:00:00Z').toLocaleDateString('en-US', {
             weekday: 'short', month: 'short', day: 'numeric',
           })
+
+          // Day is locked when manually locked or all matches have passed their lock time.
+          const dayManuallyLocked = matchDay.locked
+          const allMatchesLocked = sortedMatches.length > 0 && sortedMatches.every(m => isMatchLocked(m, dayManuallyLocked))
+          const isDayLocked = dayManuallyLocked || allMatchesLocked
+
+          // Lock timer points to the earliest match's lock time (kickoff − 5 min).
+          const earliestLockTime = sortedMatches.length > 0
+            ? new Date(Math.min(...sortedMatches.map(m => matchLockMs(m.kickoff_time)))).toISOString()
+            : matchDay.lock_time
 
           return (
             <div key={matchDay.id} className="space-y-3">
@@ -242,7 +260,7 @@ export default async function PredictPage() {
                   </div>
                 </div>
 
-                {isLocked ? (
+                {isDayLocked ? (
                   <div className="text-[10px] font-bold px-2.5 py-1 rounded-full"
                     style={{ background: 'rgba(239,79,91,0.08)', color: 'var(--color-danger)', border: '1px solid rgba(239,79,91,0.25)' }}>
                     🔒 Locked
@@ -252,7 +270,7 @@ export default async function PredictPage() {
                     style={{ background: 'rgba(245,166,35,0.13)', border: '1px solid rgba(245,166,35,0.3)' }}>
                     <div className="text-[9px] font-bold uppercase tracking-wide" style={{ color: 'var(--color-amber)' }}>Locks</div>
                     <div className="text-[13px] font-bold" style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-amber)' }}>
-                      <LockTimer lockTime={matchDay.lock_time} />
+                      <LockTimer lockTime={earliestLockTime} />
                     </div>
                   </div>
                 )}
@@ -268,7 +286,7 @@ export default async function PredictPage() {
                   key={match.id}
                   match={match}
                   currentPick={predictionMap[match.id] ?? null}
-                  isLocked={isLocked}
+                  isLocked={isMatchLocked(match, dayManuallyLocked)}
                   stageLabel={stageLabel}
                   onSave={savePick}
                 />
@@ -289,7 +307,7 @@ export default async function PredictPage() {
                       key={item.id}
                       item={{ ...item, options: [...(item.pikanteria_options ?? [])].sort((a, b) => a.sort_order - b.sort_order) }}
                       currentAnswer={answerMap[item.id] ?? null}
-                      isLocked={isLocked}
+                      isLocked={isDayLocked}
                       onSave={saveAnswer}
                     />
                   ))}
