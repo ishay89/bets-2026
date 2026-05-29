@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { redirect } from 'next/navigation'
 import { BottomNav } from '@/components/bottom-nav'
 import type { Pick } from '@/lib/types'
 
@@ -17,6 +18,7 @@ const STAGE_LABELS: Record<string, string> = {
 export default async function HistoryPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
 
   const { data: matchDays } = await supabase
     .from('match_days')
@@ -36,7 +38,7 @@ export default async function HistoryPage() {
   const allPicks: ('W' | 'L' | null)[] = []
   for (const day of ((matchDays ?? []) as DayRow[]).slice(0, 10)) {
     for (const m of day.matches) {
-      const pred = m.predictions.find(p => p.user_id === user!.id)
+      const pred = m.predictions.find(p => p.user_id === user.id)
       if (pred && m.result !== null) {
         allPicks.push(pred.pick === m.result ? 'W' : 'L')
       }
@@ -93,10 +95,10 @@ export default async function HistoryPage() {
         {((matchDays ?? []) as DayRow[]).map((day) => {
           const myMatchPreds = day.matches.map(m => ({
             ...m,
-            myPick: m.predictions.find(p => p.user_id === user!.id),
+            myPick: m.predictions.find(p => p.user_id === user.id),
           }))
           const myPikaAnswers = day.pikanteria.map(p => {
-            const myAnswer = p.pikanteria_answers.find(a => a.user_id === user!.id)
+            const myAnswer = p.pikanteria_answers.find(a => a.user_id === user.id)
             const myOption = myAnswer
               ? p.pikanteria_options.find(o => o.id === myAnswer.option_id) ?? null
               : null

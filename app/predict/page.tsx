@@ -28,6 +28,7 @@ type FullMatchDay = MatchDay & {
 export default async function PredictPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
 
   const [{ data: matchDaysRaw }, { data: preTournamentPick }] = await Promise.all([
     supabase
@@ -38,7 +39,7 @@ export default async function PredictPage() {
     supabase
       .from('pre_tournament_picks')
       .select('winner_team, top_scorer')
-      .eq('user_id', user!.id)
+      .eq('user_id', user.id)
       .maybeSingle(),
   ])
 
@@ -55,8 +56,8 @@ export default async function PredictPage() {
     { data: crowdMatchRows },
     { data: crowdPikRows },
   ] = await Promise.all([
-    supabase.from('predictions').select('match_id, pick').eq('user_id', user!.id),
-    supabase.from('pikanteria_answers').select('pikanteria_id, option_id').eq('user_id', user!.id),
+    supabase.from('predictions').select('match_id, pick').eq('user_id', user.id),
+    supabase.from('pikanteria_answers').select('pikanteria_id, option_id').eq('user_id', user.id),
     supabase.rpc('crowd_match_picks'),
     supabase.rpc('crowd_pikanteria_picks'),
   ])
@@ -120,7 +121,7 @@ export default async function PredictPage() {
     const shouldAudit = shouldWriteAuditEvent(oldValue, newValue)
 
     const { data: savedPrediction, error } = await service.from('predictions').upsert(
-      { user_id: user!.id, match_id: matchId, pick },
+      { user_id: user.id, match_id: matchId, pick },
       { onConflict: 'user_id,match_id' }
     ).select('id').single()
     if (error) throw error
@@ -199,7 +200,7 @@ export default async function PredictPage() {
     const shouldAudit = shouldWriteAuditEvent(oldValue, newValue)
 
     const { data: savedAnswer, error } = await service.from('pikanteria_answers').upsert(
-      { user_id: user!.id, pikanteria_id: picanteriaId, option_id: optionId },
+      { user_id: user.id, pikanteria_id: picanteriaId, option_id: optionId },
       { onConflict: 'user_id,pikanteria_id' }
     ).select('id').single()
     if (error) throw error

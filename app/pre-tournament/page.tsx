@@ -1,6 +1,7 @@
 import { shouldWriteAuditEvent, writeAuditEvent, type AuditJson } from '@/lib/audit'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { redirect } from 'next/navigation'
 import { BottomNav } from '@/components/bottom-nav'
 
 const TEAMS = [
@@ -109,9 +110,10 @@ async function savePreTournamentPick(formData: FormData) {
 export default async function PreTournamentPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
 
   const [{ data: pick }, { data: firstDay }] = await Promise.all([
-    supabase.from('pre_tournament_picks').select('*').eq('user_id', user!.id).single(),
+    supabase.from('pre_tournament_picks').select('*').eq('user_id', user.id).single(),
     supabase.from('match_days').select('lock_time').not('published_at', 'is', null)
       .order('date', { ascending: true }).limit(1).single(),
   ])
