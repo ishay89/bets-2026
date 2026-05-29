@@ -13,7 +13,7 @@ export default async function ProfilePage() {
   const [{ data: profile }, { data: pick }, { data: predictions }, { data: pikaAnswers }] =
     await Promise.all([
       supabase.from('users').select('display_name, is_admin').eq('id', user.id).single(),
-      supabase.from('pre_tournament_picks').select('*').eq('user_id', user.id).single(),
+      supabase.from('pre_tournament_picks').select('*').eq('user_id', user.id).maybeSingle(),
       supabase.from('predictions').select('points').eq('user_id', user.id),
       supabase.from('pikanteria_answers').select('points').eq('user_id', user.id),
     ])

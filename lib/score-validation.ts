@@ -83,8 +83,9 @@ async function getSnapshotSum(
     .eq('user_id', userId)
 
   if (excludeMatchDayId !== null) {
-    // exclude the row we're about to upsert
-    query.neq('match_day_id', excludeMatchDayId)
+    // Exclude the current match day's row but keep the pre-tournament row (match_day_id IS NULL).
+    // Plain .neq() would silently drop NULL rows due to SQL NULL semantics, understating the sum.
+    query.or(`match_day_id.neq.${excludeMatchDayId},match_day_id.is.null`)
   } else {
     // pre-tournament: exclude the null row (the one we're about to upsert)
     query.not('match_day_id', 'is', null)
@@ -207,25 +208,35 @@ export async function snapshotMatchDay(
 export async function recalculateAllSnapshots(
   supabase: SupabaseClient,
 ): Promise<{ written: number; invalid: number }> {
-  // Fetch all match days that have at least one scored match, oldest first
-  const { data: matchDays } = await supabase
-    .from('match_days')
-    .select('id, stage, matches(result)')
-    .not('published_at', 'is', null)
-    .order('date', { ascending: true })
+  // Fetch everything in parallel
+  const [{ data: matchDays }, { data: users }, { data: picks }] = await Promise.all([
+    supabase
+      .from('match_days')
+      .select('id, stage, matches(result)')
+      .not('published_at', 'is', null)
+      .order('date', { ascending: true }),
+    supabase.from('users').select('id'),
+    supabase.from('pre_tournament_picks').select('user_id'),
+  ])
 
   type RecalcDay = { id: string; stage: string; matches: { result: string | null }[] }
   const scoredDays = ((matchDays ?? []) as RecalcDay[]).filter(d =>
     d.matches.some(m => m.result !== null)
   )
-
-  const { data: users } = await supabase.from('users').select('id')
   const allUsers = users ?? []
+  const allPicks = picks ?? []
 
   let written = 0
   let invalid = 0
 
-  // Process days in chronological order so cumulative calculations are sequential
+  // Pass 1: write pre-tournament snapshot rows so match-day validation can include them
+  // via getSnapshotSum's .or() clause. Without this, is_valid on match-day snapshots would
+  // be false for any user with pre-tournament points (computeCumulativeFromRaw includes them
+  // but getSnapshotSum would find no NULL row to sum against).
+  await Promise.all(allPicks.map(p => upsertPreTournamentSnapshot(supabase, p.user_id)))
+  written += allPicks.length
+
+  // Pass 2: match-day snapshots in chronological order (pre-tournament rows now exist)
   for (const day of scoredDays) {
     await Promise.all(
       allUsers.map((u: { id: string }) => upsertMatchDaySnapshot(supabase, u.id, day.id, day.stage))
@@ -233,12 +244,9 @@ export async function recalculateAllSnapshots(
     written += allUsers.length
   }
 
-  // Pre-tournament snapshots for users with picks
-  const { data: picks } = await supabase.from('pre_tournament_picks').select('user_id')
-  for (const pick of picks ?? []) {
-    await upsertPreTournamentSnapshot(supabase, pick.user_id)
-    written++
-  }
+  // Pass 3: re-run pre-tournament so is_valid reflects the now-present match-day rows
+  await Promise.all(allPicks.map(p => upsertPreTournamentSnapshot(supabase, p.user_id)))
+  written += allPicks.length
 
   // Count invalids
   const { count } = await supabase
