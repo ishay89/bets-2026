@@ -1,9 +1,10 @@
-import { createAdminClient } from '@/lib/supabase/server'
+import { createAdminClient, assertAdmin } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 
 async function saveOdds(formData: FormData) {
   'use server'
+  await assertAdmin()
   const supabase = createAdminClient()
 
   for (let i = 1; i <= 8; i++) {
@@ -22,6 +23,7 @@ async function saveOdds(formData: FormData) {
 
 async function toggleDayLock(formData: FormData) {
   'use server'
+  await assertAdmin()
   const supabase = createAdminClient()
   const matchDayId = formData.get('match_day_id') as string
   const locked = formData.get('locked') === 'true'
@@ -33,6 +35,7 @@ async function toggleDayLock(formData: FormData) {
 
 async function toggleMatchLock(formData: FormData) {
   'use server'
+  await assertAdmin()
   const supabase = createAdminClient()
   const matchId = formData.get('match_id') as string
   const locked = formData.get('locked') === 'true'

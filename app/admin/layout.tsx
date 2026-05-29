@@ -1,6 +1,8 @@
+import { assertAdmin } from '@/lib/supabase/server'
 import { AdminNav } from '@/components/admin-nav'
 
-export default function AdminLayout({ children }: { children: React.ReactNode }) {
+export default async function AdminLayout({ children }: { children: React.ReactNode }) {
+  await assertAdmin()
   return (
     <div className="min-h-screen bg-bg">
       <header
