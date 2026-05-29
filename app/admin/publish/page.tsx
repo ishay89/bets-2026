@@ -1,4 +1,4 @@
-import { createAdminClient } from '@/lib/supabase/server'
+import { createAdminClient, assertAdmin } from '@/lib/supabase/server'
 import { LOCK_LEAD_MS } from '@/lib/lock'
 import {
   automatedMatchPick,
@@ -14,6 +14,7 @@ import type { Pick } from '@/lib/types'
 
 async function publishMatchDay(formData: FormData) {
   'use server'
+  await assertAdmin()
   const supabase = createAdminClient()
 
   const matchDayId = formData.get('match_day_id') as string

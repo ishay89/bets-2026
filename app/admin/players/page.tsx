@@ -1,10 +1,11 @@
-import { createClient, createServiceClient } from '@/lib/supabase/server'
+import { createClient, createServiceClient, assertAdmin } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import Link from 'next/link'
 import type { User } from '@/lib/types'
 
 async function toggleAdmin(formData: FormData) {
   'use server'
+  await assertAdmin()
   const supabase = await createServiceClient()
   const userId = formData.get('user_id') as string
   const isAdmin = formData.get('is_admin') === 'true'

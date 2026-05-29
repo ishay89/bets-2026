@@ -1,4 +1,4 @@
-import { createServiceClient } from '@/lib/supabase/server'
+import { createServiceClient, assertAdmin } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { calcPreTournamentWinnerPoints, calcTopScorerPoints } from '@/lib/scoring'
@@ -6,6 +6,7 @@ import { upsertPreTournamentSnapshot } from '@/lib/score-validation'
 
 async function scoreTournamentEnd(formData: FormData) {
   'use server'
+  await assertAdmin()
   const supabase = await createServiceClient()
   const winner = (formData.get('winner') as string).trim()
   const runnerUp = (formData.get('runner_up') as string).trim()

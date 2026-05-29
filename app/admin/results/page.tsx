@@ -1,4 +1,4 @@
-import { createClient, createServiceClient } from '@/lib/supabase/server'
+import { createClient, createServiceClient, assertAdmin } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { calcMatchPoints, calcPicanteriaPoints } from '@/lib/scoring'
@@ -10,6 +10,7 @@ type MatchDayRow = MatchDay & { matches: Match[]; pikanteria: PikanteriaRow[] }
 
 async function enterResults(formData: FormData) {
   'use server'
+  await assertAdmin()
   const supabase = await createServiceClient()
 
   const matchDayId = formData.get('match_day_id') as string
