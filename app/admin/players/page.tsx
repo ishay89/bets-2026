@@ -1,4 +1,5 @@
 import { createClient, createServiceClient, assertAdmin } from '@/lib/supabase/server'
+import { parseUUID } from '@/lib/validation'
 import { revalidatePath } from 'next/cache'
 import Link from 'next/link'
 import type { User } from '@/lib/types'
@@ -7,7 +8,7 @@ async function toggleAdmin(formData: FormData) {
   'use server'
   await assertAdmin()
   const supabase = await createServiceClient()
-  const userId = formData.get('user_id') as string
+  const userId = parseUUID(formData.get('user_id'), 'user_id')
   const isAdmin = formData.get('is_admin') === 'true'
   await supabase.from('users').update({ is_admin: !isAdmin }).eq('id', userId)
   revalidatePath('/admin/players')

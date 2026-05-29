@@ -1,4 +1,5 @@
 import { createAdminClient, assertAdmin } from '@/lib/supabase/server'
+import { parseUUID, parseOdds } from '@/lib/validation'
 import { LOCK_LEAD_MS } from '@/lib/lock'
 import {
   automatedMatchPick,
@@ -17,17 +18,18 @@ async function publishMatchDay(formData: FormData) {
   await assertAdmin()
   const supabase = createAdminClient()
 
-  const matchDayId = formData.get('match_day_id') as string
+  const matchDayId = parseUUID(formData.get('match_day_id'), 'match_day_id')
   const date = formData.get('date') as string
 
   // Update odds for each match (hidden inputs carry match UUIDs)
   for (let i = 1; i <= 8; i++) {
-    const matchId = (formData.get(`match_id_${i}`) as string | null)?.trim()
-    if (!matchId) break
+    const rawMatchId = (formData.get(`match_id_${i}`) as string | null)?.trim()
+    if (!rawMatchId) break
+    const matchId = parseUUID(rawMatchId, `match_id_${i}`)
     await supabase.from('matches').update({
-      odds_home: parseFloat(formData.get(`odds_home_${i}`) as string),
-      odds_draw: parseFloat(formData.get(`odds_draw_${i}`) as string),
-      odds_away: parseFloat(formData.get(`odds_away_${i}`) as string),
+      odds_home: parseOdds(formData.get(`odds_home_${i}`), `odds_home_${i}`),
+      odds_draw: parseOdds(formData.get(`odds_draw_${i}`), `odds_draw_${i}`),
+      odds_away: parseOdds(formData.get(`odds_away_${i}`), `odds_away_${i}`),
     }).eq('id', matchId)
   }
 
@@ -64,8 +66,13 @@ async function publishMatchDay(formData: FormData) {
     const optionRows: { label: string; odds: number; sort_order: number }[] = []
     for (let j = 1; j <= count; j++) {
       const label = (formData.get(`pik_opt_label_${i}_${j}`) as string | null)?.trim()
-      const odds = parseFloat(formData.get(`pik_opt_odds_${i}_${j}`) as string)
-      if (!label || isNaN(odds)) continue
+      if (!label) continue
+      let odds: number
+      try {
+        odds = parseOdds(formData.get(`pik_opt_odds_${i}_${j}`), `pik_opt_odds_${i}_${j}`)
+      } catch {
+        continue
+      }
       optionRows.push({ label, odds, sort_order: j - 1 })
     }
 

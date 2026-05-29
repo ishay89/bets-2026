@@ -3,29 +3,8 @@ import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { BottomNav } from '@/components/bottom-nav'
-
-const TEAMS = [
-  { name: 'Argentina', odds: 4.0 },
-  { name: 'France', odds: 4.5 },
-  { name: 'Brazil', odds: 5.0 },
-  { name: 'England', odds: 6.0 },
-  { name: 'Germany', odds: 6.5 },
-  { name: 'Spain', odds: 7.5 },
-  { name: 'Portugal', odds: 8.0 },
-  { name: 'Netherlands', odds: 9.0 },
-  { name: 'USA', odds: 12.0 },
-  { name: 'Mexico', odds: 15.0 },
-]
-
-const SCORERS = [
-  { name: 'K. Mbappé', odds: 5.0 },
-  { name: 'Vinícius Jr', odds: 6.0 },
-  { name: 'H. Kane', odds: 6.5 },
-  { name: 'L. Messi', odds: 8.0 },
-  { name: 'C. Ronaldo', odds: 9.0 },
-  { name: 'E. Haaland', odds: 7.0 },
-  { name: 'J. Bellingham', odds: 8.5 },
-]
+import { TEAMS, SCORERS } from '@/lib/pre-tournament'
+import { parseTeamName, parseScorerName } from '@/lib/validation'
 
 const FLAGS: Record<string, string> = {
   Argentina: '🇦🇷', France: '🇫🇷', Brazil: '🇧🇷', England: '🏴󠁧󠁢󠁥󠁮󠁧󠁿',
@@ -39,11 +18,10 @@ async function savePreTournamentPick(formData: FormData) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('Unauthorized')
 
-  const winnerName = formData.get('winner') as string
-  const scorerName = formData.get('scorer') as string
-  const winner = TEAMS.find(t => t.name === winnerName)
-  const scorer = SCORERS.find(s => s.name === scorerName)
-  if (!winner || !scorer) return
+  const winnerName = parseTeamName(formData.get('winner'))
+  const scorerName = parseScorerName(formData.get('scorer'))
+  const winner = TEAMS.find(t => t.name === winnerName)!
+  const scorer = SCORERS.find(s => s.name === scorerName)!
 
   const service = await createServiceClient()
   const [{ data: existing }, { data: firstDay }] = await Promise.all([

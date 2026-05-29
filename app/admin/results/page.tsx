@@ -9,6 +9,7 @@ import {
   type PikanteriaInput,
 } from '@/lib/scoring-writes'
 import type { Stage, Pick, Match, Pikanteria, PicanteriaOption, MatchDay } from '@/lib/types'
+import { parseUUID, parsePick } from '@/lib/validation'
 
 type PikanteriaRow = Pikanteria & { pikanteria_options: PicanteriaOption[] }
 type MatchDayRow = MatchDay & { matches: Match[]; pikanteria: PikanteriaRow[] }
@@ -18,14 +19,15 @@ async function enterResults(formData: FormData) {
   await assertAdmin()
   const supabase = await createServiceClient()
 
-  const matchDayId = formData.get('match_day_id') as string
+  const matchDayId = parseUUID(formData.get('match_day_id'), 'match_day_id')
   const { data: matchDay } = await supabase
     .from('match_days')
     .select('stage')
     .eq('id', matchDayId)
     .single()
 
-  const stage = matchDay!.stage as Stage
+  if (!matchDay) throw new Error('Match day not found')
+  const stage = matchDay.stage as Stage
 
   // ── Gather the matches being scored from this submission ──────────────────
   const { data: matches } = await supabase
@@ -34,8 +36,11 @@ async function enterResults(formData: FormData) {
     .eq('match_day_id', matchDayId)
 
   const scoredMatches = (matches ?? [])
-    .map(m => ({ ...m, result: formData.get(`result_${m.id}`) as Pick | null }))
-    .filter((m): m is typeof m & { result: Pick } => m.result !== null)
+    .flatMap(m => {
+      const raw = formData.get(`result_${m.id}`)
+      if (raw === null) return []
+      return [{ ...m, result: parsePick(raw, `match ${m.id}`) }]
+    })
 
   // Fetch all predictions for the scored matches in one query, then group.
   const matchIds = scoredMatches.map(m => m.id)
@@ -72,8 +77,9 @@ async function enterResults(formData: FormData) {
 
   const pikInputs: PikanteriaInput[] = []
   for (const pika of pikaItems ?? []) {
-    const winningOptionId = formData.get(`pik_${pika.id}`) as string | null
-    if (!winningOptionId) continue
+    const rawOptionId = formData.get(`pik_${pika.id}`)
+    if (!rawOptionId) continue
+    const winningOptionId = parseUUID(rawOptionId, `pikanteria option for ${pika.id}`)
 
     const winningOption = (pika.pikanteria_options as { id: string; odds: number }[])
       .find(o => o.id === winningOptionId)

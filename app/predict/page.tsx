@@ -14,6 +14,7 @@ import {
   hasCompletedPreTournamentPick,
   shouldRequirePreTournamentPick,
 } from '@/lib/pre-tournament'
+import { parseUUID, parsePick } from '@/lib/validation'
 
 const STAGE_LABELS: Record<string, string> = {
   group: 'Group Stage ×1', r16: 'Round of 16 ×1.5', qf: 'Quarter Finals ×1.5',
@@ -85,6 +86,8 @@ export default async function PredictPage() {
 
   async function savePick(matchId: string, pick: Pick) {
     'use server'
+    parseUUID(matchId, 'match_id')
+    parsePick(pick, 'match')
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) throw new Error('Unauthorized')
@@ -155,6 +158,8 @@ export default async function PredictPage() {
 
   async function saveAnswer(picanteriaId: string, optionId: string) {
     'use server'
+    parseUUID(picanteriaId, 'pikanteria_id')
+    parseUUID(optionId, 'option_id')
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) throw new Error('Unauthorized')
