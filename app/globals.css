@@ -92,6 +92,17 @@
   --hero-glow:     radial-gradient(circle at 72% 50%, rgba(0, 144, 90, 0.16) 0%, transparent 64%);
 }
 
+body {
+  background-image:
+    radial-gradient(circle at 88% -12%, var(--color-accent-soft) 0%, transparent 34%),
+    linear-gradient(135deg, transparent 0%, transparent 58%, var(--color-accent-soft) 100%);
+  background-attachment: fixed;
+}
+
+[data-team] .team-theme-chip {
+  background: linear-gradient(135deg, var(--team-primary), var(--team-secondary));
+}
+
 /* ── Pitch stripe utility (for hero / card sections) ─────── */
 .pitch-stripes {
   background-image: repeating-linear-gradient(
