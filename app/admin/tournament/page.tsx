@@ -1,8 +1,8 @@
 import { createServiceClient, assertAdmin } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
-import { calcPreTournamentWinnerPoints, calcTopScorerPoints } from '@/lib/scoring'
 import { upsertPreTournamentSnapshot } from '@/lib/score-validation'
+import { buildTournamentScoringPayload } from '@/lib/scoring-writes'
 
 async function scoreTournamentEnd(formData: FormData) {
   'use server'
@@ -12,22 +12,24 @@ async function scoreTournamentEnd(formData: FormData) {
   const runnerUp = (formData.get('runner_up') as string).trim()
   const topScorer = (formData.get('top_scorer') as string).trim()
 
-  const { data: picks } = await supabase.from('pre_tournament_picks').select('*')
+  const { data: picks } = await supabase
+    .from('pre_tournament_picks')
+    .select('id, user_id, winner_team, winner_odds, top_scorer, top_scorer_odds')
 
-  for (const pick of picks ?? []) {
-    let placement: 'winner' | 'runner-up' | 'other' = 'other'
-    if (pick.winner_team === winner) placement = 'winner'
-    else if (pick.winner_team === runnerUp) placement = 'runner-up'
+  const pickPoints = buildTournamentScoringPayload(picks ?? [], winner, runnerUp, topScorer)
 
-    const winnerPoints = calcPreTournamentWinnerPoints(pick.winner_odds, placement)
-    const topScorerPoints = calcTopScorerPoints(pick.top_scorer_odds, pick.top_scorer === topScorer)
-
-    await supabase.from('pre_tournament_picks')
-      .update({ winner_points: winnerPoints, top_scorer_points: topScorerPoints })
-      .eq('id', pick.id)
-
-    await upsertPreTournamentSnapshot(supabase, pick.user_id)
+  // Single atomic write: all picks scored together, or none (rolled back).
+  const { error } = await supabase.rpc('score_tournament_end', {
+    p_pick_points: pickPoints,
+  })
+  if (error) {
+    throw new Error(`Tournament scoring failed and was rolled back: ${error.message}`)
   }
+
+  // Snapshots are derived/recoverable data, written outside the transaction.
+  await Promise.all(
+    (picks ?? []).map(p => upsertPreTournamentSnapshot(supabase, p.user_id))
+  )
 
   revalidatePath('/')
   revalidatePath('/leaderboard')
