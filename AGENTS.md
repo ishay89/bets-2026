@@ -51,11 +51,17 @@ The app uses Next.js App Router with this structure:
 - `/history` — View past predictions and results
 - `/leaderboard` — Full leaderboard with all players
 - `/profile` — User profile/settings
-- `/admin/*` — Admin-only pages (guarded in `proxy.ts` middleware)
+- `/h2h` — Head-to-head player comparison selector
+- `/h2h/[opponentId]` — Detailed H2H comparison against a specific opponent
+- `/admin/*` — Admin-only pages (guarded by `assertAdmin()` in layout + each Server Action)
   - `/admin/players` — Manage users
+  - `/admin/players/[userId]` — Per-user prediction status
   - `/admin/tournament` — Create match days and matches
+  - `/admin/edit` — Edit existing match days and matches
   - `/admin/publish` — Publish drafts to make them playable
   - `/admin/results` — Enter match results and calculate points
+  - `/admin/scores` — Score validation and recalculation
+  - `/admin/audit` — View prediction audit log
 
 #### Middleware Authentication (proxy.ts)
 
@@ -65,6 +71,10 @@ The app uses Next.js App Router with this structure:
 - Uses Supabase SSR client to validate session via cookies
 
 All routes except auth/login require authentication.
+
+> **IMPORTANT — Next.js 16 naming**: In Next.js 16, the middleware file is `proxy.ts` (not `middleware.ts`). Do **not** create a `middleware.ts` file — having both files simultaneously causes a hard build error: `Both middleware file and proxy file are detected. Please use proxy.ts only.`
+
+For programmatic admin checks inside Server Components and Server Actions, use the `assertAdmin()` helper from `lib/supabase/server.ts` — it calls `getUser()` and redirects to `/login` or `/` on failure.
 
 #### Data Model & Scoring
 
@@ -94,6 +104,8 @@ All routes except auth/login require authentication.
   - Predictions/pikanteria answers are user-scoped (read all, write own)
   - Match days only visible if `published_at IS NOT NULL`
   - Admins have unrestricted access (not enforced by RLS, but by middleware)
+- **`assertAdmin()`** in `lib/supabase/server.ts` — call at the top of every admin Server Action and admin layout to verify the user is authenticated and has `is_admin = true`; redirects to `/login` or `/` on failure
+- **Server Components**: after `supabase.auth.getUser()`, always check `if (!user) redirect('/login')` before using `user.id` — never use `user!.id`
 
 **Environment Variables Required**:
 ```
@@ -110,59 +122,95 @@ SUPABASE_SERVICE_ROLE_KEY=...  # For server-side admin operations
 
 ```
 app/                    # Next.js app router pages
-├── admin/              # Admin pages (tournament setup, results)
-├── auth/               # Auth routes (callback handler)
-├── predict/            # Make predictions
-├── pre-tournament/     # Pre-tournament picks
-├── leaderboard/        # Full leaderboard
-├── history/            # Past predictions
-├── profile/            # User profile
-├── login/              # Login page
+├── admin/              # Admin pages (all guarded by assertAdmin())
+│   ├── layout.tsx      # Shared admin layout with nav; calls assertAdmin()
+│   ├── page.tsx        # Admin dashboard
+│   ├── audit/          # Prediction audit log
+│   ├── edit/           # Edit match days and matches
+│   ├── players/        # Manage users
+│   │   └── [userId]/   # Per-user prediction status
+│   ├── publish/        # Publish draft match days
+│   ├── results/        # Enter match results
+│   ├── scores/         # Score validation and recalculation
+│   └── tournament/     # Create match days and matches
+├── auth/callback/      # Supabase OAuth callback handler
+├── h2h/                # Head-to-head comparison selector
+│   └── [opponentId]/   # Detailed H2H stats page
+├── history/            # Past predictions and results
+├── leaderboard/        # Full live leaderboard
+├── login/              # Auth entry point
+├── predict/            # Make/view daily predictions
+├── pre-tournament/     # One-time tournament picks
+├── profile/            # User profile and stats
 ├── layout.tsx          # Root layout with metadata
-└── page.tsx            # Home page (leaderboard mini + today's matches)
+└── page.tsx            # Home page (mini leaderboard + today's matches)
 
 components/             # Reusable React components
-├── match-card.tsx      # Match display with odds
-├── leaderboard-realtime.tsx  # Live leaderboard subscriber
-├── pikanteria-card.tsx  # Bonus question card
-├── lock-timer.tsx      # Countdown to lock time
-└── bottom-nav.tsx      # Mobile navigation bar
+├── admin-nav.tsx       # Admin section navigation bar
+├── bottom-nav.tsx      # Mobile bottom navigation
+├── crowd-insight.tsx   # Crowd pick distribution display
+├── leaderboard.tsx     # Leaderboard table component
+├── leaderboard-realtime.tsx  # Live leaderboard with Supabase subscription
+├── lock-timer.tsx      # Countdown to pick lock time
+├── match-card.tsx      # Match display with odds and pick UI
+├── pikanteria-builder.tsx    # Admin: pikanteria question builder
+├── pikanteria-card.tsx # Pikanteria side-bet card
+└── theme-toggle.tsx    # Light/dark theme switcher
 
 lib/
+├── audit.ts            # Audit event writing helpers
+├── crowd.ts            # Crowd pick aggregation and insight logic
+├── display.ts          # Shared display/formatting utilities
+├── h2h.ts              # Head-to-head comparison calculations
+├── lock.ts             # Match lock-time helpers (5 min before kickoff)
+├── monkey.ts           # Monkey AI pick logic
+├── pre-tournament.ts   # Pre-tournament pick helpers and guards
+├── score-validation.ts # Score integrity validation
 ├── scoring.ts          # Point calculation functions
+├── team-theme.ts       # Winner team dynamic theme tokens
 ├── types.ts            # TypeScript interfaces (User, Match, Prediction, etc.)
-├── monkey.ts           # Monkey AI logic
 └── supabase/
-    ├── server.ts       # Server-side Supabase client (SSR)
+    ├── server.ts       # Server-side Supabase client; exports createClient(),
+    │                   # createAdminClient(), createServiceClient(), assertAdmin()
     └── client.ts       # Browser-side Supabase client
 
 supabase/
-├── migrations/
-│   ├── 001_schema.sql  # Create all tables and leaderboard view
-│   └── 002_rls.sql     # Enable RLS policies
-└── README.md           # Migration setup instructions
+└── migrations/
+    ├── 001_schema.sql              # Create all tables and leaderboard view
+    ├── 002_rls.sql                 # Enable RLS policies
+    ├── 003_add_r32_stage.sql       # Add r32 stage
+    ├── 004_score_snapshots.sql     # Score snapshot table
+    ├── 005_leaderboard_today_points.sql
+    ├── 006_pikanteria_options.sql  # N-option pikanteria support
+    ├── 007_user_prediction_audit_events.sql
+    ├── 008_automated_marker_users.sql
+    ├── 008_match_locking.sql       # Per-match lock flag
+    └── 009_crowd_picks.sql         # Crowd pick RPCs
 
 public/                 # Static assets
 
+proxy.ts                # Next.js 16 middleware (auth guard + session refresh)
 tsconfig.json           # TypeScript config with @ path alias
 next.config.ts          # Next.js config
 eslint.config.mjs       # ESLint rules
 postcss.config.mjs      # Tailwind CSS PostCSS config
 vitest.config.ts        # Vitest config
 package.json            # Dependencies and scripts
-proxy.ts                # Middleware for auth & admin guard
 ```
 
 ### Testing
 
 Tests are in `lib/*.test.ts` files. Vitest is configured with React support via `@vitejs/plugin-react`.
 
-Example: `lib/scoring.test.ts` covers:
-- Point calculations for all match stages
-- Pikanteria odds calculation
-- Pre-tournament winner/runner-up/other scenarios
-- Top scorer odds
-- Decimal rounding (2 places)
+Test files:
+- `lib/scoring.test.ts` — point calculations for all stages, rounding
+- `lib/crowd.test.ts` — crowd pick aggregation and percentage logic
+- `lib/h2h.test.ts` — head-to-head comparison calculations
+- `lib/lock.test.ts` — match lock-time logic
+- `lib/monkey.test.ts` — monkey AI pick strategy
+- `lib/pre-tournament.test.ts` — pre-tournament pick helpers
+- `lib/team-theme.test.ts` — team theme token mapping
+- `lib/audit.test.ts` — audit event deduplication
 
 Run single test file:
 ```bash
@@ -226,7 +274,9 @@ npm test -- lib/scoring.test.ts
 
 ## Common Issues
 
-- **401 Unauthorized on admin routes**: Ensure user has `is_admin = true` in users table
+- **Build error "Both middleware file and proxy file are detected"**: Do NOT create `middleware.ts` — Next.js 16 uses `proxy.ts` as its middleware file. Delete `middleware.ts` if it exists.
+- **401 Unauthorized on admin routes**: Ensure user has `is_admin = true` in users table; check `assertAdmin()` is called in the layout and each Server Action
 - **Predictions not appearing**: Check match_day has `published_at IS NOT NULL`
 - **Lock time shows negative**: Verify match_day.lock_time is in future; UI clamps to 0
 - **Points not calculated**: Admin must enter result (1/X/2) in matches table; points trigger on result entry
+- **Server crash / forced reload**: Never use `user!.id` in Server Components — always guard with `if (!user) redirect('/login')` after `getUser()`
