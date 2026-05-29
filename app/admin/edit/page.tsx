@@ -1,4 +1,5 @@
 import { createAdminClient, assertAdmin } from '@/lib/supabase/server'
+import { parseUUID, parseOdds } from '@/lib/validation'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 
@@ -8,12 +9,13 @@ async function saveOdds(formData: FormData) {
   const supabase = createAdminClient()
 
   for (let i = 1; i <= 8; i++) {
-    const matchId = (formData.get(`match_id_${i}`) as string | null)?.trim()
-    if (!matchId) break
+    const rawMatchId = (formData.get(`match_id_${i}`) as string | null)?.trim()
+    if (!rawMatchId) break
+    const matchId = parseUUID(rawMatchId, `match_id_${i}`)
     await supabase.from('matches').update({
-      odds_home: parseFloat(formData.get(`odds_home_${i}`) as string),
-      odds_draw: parseFloat(formData.get(`odds_draw_${i}`) as string),
-      odds_away: parseFloat(formData.get(`odds_away_${i}`) as string),
+      odds_home: parseOdds(formData.get(`odds_home_${i}`), `odds_home_${i}`),
+      odds_draw: parseOdds(formData.get(`odds_draw_${i}`), `odds_draw_${i}`),
+      odds_away: parseOdds(formData.get(`odds_away_${i}`), `odds_away_${i}`),
     }).eq('id', matchId)
   }
 
@@ -25,7 +27,7 @@ async function toggleDayLock(formData: FormData) {
   'use server'
   await assertAdmin()
   const supabase = createAdminClient()
-  const matchDayId = formData.get('match_day_id') as string
+  const matchDayId = parseUUID(formData.get('match_day_id'), 'match_day_id')
   const locked = formData.get('locked') === 'true'
   await supabase.from('match_days').update({ locked: !locked }).eq('id', matchDayId)
   revalidatePath('/predict')
@@ -37,7 +39,7 @@ async function toggleMatchLock(formData: FormData) {
   'use server'
   await assertAdmin()
   const supabase = createAdminClient()
-  const matchId = formData.get('match_id') as string
+  const matchId = parseUUID(formData.get('match_id'), 'match_id')
   const locked = formData.get('locked') === 'true'
   await supabase.from('matches').update({ locked: !locked }).eq('id', matchId)
   revalidatePath('/predict')

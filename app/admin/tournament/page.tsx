@@ -3,14 +3,17 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { upsertPreTournamentSnapshot } from '@/lib/score-validation'
 import { buildTournamentScoringPayload } from '@/lib/scoring-writes'
+import { TEAMS, SCORERS } from '@/lib/pre-tournament'
+import { parseTeamName, parseScorerName, parseNonEmpty } from '@/lib/validation'
 
 async function scoreTournamentEnd(formData: FormData) {
   'use server'
   await assertAdmin()
   const supabase = await createServiceClient()
-  const winner = (formData.get('winner') as string).trim()
-  const runnerUp = (formData.get('runner_up') as string).trim()
-  const topScorer = (formData.get('top_scorer') as string).trim()
+
+  const winner = parseTeamName(formData.get('winner'))
+  const runnerUp = parseNonEmpty(formData.get('runner_up'), 'runner_up')
+  const topScorer = parseScorerName(formData.get('top_scorer'))
 
   const { data: picks } = await supabase
     .from('pre_tournament_picks')
@@ -43,6 +46,8 @@ const inputStyle = {
   color: 'var(--color-text)',
 }
 
+const cls = 'rounded-lg px-3 py-2 text-sm w-full'
+
 export default function TournamentEndPage() {
   return (
     <div className="max-w-lg mx-auto space-y-6 pb-10">
@@ -54,23 +59,38 @@ export default function TournamentEndPage() {
       </div>
 
       <form action={scoreTournamentEnd} className="space-y-4">
-        {[
-          { name: 'winner', label: '🥇 Tournament Winner', placeholder: 'Team name exactly as entered' },
-          { name: 'runner_up', label: '🥈 Runner-Up', placeholder: 'Team name exactly as entered' },
-          { name: 'top_scorer', label: '⚽ Top Scorer', placeholder: 'Player name exactly as entered' },
-        ].map(({ name, label, placeholder }) => (
-          <div key={name} className="rounded-xl p-4 space-y-2"
-            style={{ background: 'var(--color-panel)', border: '1px solid rgba(255,255,255,0.06)' }}>
-            <label className="text-sm font-semibold text-text block">{label}</label>
-            <input
-              name={name}
-              placeholder={placeholder}
-              required
-              style={inputStyle}
-              className="rounded-lg px-3 py-2 text-sm w-full"
-            />
-          </div>
-        ))}
+        <div className="rounded-xl p-4 space-y-2"
+          style={{ background: 'var(--color-panel)', border: '1px solid rgba(255,255,255,0.06)' }}>
+          <label className="text-sm font-semibold text-text block">🥇 Tournament Winner</label>
+          <select name="winner" required style={inputStyle} className={cls} defaultValue="">
+            <option value="" disabled>Select winning team...</option>
+            {TEAMS.map(t => (
+              <option key={t.name} value={t.name}>{t.name}</option>
+            ))}
+          </select>
+        </div>
+
+        <div className="rounded-xl p-4 space-y-2"
+          style={{ background: 'var(--color-panel)', border: '1px solid rgba(255,255,255,0.06)' }}>
+          <label className="text-sm font-semibold text-text block">🥈 Runner-Up</label>
+          <select name="runner_up" required style={inputStyle} className={cls} defaultValue="">
+            <option value="" disabled>Select runner-up team...</option>
+            {TEAMS.map(t => (
+              <option key={t.name} value={t.name}>{t.name}</option>
+            ))}
+          </select>
+        </div>
+
+        <div className="rounded-xl p-4 space-y-2"
+          style={{ background: 'var(--color-panel)', border: '1px solid rgba(255,255,255,0.06)' }}>
+          <label className="text-sm font-semibold text-text block">⚽ Top Scorer</label>
+          <select name="top_scorer" required style={inputStyle} className={cls} defaultValue="">
+            <option value="" disabled>Select top scorer...</option>
+            {SCORERS.map(s => (
+              <option key={s.name} value={s.name}>{s.name}</option>
+            ))}
+          </select>
+        </div>
 
         <div className="rounded-xl p-4"
           style={{ background: 'rgba(245,166,35,0.08)', border: '1px solid rgba(245,166,35,0.25)' }}>
