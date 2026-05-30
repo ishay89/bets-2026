@@ -5,8 +5,7 @@
 # Settings → General (e.g. "abcdefghijklmnopqrst"). Without it, remote
 # commands (supabase db push, supabase db pull) will fail.
 
-[project]
-project_id = ""  # TODO: fill in your Supabase project reference
+project_id = "ecptuvvoldcxwlgmmxog"
 
 [api]
 enabled = true
