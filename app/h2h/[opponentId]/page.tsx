@@ -5,36 +5,7 @@ import { BottomNav } from '@/components/bottom-nav'
 import { isMatchLocked } from '@/lib/lock'
 import { buildH2H, pickAgreement, type H2HMatch, type H2HRound, type RoundWinner } from '@/lib/h2h'
 import { getAvatar, getAutomationLabel, getFlag, isAutomated, stageLabel } from '@/lib/display'
-import type { LeaderboardEntry, Pick } from '@/lib/types'
-
-// ── Raw fetch shapes (mirrors app/history/page.tsx nested query) ──────────────
-type PredRow = { pick: Pick; points: number | null; user_id: string }
-type MatchRow = {
-  id: string
-  home_team: string
-  away_team: string
-  kickoff_time: string
-  result: Pick | null
-  locked: boolean | null
-  predictions: PredRow[]
-}
-type PikaOptionRow = { id: string; label: string; is_correct: boolean }
-type PikaAnswerRow = { option_id: string; points: number | null; user_id: string }
-type PikaRow = {
-  id: string
-  question: string
-  pikanteria_options: PikaOptionRow[]
-  pikanteria_answers: PikaAnswerRow[]
-}
-type DayRow = {
-  id: string
-  date: string
-  stage: string
-  lock_time: string
-  locked: boolean
-  matches: MatchRow[]
-  pikanteria: PikaRow[]
-}
+import { getLeaderboardEntries, getMatchDaysWithUserData, type HistoryMatchDay } from '@/lib/data'
 
 // View-model carried alongside each H2HMatch for rendering.
 type RowVM = {
@@ -76,33 +47,17 @@ export default async function H2HComparePage({
   if (opponentId === myId) redirect('/h2h')
 
   // Totals from the leaderboard view (consistent with standings) + identity.
-  const { data: entries } = await supabase
-    .from('leaderboard')
-    .select('*')
-    .returns<LeaderboardEntry[]>()
-  const me = (entries ?? []).find(e => e.id === myId) ?? null
-  const them = (entries ?? []).find(e => e.id === opponentId) ?? null
+  const entries = await getLeaderboardEntries(supabase)
+  const me = entries.find(e => e.id === myId) ?? null
+  const them = entries.find(e => e.id === opponentId) ?? null
   if (!them) notFound()
 
   // Nested payload — mirror history. RLS (migration 009) already strips the
   // opponent's unlocked rows; we keep only the two users' rows in JS.
-  const { data: matchDaysRaw } = await supabase
-    .from('match_days')
-    .select(`
-      id, date, stage, lock_time, locked,
-      matches(id, home_team, away_team, kickoff_time, result, locked,
-        predictions(pick, points, user_id)
-      ),
-      pikanteria(id, question,
-        pikanteria_options(id, label, is_correct),
-        pikanteria_answers(option_id, points, user_id)
-      )
-    `)
-    .not('published_at', 'is', null)
-    .order('date', { ascending: false })
+  const matchDaysRaw = await getMatchDaysWithUserData(supabase)
 
   const now = nowMs()
-  const days = (matchDaysRaw ?? []) as DayRow[]
+  const days = matchDaysRaw as HistoryMatchDay[]
 
   const roundsVM: RoundVM[] = []
   const h2hRounds: H2HRound[] = []

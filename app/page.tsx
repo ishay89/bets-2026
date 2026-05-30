@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { BottomNav } from '@/components/bottom-nav'
 import type { LeaderboardEntry } from '@/lib/types'
 import { PRE_TOURNAMENT_PATH, hasCompletedPreTournamentPick } from '@/lib/pre-tournament'
+import { getLeaderboardEntries } from '@/lib/data'
 
 type HomeMatchRow = {
   home_team: string
@@ -19,8 +20,8 @@ export default async function HomePage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const [{ data: entries }, { data: todayDay }, { data: preTournamentPick }] = await Promise.all([
-    supabase.from('leaderboard').select('*').returns<LeaderboardEntry[]>(),
+  const [entries, { data: todayDay }, { data: preTournamentPick }] = await Promise.all([
+    getLeaderboardEntries(supabase),
     supabase
       .from('match_days')
       .select('id, stage, date, lock_time, matches(home_team, away_team, kickoff_time, odds_home, odds_draw, odds_away)')
@@ -49,7 +50,7 @@ export default async function HomePage() {
   const hours = minutesUntilLock != null ? Math.floor(minutesUntilLock / 60) : 0
   const mins = minutesUntilLock != null ? minutesUntilLock % 60 : 0
 
-  const allEntries = entries ?? []
+  const allEntries = entries
   const top3 = allEntries.slice(0, 3)
   const myEntry = allEntries.find(e => e.id === user?.id)
   const myRank = myEntry ? allEntries.indexOf(myEntry) + 1 : null

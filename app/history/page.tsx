@@ -1,14 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { BottomNav } from '@/components/bottom-nav'
-import type { Pick } from '@/lib/types'
-
-type PredRow = { pick: Pick; points: number | null; user_id: string }
-type MatchWithPreds = { id: string; home_team: string; away_team: string; result: Pick | null; predictions: PredRow[] }
-type PikaOptionRow = { id: string; label: string; is_correct: boolean }
-type PikaAnswerRow = { option_id: string; points: number | null; user_id: string }
-type PikaWithAnswers = { id: string; question: string; pikanteria_options: PikaOptionRow[]; pikanteria_answers: PikaAnswerRow[] }
-type DayRow = { id: string; date: string; stage: string; matches: MatchWithPreds[]; pikanteria: PikaWithAnswers[] }
+import { getMatchDaysWithUserData } from '@/lib/data'
 
 const STAGE_LABELS: Record<string, string> = {
   group: 'Group Stage', r16: 'Round of 16', qf: 'Quarter Finals',
@@ -20,23 +13,10 @@ export default async function HistoryPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const { data: matchDays } = await supabase
-    .from('match_days')
-    .select(`
-      id, date, stage,
-      matches(id, home_team, away_team, result,
-        predictions(pick, points, user_id)
-      ),
-      pikanteria(id, question,
-        pikanteria_options(id, label, is_correct),
-        pikanteria_answers(option_id, points, user_id)
-      )
-    `)
-    .not('published_at', 'is', null)
-    .order('date', { ascending: false })
+  const matchDays = await getMatchDaysWithUserData(supabase)
 
   const allPicks: ('W' | 'L' | null)[] = []
-  for (const day of ((matchDays ?? []) as DayRow[]).slice(0, 10)) {
+  for (const day of matchDays.slice(0, 10)) {
     for (const m of day.matches) {
       const pred = m.predictions.find(p => p.user_id === user.id)
       if (pred && m.result !== null) {
@@ -85,14 +65,14 @@ export default async function HistoryPage() {
         )}
 
         <div className="text-[10px] font-bold uppercase tracking-[1.2px] px-0.5 text-muted">By day</div>
-        {(matchDays ?? []).length === 0 && (
+        {matchDays.length === 0 && (
           <div className="text-center py-10">
             <div className="text-4xl mb-3">📋</div>
             <div className="text-text font-semibold">No history yet</div>
           </div>
         )}
 
-        {((matchDays ?? []) as DayRow[]).map((day) => {
+        {matchDays.map((day) => {
           const myMatchPreds = day.matches.map(m => ({
             ...m,
             myPick: m.predictions.find(p => p.user_id === user.id),
@@ -154,7 +134,7 @@ export default async function HistoryPage() {
                     </div>
                   </div>
                 ))}
-                {myPikaAnswers.filter((p): p is typeof p & { myAnswer: PikaAnswerRow } => p.myAnswer !== undefined).map((p) => (
+                {myPikaAnswers.filter((p): p is typeof p & { myAnswer: NonNullable<typeof p['myAnswer']> } => p.myAnswer !== undefined).map((p) => (
                   <div key={p.id} className="flex items-center gap-2 py-1.5"
                     style={{ borderTop: '1px solid var(--border-subtle)' }}>
                     <span className="text-[11px] flex-1" style={{ color: 'var(--color-amber)' }}>

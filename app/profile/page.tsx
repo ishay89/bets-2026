@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { BottomNav } from '@/components/bottom-nav'
+import { getLeaderboardEntries } from '@/lib/data'
 
 const AVATARS = ['🦁','🐯','🦊','🐺','🦅','🐻','🐼','🦝','🦄','🐉','🦋','🌟','🔥','⚡','🎯']
 
@@ -24,8 +25,8 @@ export default async function ProfilePage() {
   const preScorer = pick?.top_scorer_points ?? 0
   const total = matchPoints + pikaPoints + preWinner + preScorer
 
-  const { data: allEntries } = await supabase.from('leaderboard').select('id')
-  const rank = (allEntries ?? []).findIndex(e => e.id === user.id) + 1
+  const allEntries = await getLeaderboardEntries(supabase)
+  const rank = allEntries.findIndex(e => e.id === user.id) + 1
 
   const name = profile?.display_name ?? 'You'
   const av = AVATARS[name.charCodeAt(0) % AVATARS.length]
