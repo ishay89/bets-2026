@@ -25,3 +25,15 @@ export function isMatchLocked(
   if (match.locked === true || dayLocked) return true
   return now >= matchLockMs(match.kickoff_time)
 }
+
+/**
+ * The lock_time (ISO string) for a day, derived from its published matches:
+ * 5 minutes before the earliest kickoff. Returns null when no kickoffs are
+ * given, so callers can fall back to an existing value (e.g. a pikanteria-only
+ * day keeps its current lock_time).
+ */
+export function earliestPublishedLockTime(kickoffs: string[]): string | null {
+  if (kickoffs.length === 0) return null
+  const earliest = Math.min(...kickoffs.map(k => new Date(k).getTime()))
+  return new Date(earliest - LOCK_LEAD_MS).toISOString()
+}

@@ -158,7 +158,9 @@ export default async function PredictPage() {
           // Day is locked when manually locked or all matches have passed their lock time.
           const dayManuallyLocked = matchDay.locked
           const allMatchesLocked = sortedMatches.length > 0 && sortedMatches.every(m => isMatchLocked(m, dayManuallyLocked))
-          const isDayLocked = dayManuallyLocked || allMatchesLocked
+          // A pikanteria-only day (no published matches) locks at the day's lock_time.
+          const pikaOnlyLocked = sortedMatches.length === 0 && new Date().getTime() >= new Date(matchDay.lock_time).getTime()
+          const isDayLocked = dayManuallyLocked || allMatchesLocked || pikaOnlyLocked
 
           // Lock timer points to the earliest match's lock time (kickoff − 5 min).
           const earliestLockTime = sortedMatches.length > 0
@@ -201,10 +203,12 @@ export default async function PredictPage() {
               </div>
 
               {/* Matches */}
-              <div className="text-[10px] font-bold uppercase tracking-[1.2px]"
-                style={{ color: 'var(--color-muted)' }}>
-                Matches{multiplier ? ` · Multiplier ${multiplier}` : ''}
-              </div>
+              {sortedMatches.length > 0 && (
+                <div className="text-[10px] font-bold uppercase tracking-[1.2px]"
+                  style={{ color: 'var(--color-muted)' }}>
+                  Matches{multiplier ? ` · Multiplier ${multiplier}` : ''}
+                </div>
+              )}
               {sortedMatches.map(match => {
                 const tally = crowdTally[match.id] ?? { '1': 0, X: 0, '2': 0, total: 0 }
                 return (

@@ -8,6 +8,9 @@ import {
   buildPikanteriaScoringPayload,
   type ScoredMatchInput,
   type PikanteriaInput,
+  type MatchResultWrite,
+  type PikanteriaWinnerWrite,
+  type PointsWrite,
 } from '@/lib/scoring-writes'
 import type { Stage, Pick, Match, Pikanteria, PicanteriaOption, MatchDay } from '@/lib/types'
 import { parseUUID, parsePick } from '@/lib/validation'
@@ -15,12 +18,19 @@ import { parseUUID, parsePick } from '@/lib/validation'
 type PikanteriaRow = Pikanteria & { pikanteria_options: PicanteriaOption[] }
 type MatchDayRow = MatchDay & { matches: Match[]; pikanteria: PikanteriaRow[] }
 
-async function enterResults(formData: FormData) {
-  'use server'
-  await assertAdmin()
-  const supabase = await createServiceClient()
+type ServiceClient = Awaited<ReturnType<typeof createServiceClient>>
 
-  const matchDayId = parseUUID(formData.get('match_day_id'), 'match_day_id')
+// Shared scoring core: score any subset of a day's matches/pikanteria in one
+// atomic RPC, then refresh the day's snapshot. Reused by the per-item buttons
+// and the day-wide "Score All". The RPC's whole-day invariants stay satisfied
+// for partial scoring — already-scored items keep their points, and unscored
+// items have result IS NULL so they're excluded from the checks.
+async function scoreItems(
+  supabase: ServiceClient,
+  matchDayId: string,
+  scoredMatches: { matchId: string; result: Pick }[],
+  resolvedPikas: { pikanteriaId: string; optionId: string }[],
+) {
   const { data: matchDay, error: matchDayError } = await supabase
     .from('match_days')
     .select('stage')
@@ -30,95 +40,92 @@ async function enterResults(formData: FormData) {
   if (!matchDay) throw new Error('Match day not found')
   const stage = matchDay.stage as Stage
 
-  // ── Gather the matches being scored from this submission ──────────────────
-  const { data: matches, error: matchesError } = await supabase
-    .from('matches')
-    .select('id, odds_home, odds_draw, odds_away')
-    .eq('match_day_id', matchDayId)
-  if (matchesError) throw matchesError
+  let matchResults: MatchResultWrite[] = []
+  let predictionPoints: PointsWrite[] = []
 
-  const scoredMatches = (matches ?? [])
-    .flatMap(m => {
-      const raw = formData.get(`result_${m.id}`)
-      if (raw === null) return []
-      return [{ ...m, result: parsePick(raw, `match ${m.id}`) }]
-    })
+  if (scoredMatches.length) {
+    const matchIds = scoredMatches.map(m => m.matchId)
+    const resultById = new Map(scoredMatches.map(m => [m.matchId, m.result]))
 
-  // Fetch all predictions for the scored matches in one query, then group.
-  const matchIds = scoredMatches.map(m => m.id)
-  const { data: predictions, error: predsError } = matchIds.length
-    ? await supabase
-        .from('predictions')
-        .select('id, match_id, pick')
-        .in('match_id', matchIds)
-    : { data: [], error: null }
-  if (predsError) throw predsError
+    const { data: matchRows, error: matchesError } = await supabase
+      .from('matches')
+      .select('id, odds_home, odds_draw, odds_away')
+      .eq('match_day_id', matchDayId)
+      .in('id', matchIds)
+    if (matchesError) throw matchesError
 
-  const predsByMatch = new Map<string, { id: string; pick: Pick }[]>()
-  for (const p of (predictions ?? []) as { id: string; match_id: string; pick: Pick }[]) {
-    const list = predsByMatch.get(p.match_id) ?? []
-    list.push({ id: p.id, pick: p.pick })
-    predsByMatch.set(p.match_id, list)
+    const { data: predictions, error: predsError } = await supabase
+      .from('predictions')
+      .select('id, match_id, pick')
+      .in('match_id', matchIds)
+    if (predsError) throw predsError
+
+    const predsByMatch = new Map<string, { id: string; pick: Pick }[]>()
+    for (const p of (predictions ?? []) as { id: string; match_id: string; pick: Pick }[]) {
+      const list = predsByMatch.get(p.match_id) ?? []
+      list.push({ id: p.id, pick: p.pick })
+      predsByMatch.set(p.match_id, list)
+    }
+
+    const matchInputs: ScoredMatchInput[] = (matchRows ?? []).map(m => ({
+      id: m.id,
+      odds_home: m.odds_home,
+      odds_draw: m.odds_draw,
+      odds_away: m.odds_away,
+      result: resultById.get(m.id)!,
+      predictions: predsByMatch.get(m.id) ?? [],
+    }))
+
+    ;({ matchResults, predictionPoints } = buildMatchScoringPayload(matchInputs, stage))
   }
 
-  const matchInputs: ScoredMatchInput[] = scoredMatches.map(m => ({
-    id: m.id,
-    odds_home: m.odds_home,
-    odds_draw: m.odds_draw,
-    odds_away: m.odds_away,
-    result: m.result,
-    predictions: predsByMatch.get(m.id) ?? [],
-  }))
+  let winners: PikanteriaWinnerWrite[] = []
+  let answerPoints: PointsWrite[] = []
 
-  const { matchResults, predictionPoints } = buildMatchScoringPayload(matchInputs, stage)
+  if (resolvedPikas.length) {
+    const pikIds = resolvedPikas.map(p => p.pikanteriaId)
+    const optionById = new Map(resolvedPikas.map(p => [p.pikanteriaId, p.optionId]))
 
-  // ── Gather the pikanteria being resolved from this submission ─────────────
-  const { data: pikaItems, error: pikaError } = await supabase
-    .from('pikanteria')
-    .select('id, pikanteria_options(id, odds)')
-    .eq('match_day_id', matchDayId)
-  if (pikaError) throw pikaError
+    const { data: pikaItems, error: pikaError } = await supabase
+      .from('pikanteria')
+      .select('id, pikanteria_options(id, odds)')
+      .eq('match_day_id', matchDayId)
+      .in('id', pikIds)
+    if (pikaError) throw pikaError
 
-  const pikInputs: PikanteriaInput[] = []
-  for (const pika of pikaItems ?? []) {
-    const rawOptionId = formData.get(`pik_${pika.id}`)
-    if (!rawOptionId) continue
-    const winningOptionId = parseUUID(rawOptionId, `pikanteria option for ${pika.id}`)
+    const pikInputs: PikanteriaInput[] = []
+    for (const pika of pikaItems ?? []) {
+      const winningOptionId = optionById.get(pika.id)
+      if (!winningOptionId) continue
+      const winningOption = (pika.pikanteria_options as { id: string; odds: number }[])
+        .find(o => o.id === winningOptionId)
+      if (!winningOption) continue
+      pikInputs.push({ id: pika.id, winningOptionId, winningOdds: Number(winningOption.odds), answers: [] })
+    }
 
-    const winningOption = (pika.pikanteria_options as { id: string; odds: number }[])
-      .find(o => o.id === winningOptionId)
-    if (!winningOption) continue
+    const answeredIds = pikInputs.map(p => p.id)
+    const { data: answers, error: answersError } = answeredIds.length
+      ? await supabase
+          .from('pikanteria_answers')
+          .select('id, pikanteria_id, option_id')
+          .in('pikanteria_id', answeredIds)
+      : { data: [], error: null }
+    if (answersError) throw answersError
 
-    pikInputs.push({
-      id: pika.id,
-      winningOptionId,
-      winningOdds: Number(winningOption.odds),
-      answers: [],
-    })
+    const ansByPik = new Map<string, { id: string; option_id: string }[]>()
+    for (const a of (answers ?? []) as { id: string; pikanteria_id: string; option_id: string }[]) {
+      const list = ansByPik.get(a.pikanteria_id) ?? []
+      list.push({ id: a.id, option_id: a.option_id })
+      ansByPik.set(a.pikanteria_id, list)
+    }
+    for (const input of pikInputs) {
+      input.answers = ansByPik.get(input.id) ?? []
+    }
+
+    ;({ winners, answerPoints } = buildPikanteriaScoringPayload(pikInputs))
   }
 
-  const pikIds = pikInputs.map(p => p.id)
-  const { data: answers, error: answersError } = pikIds.length
-    ? await supabase
-        .from('pikanteria_answers')
-        .select('id, pikanteria_id, option_id')
-        .in('pikanteria_id', pikIds)
-    : { data: [], error: null }
-  if (answersError) throw answersError
-
-  const ansByPik = new Map<string, { id: string; option_id: string }[]>()
-  for (const a of (answers ?? []) as { id: string; pikanteria_id: string; option_id: string }[]) {
-    const list = ansByPik.get(a.pikanteria_id) ?? []
-    list.push({ id: a.id, option_id: a.option_id })
-    ansByPik.set(a.pikanteria_id, list)
-  }
-  for (const input of pikInputs) {
-    input.answers = ansByPik.get(input.id) ?? []
-  }
-
-  const { winners, answerPoints } = buildPikanteriaScoringPayload(pikInputs)
-
-  // ── Single atomic write: all-or-nothing inside one Postgres transaction ───
+  // Single atomic write: all-or-nothing inside one Postgres transaction.
   const { error } = await supabase.rpc('enter_match_day_results', {
     p_match_day_id: matchDayId,
     p_match_results: matchResults,
@@ -127,17 +134,70 @@ async function enterResults(formData: FormData) {
     p_answer_points: answerPoints,
   })
   if (error) {
-    // The transaction rolled back; the match day is left exactly as it was.
     throw new Error(`Scoring failed and was rolled back: ${error.message}`)
   }
 
-  // Snapshots are derived/recoverable data (rebuildable via recalculate), so
-  // they stay outside the scoring transaction.
+  // Snapshots are derived/recoverable, so they stay outside the scoring txn.
   await snapshotMatchDay(supabase, matchDayId)
 
   revalidatePath('/')
   revalidatePath('/leaderboard')
   revalidatePath('/admin/scores')
+}
+
+async function scoreMatch(formData: FormData) {
+  'use server'
+  await assertAdmin()
+  const supabase = await createServiceClient()
+  const matchDayId = parseUUID(formData.get('match_day_id'), 'match_day_id')
+  const matchId = parseUUID(formData.get('match_id'), 'match_id')
+  const result = parsePick(formData.get(`result_${matchId}`), `match ${matchId}`)
+  await scoreItems(supabase, matchDayId, [{ matchId, result }], [])
+  redirect('/admin/results')
+}
+
+async function scorePikanteria(formData: FormData) {
+  'use server'
+  await assertAdmin()
+  const supabase = await createServiceClient()
+  const matchDayId = parseUUID(formData.get('match_day_id'), 'match_day_id')
+  const pikanteriaId = parseUUID(formData.get('pikanteria_id'), 'pikanteria_id')
+  const optionId = parseUUID(formData.get(`pik_${pikanteriaId}`), `pikanteria option for ${pikanteriaId}`)
+  await scoreItems(supabase, matchDayId, [], [{ pikanteriaId, optionId }])
+  redirect('/admin/results')
+}
+
+async function enterResults(formData: FormData) {
+  'use server'
+  await assertAdmin()
+  const supabase = await createServiceClient()
+  const matchDayId = parseUUID(formData.get('match_day_id'), 'match_day_id')
+
+  const { data: matches } = await supabase
+    .from('matches')
+    .select('id')
+    .eq('match_day_id', matchDayId)
+
+  const scoredMatches = (matches ?? []).flatMap(m => {
+    const raw = formData.get(`result_${m.id}`)
+    if (raw === null) return []
+    return [{ matchId: m.id as string, result: parsePick(raw, `match ${m.id}`) }]
+  })
+
+  const { data: pikaItems } = await supabase
+    .from('pikanteria')
+    .select('id')
+    .eq('match_day_id', matchDayId)
+
+  const resolvedPikas = (pikaItems ?? []).flatMap(p => {
+    const raw = formData.get(`pik_${p.id}`)
+    if (raw === null) return []
+    return [{ pikanteriaId: p.id as string, optionId: parseUUID(raw, `pikanteria option for ${p.id}`) }]
+  })
+
+  if (scoredMatches.length || resolvedPikas.length) {
+    await scoreItems(supabase, matchDayId, scoredMatches, resolvedPikas)
+  }
   redirect('/admin/results')
 }
 
@@ -147,13 +207,17 @@ const inputStyle = {
   color: 'var(--color-text)',
 }
 
+const scoreBtn = 'px-3 py-1.5 rounded-lg text-xs font-bold'
+const scoreBtnStyle = { background: 'var(--color-accent)', color: '#000' }
+
 export default async function ResultsPage() {
   const supabase = await createClient()
 
   const matchDays = await getPublishedMatchDaysWithAll(supabase)
 
   const unscoredDays = (matchDays as MatchDayRow[]).filter(d =>
-    d.matches.some(m => m.result === null)
+    d.matches.some(m => m.result === null) ||
+    d.pikanteria.some(p => !p.pikanteria_options.some(o => o.is_correct))
   )
 
   if (unscoredDays.length === 0) {
@@ -172,104 +236,127 @@ export default async function ResultsPage() {
         <div className="font-black text-lg" style={{ color: 'var(--color-amber)' }}>
           ✅ Enter Results
         </div>
-        <div className="text-muted text-xs">{unscoredDays.length} match day{unscoredDays.length > 1 ? 's' : ''} with pending results</div>
+        <div className="text-muted text-xs">
+          {unscoredDays.length} match day{unscoredDays.length > 1 ? 's' : ''} with pending results · score items one at a time or all at once
+        </div>
       </div>
 
       {unscoredDays.map(matchDay => {
         const total = matchDay.matches.length
         const done = matchDay.matches.filter(m => m.result !== null).length
+        const unscoredMatches = matchDay.matches.filter(m => m.result === null)
+        const unresolvedPikas = matchDay.pikanteria.filter(p => !p.pikanteria_options.some(o => o.is_correct))
 
         return (
           <div key={matchDay.id} className="space-y-4">
             <div className="flex items-center justify-between">
-              <div>
-                <div className="font-bold text-sm text-text">{matchDay.date} · {matchDay.stage}</div>
-              </div>
+              <div className="font-bold text-sm text-text">{matchDay.date} · {matchDay.stage}</div>
               <div className="rounded-xl px-3 py-1 text-xs font-bold"
                 style={{ background: 'var(--color-amber-soft)', border: '1px solid var(--border-warn)', color: 'var(--color-amber)' }}>
                 {done}/{total} scored
               </div>
             </div>
 
-            <form action={enterResults} className="space-y-4">
-              <input type="hidden" name="match_day_id" value={matchDay.id} />
+            {/* Per-match scoring — each its own form */}
+            {unscoredMatches.map(match => (
+              <form key={match.id} action={scoreMatch} className="rounded-xl p-4 space-y-3"
+                style={{ background: 'var(--color-panel)', border: '1px solid var(--border-base)' }}>
+                <input type="hidden" name="match_day_id" value={matchDay.id} />
+                <input type="hidden" name="match_id" value={match.id} />
+                <div className="text-sm font-bold text-text">{match.home_team} vs {match.away_team}</div>
+                <div className="flex gap-2">
+                  {[
+                    { value: '1', label: `1 — ${match.home_team}` },
+                    { value: 'X', label: 'X — Draw' },
+                    { value: '2', label: `2 — ${match.away_team}` },
+                  ].map(({ value, label }) => (
+                    <label key={value}
+                      className="flex-1 flex items-center gap-1.5 rounded-lg p-2 cursor-pointer"
+                      style={inputStyle}>
+                      <input type="radio" name={`result_${match.id}`} value={value} required />
+                      <span className="text-xs text-text font-medium">{label}</span>
+                    </label>
+                  ))}
+                </div>
+                <button type="submit" className={`${scoreBtn} w-full py-2`} style={scoreBtnStyle}>
+                  ⚡ Score this match
+                </button>
+              </form>
+            ))}
 
-              {/* Unscored matches only */}
-              {matchDay.matches.filter(m => m.result === null).map(match => (
-                <div key={match.id} className="rounded-xl p-4 space-y-3"
-                  style={{
-                    background: 'var(--color-panel)',
-                    border: '1px solid var(--border-base)',
-                  }}>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-bold text-text">
-                      {match.home_team} vs {match.away_team}
-                    </span>
-                  </div>
-                  <div className="flex gap-2">
-                    {[
-                      { value: '1', label: `1 — ${match.home_team}` },
-                      { value: 'X', label: 'X — Draw' },
-                      { value: '2', label: `2 — ${match.away_team}` },
-                    ].map(({ value, label }) => (
-                      <label key={value}
-                        className="flex-1 flex items-center gap-1.5 rounded-lg p-2 cursor-pointer"
+            {/* Per-pikanteria scoring — each its own form */}
+            {unresolvedPikas.length > 0 && (
+              <div className="font-bold text-xs uppercase tracking-wider mt-2" style={{ color: 'var(--color-amber)' }}>
+                🌶️ Pikanteria Results
+              </div>
+            )}
+            {unresolvedPikas.map(pika => {
+              const options = [...pika.pikanteria_options].sort((a, b) => a.sort_order - b.sort_order)
+              return (
+                <form key={pika.id} action={scorePikanteria} className="rounded-xl p-4 space-y-3"
+                  style={{ background: 'var(--color-panel)', border: '1px solid var(--border-base)' }}>
+                  <input type="hidden" name="match_day_id" value={matchDay.id} />
+                  <input type="hidden" name="pikanteria_id" value={pika.id} />
+                  <p className="text-sm font-semibold text-text">{pika.question}</p>
+                  <div className="flex gap-2 flex-wrap">
+                    {options.map(opt => (
+                      <label key={opt.id}
+                        className="flex-1 flex items-center gap-1.5 rounded-lg p-2 cursor-pointer min-w-[80px]"
                         style={inputStyle}>
-                        <input
-                          type="radio"
-                          name={`result_${match.id}`}
-                          value={value}
-                        />
-                        <span className="text-xs text-text font-medium">{label}</span>
+                        <input type="radio" name={`pik_${pika.id}`} value={opt.id} required />
+                        <span className="text-xs text-text font-medium">{opt.label}</span>
+                        <span className="text-[10px] text-muted" style={{ fontFamily: 'var(--font-mono)' }}>
+                          {opt.odds.toFixed(2)}
+                        </span>
                       </label>
                     ))}
                   </div>
+                  <button type="submit" className={`${scoreBtn} w-full py-2`} style={scoreBtnStyle}>
+                    ⚡ Score this question
+                  </button>
+                </form>
+              )
+            })}
+
+            {/* Day-wide "Score All" — scores every item filled in below at once */}
+            <form action={enterResults} className="space-y-4 rounded-xl p-4"
+              style={{ background: 'var(--color-bg)', border: '1px dashed var(--border-base)' }}>
+              <input type="hidden" name="match_day_id" value={matchDay.id} />
+              <div className="text-[11px] text-muted">
+                Or fill every item above and score the whole day in one transaction:
+              </div>
+              {unscoredMatches.map(match => (
+                <div key={match.id} className="flex items-center gap-2 flex-wrap">
+                  <span className="text-xs text-text font-medium flex-1 min-w-[120px]">
+                    {match.home_team} vs {match.away_team}
+                  </span>
+                  {['1', 'X', '2'].map(value => (
+                    <label key={value} className="flex items-center gap-1 rounded-lg px-2 py-1 cursor-pointer" style={inputStyle}>
+                      <input type="radio" name={`result_${match.id}`} value={value} />
+                      <span className="text-xs text-text font-medium">{value}</span>
+                    </label>
+                  ))}
                 </div>
               ))}
-
-              {/* Pikanteria without a correct answer */}
-              {matchDay.pikanteria.filter(p => !p.pikanteria_options.some(o => o.is_correct)).length > 0 && (
-                <>
-                  <div className="font-bold text-xs uppercase tracking-wider mt-2" style={{ color: 'var(--color-amber)' }}>
-                    🌶️ Pikanteria Results
+              {unresolvedPikas.map(pika => {
+                const options = [...pika.pikanteria_options].sort((a, b) => a.sort_order - b.sort_order)
+                return (
+                  <div key={pika.id} className="space-y-1">
+                    <div className="text-xs text-text font-medium">{pika.question}</div>
+                    <div className="flex gap-2 flex-wrap">
+                      {options.map(opt => (
+                        <label key={opt.id} className="flex items-center gap-1 rounded-lg px-2 py-1 cursor-pointer" style={inputStyle}>
+                          <input type="radio" name={`pik_${pika.id}`} value={opt.id} />
+                          <span className="text-xs text-text font-medium">{opt.label}</span>
+                        </label>
+                      ))}
+                    </div>
                   </div>
-                  {matchDay.pikanteria
-                    .filter(p => !p.pikanteria_options.some(o => o.is_correct))
-                    .map(pika => {
-                      const options = [...pika.pikanteria_options].sort(
-                        (a, b) => a.sort_order - b.sort_order
-                      )
-                      return (
-                        <div key={pika.id} className="rounded-xl p-4 space-y-3"
-                          style={{ background: 'var(--color-panel)', border: '1px solid var(--border-base)' }}>
-                          <p className="text-sm font-semibold text-text">{pika.question}</p>
-                          <div className="flex gap-2 flex-wrap">
-                            {options.map(opt => (
-                              <label key={opt.id}
-                                className="flex-1 flex items-center gap-1.5 rounded-lg p-2 cursor-pointer min-w-[80px]"
-                                style={inputStyle}>
-                                <input
-                                  type="radio"
-                                  name={`pik_${pika.id}`}
-                                  value={opt.id}
-                                />
-                                <span className="text-xs text-text font-medium">{opt.label}</span>
-                                <span className="text-[10px] text-muted" style={{ fontFamily: 'var(--font-mono)' }}>
-                                  {opt.odds.toFixed(2)}
-                                </span>
-                              </label>
-                            ))}
-                          </div>
-                        </div>
-                      )
-                    })}
-                </>
-              )}
-
-              <button type="submit"
-                className="w-full py-3 rounded-xl font-black text-sm"
-                style={{ background: 'var(--color-accent)', color: '#000' }}>
-                ⚡ Submit Results & Score All
+                )
+              })}
+              <button type="submit" className="w-full py-2.5 rounded-xl font-black text-sm"
+                style={{ background: 'var(--color-amber)', color: 'var(--color-bg)' }}>
+                ⚡ Score All Filled Items
               </button>
             </form>
 

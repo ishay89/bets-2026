@@ -74,6 +74,31 @@ describe('buildPikanteriaScoringPayload', () => {
   })
 })
 
+// Per-item scoring (one "Score this" button) passes a single-element payload to
+// the same atomic RPC the day-wide path uses. These confirm the builders scope
+// their output to exactly the one item handed in.
+describe('per-item scoring payloads', () => {
+  it('scores a single match without touching others', () => {
+    const one: ScoredMatchInput = {
+      id: 'm1', odds_home: 2, odds_draw: 3, odds_away: 4, result: '1',
+      predictions: [{ id: 'p1', pick: '1' }],
+    }
+    const { matchResults, predictionPoints } = buildMatchScoringPayload([one], 'group')
+    expect(matchResults).toEqual([{ match_id: 'm1', result: '1' }])
+    expect(predictionPoints).toEqual([{ id: 'p1', points: 2 }])
+  })
+
+  it('scores a single pikanteria without touching others', () => {
+    const one: PikanteriaInput = {
+      id: 'pk1', winningOptionId: 'opt', winningOdds: 2.0,
+      answers: [{ id: 'a1', option_id: 'opt' }],
+    }
+    const { winners, answerPoints } = buildPikanteriaScoringPayload([one])
+    expect(winners).toEqual([{ pikanteria_id: 'pk1', option_id: 'opt' }])
+    expect(answerPoints).toEqual([{ id: 'a1', points: 2.0 }])
+  })
+})
+
 describe('buildTournamentScoringPayload', () => {
   const picks: PreTournamentPickInput[] = [
     { id: 'w', winner_team: 'Brazil', winner_odds: 4.5, top_scorer: 'Vini', top_scorer_odds: 7.0 },
