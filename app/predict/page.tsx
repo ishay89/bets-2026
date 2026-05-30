@@ -6,7 +6,7 @@ import { MatchCard } from '@/components/match-card'
 import { PicanteriaCard } from '@/components/pikanteria-card'
 import { LockTimer } from '@/components/lock-timer'
 import { BottomNav } from '@/components/bottom-nav'
-import type { Match, MatchDay, Pikanteria, PicanteriaOption, Pick } from '@/lib/types'
+import type { Pick } from '@/lib/types'
 import { isMatchLocked, matchLockMs } from '@/lib/lock'
 import { toPct, matchInsight, type CrowdTally } from '@/lib/crowd'
 import {
@@ -15,15 +15,15 @@ import {
   shouldRequirePreTournamentPick,
 } from '@/lib/pre-tournament'
 import { parseUUID, parsePick } from '@/lib/validation'
+import {
+  getPublishedMatchDaysWithAll,
+  getUserPredictions,
+  getUserPikanteriaAnswers,
+} from '@/lib/data'
 
 const STAGE_LABELS: Record<string, string> = {
   group: 'Group Stage ×1', r16: 'Round of 16 ×1.5', qf: 'Quarter Finals ×1.5',
   sf: 'Semi Finals ×2', '3rd': 'Third Place ×1.5', final: 'Final ×3',
-}
-
-type FullMatchDay = MatchDay & {
-  matches: Match[]
-  pikanteria: (Pikanteria & { pikanteria_options: PicanteriaOption[] })[]
 }
 
 export default async function PredictPage() {
@@ -32,51 +32,43 @@ export default async function PredictPage() {
   if (!user) redirect('/login')
 
   const [
-    { data: matchDaysRaw, error: matchDaysError },
+    matchDays,
     { data: preTournamentPick, error: preTournamentError },
   ] = await Promise.all([
-    supabase
-      .from('match_days')
-      .select('*, matches(*), pikanteria(*, pikanteria_options(*))')
-      .not('published_at', 'is', null)
-      .order('date', { ascending: true }),
+    getPublishedMatchDaysWithAll(supabase),
     supabase
       .from('pre_tournament_picks')
       .select('winner_team, top_scorer')
       .eq('user_id', user.id)
       .maybeSingle(),
   ])
-  if (matchDaysError) throw matchDaysError
   if (preTournamentError) throw preTournamentError
 
   if (shouldRequirePreTournamentPick('/predict', hasCompletedPreTournamentPick(preTournamentPick))) {
     redirect(PRE_TOURNAMENT_PATH)
   }
 
-  const matchDays = (matchDaysRaw ?? []) as FullMatchDay[]
   const today = new Date().toISOString().slice(0, 10)
 
   const [
-    { data: existingPredictions, error: predsError },
-    { data: existingAnswers, error: answersError },
+    existingPredictions,
+    existingAnswers,
     { data: crowdMatchRows, error: crowdMatchError },
     { data: crowdPikRows, error: crowdPikError },
   ] = await Promise.all([
-    supabase.from('predictions').select('match_id, pick').eq('user_id', user.id),
-    supabase.from('pikanteria_answers').select('pikanteria_id, option_id').eq('user_id', user.id),
+    getUserPredictions(supabase, user.id),
+    getUserPikanteriaAnswers(supabase, user.id),
     supabase.rpc('crowd_match_picks'),
     supabase.rpc('crowd_pikanteria_picks'),
   ])
-  if (predsError) throw predsError
-  if (answersError) throw answersError
   if (crowdMatchError) throw crowdMatchError
   if (crowdPikError) throw crowdPikError
 
   const predictionMap = Object.fromEntries(
-    (existingPredictions ?? []).map(p => [p.match_id, p.pick as Pick])
+    existingPredictions.map(p => [p.match_id, p.pick as Pick])
   )
   const answerMap = Object.fromEntries(
-    (existingAnswers ?? []).map(a => [a.pikanteria_id, a.option_id as string])
+    existingAnswers.map(a => [a.pikanteria_id, a.option_id as string])
   )
 
   // Aggregate crowd picks (counts only; revealed by the RPCs only after lock).

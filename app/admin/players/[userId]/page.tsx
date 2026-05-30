@@ -2,12 +2,13 @@ import { createAdminClient, assertAdmin } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { isMatchLocked } from '@/lib/lock'
-import type { Match, MatchDay, Pikanteria, PicanteriaOption, Pick, User } from '@/lib/types'
-
-type FullMatchDay = MatchDay & {
-  matches: Match[]
-  pikanteria: (Pikanteria & { pikanteria_options: PicanteriaOption[] })[]
-}
+import type { MatchDay, Pick, User } from '@/lib/types'
+import {
+  getPublishedMatchDaysWithAll,
+  getUserPredictions,
+  getUserPikanteriaAnswers,
+  type FullMatchDay,
+} from '@/lib/data'
 
 const STAGE_LABELS: Record<string, string> = {
   group: 'Group Stage', r32: 'Round of 32', r16: 'Round of 16', qf: 'Quarter Finals',
@@ -43,29 +44,25 @@ export default async function PlayerDetailPage({
   await assertAdmin()
   const supabase = createAdminClient()
 
-  const [{ data: userRow }, { data: matchDaysRaw }, { data: predictions }, { data: answers }] =
+  const [{ data: userRow }, matchDaysRaw, predictions, answers] =
     await Promise.all([
       supabase.from('users').select('*').eq('id', userId).single(),
-      supabase
-        .from('match_days')
-        .select('*, matches(*), pikanteria(*, pikanteria_options(*))')
-        .not('published_at', 'is', null)
-        .order('date', { ascending: true }),
-      supabase.from('predictions').select('match_id, pick').eq('user_id', userId),
-      supabase.from('pikanteria_answers').select('pikanteria_id, option_id').eq('user_id', userId),
+      getPublishedMatchDaysWithAll(supabase),
+      getUserPredictions(supabase, userId),
+      getUserPikanteriaAnswers(supabase, userId),
     ])
 
   if (!userRow) notFound()
   const user = userRow as User
 
   const predictionMap: Record<string, Pick> = Object.fromEntries(
-    (predictions ?? []).map(p => [p.match_id, p.pick as Pick])
+    predictions.map(p => [p.match_id, p.pick as Pick])
   )
   const answerMap: Record<string, string> = Object.fromEntries(
-    (answers ?? []).map(a => [a.pikanteria_id, a.option_id as string])
+    answers.map(a => [a.pikanteria_id, a.option_id as string])
   )
 
-  const matchDays = (matchDaysRaw ?? []) as FullMatchDay[]
+  const matchDays = matchDaysRaw as FullMatchDay[]
   const openDays = filterOpenDays(matchDays)
 
   const totalBets = openDays.reduce((n, d) => n + d.openMatches.length + d.openPikanteria.length, 0)

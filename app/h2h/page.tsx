@@ -3,17 +3,15 @@ import { createClient } from '@/lib/supabase/server'
 import { BottomNav } from '@/components/bottom-nav'
 import { getAvatar, getAutomationLabel, isAutomated } from '@/lib/display'
 import type { LeaderboardEntry } from '@/lib/types'
+import { getLeaderboardEntries } from '@/lib/data'
 
 export default async function H2HPickerPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  const { data: entries } = await supabase
-    .from('leaderboard')
-    .select('*')
-    .returns<LeaderboardEntry[]>()
+  const entries = await getLeaderboardEntries(supabase)
 
-  const others = (entries ?? []).filter(e => e.id !== user?.id)
+  const others = entries.filter(e => e.id !== user?.id)
   const humans = others.filter(e => !isAutomated(e))
   const baselines = others.filter(e => isAutomated(e))
 

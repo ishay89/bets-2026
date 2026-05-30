@@ -1,4 +1,5 @@
 import { createClient, createServiceClient, assertAdmin } from '@/lib/supabase/server'
+import { getPublishedMatchDaysWithAll } from '@/lib/data'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { snapshotMatchDay } from '@/lib/score-validation'
@@ -149,14 +150,9 @@ const inputStyle = {
 export default async function ResultsPage() {
   const supabase = await createClient()
 
-  const { data: matchDays, error: matchDaysError } = await supabase
-    .from('match_days')
-    .select('*, matches(*), pikanteria(*, pikanteria_options(*))')
-    .not('published_at', 'is', null)
-    .order('date', { ascending: true })
-  if (matchDaysError) throw matchDaysError
+  const matchDays = await getPublishedMatchDaysWithAll(supabase)
 
-  const unscoredDays = ((matchDays ?? []) as MatchDayRow[]).filter(d =>
+  const unscoredDays = (matchDays as MatchDayRow[]).filter(d =>
     d.matches.some(m => m.result === null)
   )
 
