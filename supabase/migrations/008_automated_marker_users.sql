@@ -61,12 +61,12 @@ select
   u.id,
   u.display_name,
   u.is_monkey,
-  u.automation_strategy,
   coalesce(sum(p.points), 0)
     + coalesce(sum(pa.points), 0)
     + coalesce(pt.winner_points, 0)
     + coalesce(pt.top_scorer_points, 0) as total_points,
-  coalesce(max(ds.day_points), 0) as today_points
+  coalesce(max(ds.day_points), 0) as today_points,
+  u.automation_strategy
 from public.users u
 left join public.predictions p on p.user_id = u.id
 left join public.pikanteria_answers pa on pa.user_id = u.id

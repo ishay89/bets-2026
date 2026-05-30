@@ -55,6 +55,7 @@ grant execute on function public.crowd_pikanteria_picks() to authenticated;
 -- ────────────────────────────────────────────────────────────────────────────
 
 drop policy if exists "predictions_read_all" on public.predictions;
+drop policy if exists "predictions_read_own_or_locked" on public.predictions;
 create policy "predictions_read_own_or_locked" on public.predictions for select using (
   auth.uid() = user_id
   or exists (select 1 from public.users u where u.id = auth.uid() and u.is_admin)
@@ -67,6 +68,7 @@ create policy "predictions_read_own_or_locked" on public.predictions for select 
 );
 
 drop policy if exists "pik_answers_read_all" on public.pikanteria_answers;
+drop policy if exists "pik_answers_read_own_or_locked" on public.pikanteria_answers;
 create policy "pik_answers_read_own_or_locked" on public.pikanteria_answers for select using (
   auth.uid() = user_id
   or exists (select 1 from public.users u where u.id = auth.uid() and u.is_admin)
