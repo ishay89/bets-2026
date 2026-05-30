@@ -9,10 +9,13 @@ import type { Pick } from '@/lib/types'
 import { isMatchLocked, matchLockMs } from '@/lib/lock'
 import { toPct, matchInsight, type CrowdTally } from '@/lib/crowd'
 import { parseUUID, parsePick } from '@/lib/validation'
+import { PreTournamentFutures } from '@/components/pre-tournament-futures'
+import { hasCompletedPreTournamentPick } from '@/lib/pre-tournament'
 import {
   getPublishedMatchDaysWithAll,
   getUserPredictions,
   getUserPikanteriaAnswers,
+  getFirstPublishedLockTime,
 } from '@/lib/data'
 import {
   saveMatchPrediction,
@@ -52,14 +55,28 @@ export default async function PredictPage() {
     existingAnswers,
     { data: crowdMatchRows, error: crowdMatchError },
     { data: crowdPikRows, error: crowdPikError },
+    { data: futuresPick, error: futuresPickError },
+    futuresFirstDay,
   ] = await Promise.all([
     getUserPredictions(supabase, user.id),
     getUserPikanteriaAnswers(supabase, user.id),
     supabase.rpc('crowd_match_picks'),
     supabase.rpc('crowd_pikanteria_picks'),
+    supabase.from('pre_tournament_picks').select('*').eq('user_id', user.id).maybeSingle(),
+    getFirstPublishedLockTime(supabase),
   ])
   if (crowdMatchError) throw crowdMatchError
   if (crowdPikError) throw crowdPikError
+  if (futuresPickError) throw futuresPickError
+
+  const hasEntryPick = hasCompletedPreTournamentPick(futuresPick)
+  const futuresLocked = futuresFirstDay ? new Date() >= new Date(futuresFirstDay.lock_time) : false
+
+  // Surface the most recently published match days first, so a returning player
+  // lands on the matches they still need to bet without scrolling.
+  const sortedDays = [...matchDays].sort(
+    (a, b) => new Date(b.published_at!).getTime() - new Date(a.published_at!).getTime()
+  )
 
   const predictionMap = Object.fromEntries(
     existingPredictions.map(p => [p.match_id, p.pick as Pick])
@@ -135,6 +152,10 @@ export default async function PredictPage() {
       </div>
 
       <main className="px-4 pb-28 space-y-6 mt-2">
+        {!hasEntryPick && (
+          <PreTournamentFutures pick={futuresPick} isLocked={futuresLocked} />
+        )}
+
         {matchDays.length === 0 && (
           <div className="text-center py-16">
             <div className="text-4xl mb-3">📋</div>
@@ -143,7 +164,7 @@ export default async function PredictPage() {
           </div>
         )}
 
-        {matchDays.map((matchDay, idx) => {
+        {sortedDays.map((matchDay, idx) => {
           const isToday = matchDay.date === today
           const stageLabel = STAGE_LABELS[matchDay.stage] ?? matchDay.stage
           const multiplier = stageLabel.includes('×') ? `×${stageLabel.split('×')[1]}` : ''
@@ -250,12 +271,16 @@ export default async function PredictPage() {
                 </>
               )}
 
-              {idx < matchDays.length - 1 && (
+              {idx < sortedDays.length - 1 && (
                 <div className="border-t mt-2" style={{ borderColor: 'var(--border-subtle)' }} />
               )}
             </div>
           )
         })}
+
+        {hasEntryPick && (
+          <PreTournamentFutures pick={futuresPick} isLocked={futuresLocked} />
+        )}
       </main>
 
       <BottomNav />

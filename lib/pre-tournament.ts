@@ -1,4 +1,4 @@
-export const PRE_TOURNAMENT_PATH = '/pre-tournament'
+export const PRE_TOURNAMENT_PATH = '/predict'
 
 export const TEAMS = [
   { name: 'Argentina', odds: 4.0 },
