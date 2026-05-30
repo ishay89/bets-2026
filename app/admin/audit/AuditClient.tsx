@@ -1,7 +1,8 @@
 'use client'
 
 import React, { useState, useTransition } from 'react'
-import { fetchAuditEvents, PAGE_SIZE, type AuditRow, type AuditValue } from './actions'
+import { fetchAuditEvents } from './actions'
+import { PAGE_SIZE, type AuditRow, type AuditValue } from './types'
 
 function asText(value: unknown) {
   return typeof value === 'string' || typeof value === 'number' ? String(value) : ''
