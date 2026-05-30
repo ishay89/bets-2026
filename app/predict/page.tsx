@@ -1,5 +1,4 @@
-import { shouldWriteAuditEvent, writeAuditEvent, type AuditJson } from '@/lib/audit'
-import { createClient, createServiceClient } from '@/lib/supabase/server'
+import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { MatchCard } from '@/components/match-card'
@@ -20,10 +19,28 @@ import {
   getUserPredictions,
   getUserPikanteriaAnswers,
 } from '@/lib/data'
+import {
+  saveMatchPrediction,
+  savePikanteriaAnswer,
+  type SaveResult,
+} from '@/lib/prediction-saves'
 
 const STAGE_LABELS: Record<string, string> = {
   group: 'Group Stage ×1', r16: 'Round of 16 ×1.5', qf: 'Quarter Finals ×1.5',
   sf: 'Semi Finals ×2', '3rd': 'Third Place ×1.5', final: 'Final ×3',
+}
+
+function invalidSaveResult(error: unknown): SaveResult {
+  const message = error instanceof Error ? error.message : 'Invalid prediction'
+  return { ok: false, status: 'invalid', message }
+}
+
+function revalidatePredictPath() {
+  try {
+    revalidatePath('/predict')
+  } catch (error) {
+    console.error('Failed to revalidate /predict after saving prediction', error)
+  }
 }
 
 export default async function PredictPage() {
@@ -85,152 +102,50 @@ export default async function PredictPage() {
     e.total += r.cnt
   }
 
-  async function savePick(matchId: string, pick: Pick) {
+  async function savePick(matchId: string, pick: Pick): Promise<SaveResult> {
     'use server'
-    parseUUID(matchId, 'match_id')
-    parsePick(pick, 'match')
+    try {
+      parseUUID(matchId, 'match_id')
+      parsePick(pick, 'match')
+    } catch (error) {
+      return invalidSaveResult(error)
+    }
+
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
-    if (!user) throw new Error('Unauthorized')
-
-    const service = await createServiceClient()
-    const [{ data: match }, { data: existing }] = await Promise.all([
-      service
-        .from('matches')
-        .select('id, match_day_id, home_team, away_team, kickoff_time, locked, odds_home, odds_draw, odds_away, match_days(id, date, lock_time, locked, stage)')
-        .eq('id', matchId)
-        .single(),
-      service
-        .from('predictions')
-        .select('id, pick')
-        .eq('user_id', user.id)
-        .eq('match_id', matchId)
-        .maybeSingle(),
-    ])
-
-    const matchDay = Array.isArray(match?.match_days) ? match.match_days[0] : match?.match_days
-    if (!match || !matchDay) throw new Error('Match not found')
-
-    const wasAlreadyLocked = match.locked || matchDay.locked
-    if (isMatchLocked(match, matchDay.locked)) {
-      // Persist the time-based lock to the DB so it applies to all users going forward.
-      if (!wasAlreadyLocked) {
-        await service.from('matches').update({ locked: true }).eq('id', matchId)
-      }
-      throw new Error('Match is locked')
+    if (!user) {
+      return { ok: false, status: 'error', message: 'Unauthorized' }
     }
 
-    const oldValue: AuditJson | null = existing ? { pick: existing.pick } : null
-    const newValue: AuditJson = { pick }
-    const shouldAudit = shouldWriteAuditEvent(oldValue, newValue)
-
-    const { data: savedPrediction, error } = await service.from('predictions').upsert(
-      { user_id: user.id, match_id: matchId, pick },
-      { onConflict: 'user_id,match_id' }
-    ).select('id').single()
-    if (error) throw error
-
-    if (shouldAudit) {
-      await writeAuditEvent(service, {
-        user_id: user.id,
-        event_type: 'match_prediction',
-        action: existing ? 'update' : 'create',
-        entity_id: savedPrediction.id,
-        entity_ref: matchId,
-        old_value: oldValue,
-        new_value: newValue,
-        metadata: {
-          match_id: match.id,
-          match_day_id: match.match_day_id,
-          date: matchDay.date,
-          stage: matchDay.stage,
-          home_team: match.home_team,
-          away_team: match.away_team,
-          kickoff_time: match.kickoff_time,
-          odds_home: match.odds_home,
-          odds_draw: match.odds_draw,
-          odds_away: match.odds_away,
-        },
-      })
+    const result = await saveMatchPrediction(supabase, matchId, pick)
+    if (result.ok) {
+      revalidatePredictPath()
     }
 
-    revalidatePath('/predict')
+    return result
   }
 
-  async function saveAnswer(picanteriaId: string, optionId: string) {
+  async function saveAnswer(picanteriaId: string, optionId: string): Promise<SaveResult> {
     'use server'
-    parseUUID(picanteriaId, 'pikanteria_id')
-    parseUUID(optionId, 'option_id')
+    try {
+      parseUUID(picanteriaId, 'pikanteria_id')
+      parseUUID(optionId, 'option_id')
+    } catch (error) {
+      return invalidSaveResult(error)
+    }
+
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
-    if (!user) throw new Error('Unauthorized')
-
-    const service = await createServiceClient()
-    const [{ data: item }, { data: selectedOption }, { data: existing }] = await Promise.all([
-      service
-        .from('pikanteria')
-        .select('id, question, match_day_id, match_days(id, date, lock_time, locked, stage)')
-        .eq('id', picanteriaId)
-        .single(),
-      service
-        .from('pikanteria_options')
-        .select('id, label, odds')
-        .eq('id', optionId)
-        .eq('pikanteria_id', picanteriaId)
-        .single(),
-      service
-        .from('pikanteria_answers')
-        .select('id, option_id, pikanteria_options(id, label, odds)')
-        .eq('user_id', user.id)
-        .eq('pikanteria_id', picanteriaId)
-        .maybeSingle(),
-    ])
-
-    const matchDay = Array.isArray(item?.match_days) ? item.match_days[0] : item?.match_days
-    if (!item || !matchDay || !selectedOption) throw new Error('Pikanteria option not found')
-    if (matchDay.locked || new Date() >= new Date(matchDay.lock_time)) throw new Error('Pikanteria answers are locked')
-
-    const previousOption = Array.isArray(existing?.pikanteria_options)
-      ? existing?.pikanteria_options[0]
-      : existing?.pikanteria_options
-    const oldValue: AuditJson | null = existing ? {
-      option_id: existing.option_id,
-      label: previousOption?.label ?? null,
-      odds: previousOption?.odds ?? null,
-    } : null
-    const newValue: AuditJson = {
-      option_id: selectedOption.id,
-      label: selectedOption.label,
-      odds: selectedOption.odds,
-    }
-    const shouldAudit = shouldWriteAuditEvent(oldValue, newValue)
-
-    const { data: savedAnswer, error } = await service.from('pikanteria_answers').upsert(
-      { user_id: user.id, pikanteria_id: picanteriaId, option_id: optionId },
-      { onConflict: 'user_id,pikanteria_id' }
-    ).select('id').single()
-    if (error) throw error
-
-    if (shouldAudit) {
-      await writeAuditEvent(service, {
-        user_id: user.id,
-        event_type: 'pikanteria_answer',
-        action: existing ? 'update' : 'create',
-        entity_id: savedAnswer.id,
-        entity_ref: picanteriaId,
-        old_value: oldValue,
-        new_value: newValue,
-        metadata: {
-          pikanteria_id: item.id,
-          question: item.question,
-          match_day_id: item.match_day_id,
-          date: matchDay.date,
-          stage: matchDay.stage,
-        },
-      })
+    if (!user) {
+      return { ok: false, status: 'error', message: 'Unauthorized' }
     }
 
-    revalidatePath('/predict')
+    const result = await savePikanteriaAnswer(supabase, picanteriaId, optionId)
+    if (result.ok) {
+      revalidatePredictPath()
+    }
+
+    return result
   }
 
   return (
@@ -314,7 +229,7 @@ export default async function PredictPage() {
                 const tally = crowdTally[match.id] ?? { '1': 0, X: 0, '2': 0, total: 0 }
                 return (
                   <MatchCard
-                    key={match.id}
+                    key={`${match.id}:${predictionMap[match.id] ?? 'none'}`}
                     match={match}
                     currentPick={predictionMap[match.id] ?? null}
                     isLocked={isMatchLocked(match, dayManuallyLocked)}
@@ -343,7 +258,7 @@ export default async function PredictPage() {
                   </div>
                   {pikaItems.map(item => (
                     <PicanteriaCard
-                      key={item.id}
+                      key={`${item.id}:${answerMap[item.id] ?? 'none'}`}
                       item={{ ...item, options: [...(item.pikanteria_options ?? [])].sort((a, b) => a.sort_order - b.sort_order) }}
                       currentAnswer={answerMap[item.id] ?? null}
                       isLocked={isDayLocked}
