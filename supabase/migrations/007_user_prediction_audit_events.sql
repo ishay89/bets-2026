@@ -15,6 +15,11 @@ alter table public.user_prediction_audit_events enable row level security;
 
 grant select, insert on public.user_prediction_audit_events to authenticated;
 
+create policy "user_prediction_audit_events_insert_own"
+  on public.user_prediction_audit_events
+  for insert
+  with check (auth.uid() = user_id);
+
 create index user_prediction_audit_events_committed_at_idx
   on public.user_prediction_audit_events (committed_at desc);
 
