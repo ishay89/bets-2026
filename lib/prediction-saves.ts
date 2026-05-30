@@ -13,7 +13,7 @@ export type SaveResult =
   | { ok: true; status: Extract<SaveStatus, 'created' | 'updated' | 'unchanged'>; recordId: string }
   | { ok: false; status: Exclude<SaveStatus, 'created' | 'updated' | 'unchanged'>; message: string }
 
-type RpcError = { message?: string } | Error | null
+type RpcError = unknown
 type RpcResponse = { data: unknown; error: RpcError }
 type RpcClient = {
   rpc: (fn: string, args: Record<string, unknown>) => PromiseLike<RpcResponse>

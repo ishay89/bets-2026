@@ -39,11 +39,13 @@ describe('prediction save RPC wrappers', () => {
       error: null,
     })
 
-    await expect(saveMatchPrediction(client, 'match-1', '1')).resolves.toEqual<SaveResult>({
+    const expected = {
       ok: false,
       status: 'locked',
       message: 'Match is locked',
-    })
+    } satisfies SaveResult
+
+    await expect(saveMatchPrediction(client, 'match-1', '1')).resolves.toEqual(expected)
   })
 
   test('converts RPC failures to handled errors so optimistic UI can roll back', async () => {
@@ -52,11 +54,13 @@ describe('prediction save RPC wrappers', () => {
       error: { message: 'audit insert failed' },
     })
 
-    await expect(saveMatchPrediction(client, 'match-1', '2')).resolves.toEqual<SaveResult>({
+    const expected = {
       ok: false,
       status: 'error',
       message: 'Could not save prediction. Please try again.',
-    })
+    } satisfies SaveResult
+
+    await expect(saveMatchPrediction(client, 'match-1', '2')).resolves.toEqual(expected)
   })
 
   test('saves a pikanteria option through the atomic RPC', async () => {
