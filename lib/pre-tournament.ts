@@ -35,6 +35,3 @@ export function hasCompletedPreTournamentPick(pick: PreTournamentPickStatus): bo
   return Boolean(pick?.winner_team && pick?.top_scorer)
 }
 
-export function shouldRequirePreTournamentPick(pathname: string, hasPick: boolean): boolean {
-  return pathname === '/predict' && !hasPick
-}

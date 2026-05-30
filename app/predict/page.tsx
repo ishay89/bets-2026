@@ -8,11 +8,6 @@ import { BottomNav } from '@/components/bottom-nav'
 import type { Pick } from '@/lib/types'
 import { isMatchLocked, matchLockMs } from '@/lib/lock'
 import { toPct, matchInsight, type CrowdTally } from '@/lib/crowd'
-import {
-  PRE_TOURNAMENT_PATH,
-  hasCompletedPreTournamentPick,
-  shouldRequirePreTournamentPick,
-} from '@/lib/pre-tournament'
 import { parseUUID, parsePick } from '@/lib/validation'
 import {
   getPublishedMatchDaysWithAll,
@@ -48,22 +43,7 @@ export default async function PredictPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const [
-    matchDays,
-    { data: preTournamentPick, error: preTournamentError },
-  ] = await Promise.all([
-    getPublishedMatchDaysWithAll(supabase),
-    supabase
-      .from('pre_tournament_picks')
-      .select('winner_team, top_scorer')
-      .eq('user_id', user.id)
-      .maybeSingle(),
-  ])
-  if (preTournamentError) throw preTournamentError
-
-  if (shouldRequirePreTournamentPick('/predict', hasCompletedPreTournamentPick(preTournamentPick))) {
-    redirect(PRE_TOURNAMENT_PATH)
-  }
+  const matchDays = await getPublishedMatchDaysWithAll(supabase)
 
   const today = new Date().toISOString().slice(0, 10)
 
