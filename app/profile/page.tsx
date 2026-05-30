@@ -146,7 +146,7 @@ export default async function ProfilePage() {
                   )}
                 </div>
               </div>
-              <Link href="/pre-tournament"
+              <Link href="/predict"
                 className="block text-center text-[11px] font-bold py-2 rounded-lg transition-colors"
                 style={{ color: 'var(--color-muted)', border: '1px solid var(--border-base)', background: 'var(--color-elev)' }}>
                 Edit picks →
