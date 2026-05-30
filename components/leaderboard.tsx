@@ -29,10 +29,6 @@ function isAutomated(entry: LeaderboardEntry): boolean {
   return Boolean(entry.automation_strategy || entry.is_monkey)
 }
 
-function getAvatarFromName(name: string): string {
-  return AVATARS[name.charCodeAt(0) % AVATARS.length]
-}
-
 const podiumColors = { gold: '#f5c441', silver: '#aab4cd', bronze: '#d18a4d' }
 const podiumOrder = [
   { idx: 1, color: podiumColors.silver, height: 92 },
@@ -52,7 +48,7 @@ export function Leaderboard({ entries, currentUserId }: Props) {
 
   const top3 = sorted.slice(0, 3)
   const rest = sorted.slice(3)
-  const dangerZone = sorted.slice(-2)
+  const dangerStartRank = sorted.length - 1
 
   const hasToday = entries.some(e => e.today_points > 0)
 
@@ -122,118 +118,95 @@ export function Leaderboard({ entries, currentUserId }: Props) {
       )}
 
       {/* Full list */}
-      <div className="mb-3">
+      <div className="rounded-b-xl overflow-hidden">
         {rest.map((entry, i) => {
           const rank = i + 4
           const isMe = entry.id === currentUserId
           const av = getAvatar(entry)
           const automationLabel = getAutomationLabel(entry)
+          const isDanger = entries.length >= 2 && rank >= dangerStartRank
+          const fine = rank === sorted.length - 1 ? '+₪200' : rank === sorted.length ? '+₪100' : null
           return (
-            <div
-              key={entry.id}
-              className="flex items-center gap-3"
-              style={{
-                padding: '10px 12px',
-                background: isMe ? 'var(--color-accent-soft)' : 'transparent',
-                borderBottom: '1px solid var(--border-base)',
-                borderLeft: isMe ? '2px solid var(--color-accent)' : '2px solid transparent',
-                opacity: isAutomated(entry) ? 0.6 : 1,
-                fontStyle: isAutomated(entry) ? 'italic' : 'normal',
-              }}
-            >
-              <div
-                className="font-bold text-[12px] w-[22px]"
-                style={{ fontFamily: 'var(--font-mono)', color: isMe ? 'var(--color-accent)' : 'var(--color-muted)' }}
-              >{rank}.</div>
-              <div
-                className="flex items-center justify-center rounded-full text-base shrink-0"
-                style={{ width: 28, height: 28, background: 'var(--color-elev)', fontSize: 14 }}
-              >{av}</div>
-              <div
-                className="flex-1 font-bold text-[13px]"
-                style={{ color: isMe ? 'var(--color-accent)' : 'var(--color-text)' }}
-              >
-                {entry.display_name}
-                {automationLabel && (
-                  <span className="ml-1 text-[9px] not-italic" style={{ color: 'var(--color-muted)' }}>
-                    · {automationLabel}
-                  </span>
-                )}
-              </div>
-              {!isMe && (
-                <Link
-                  href={`/h2h/${entry.id}`}
-                  className="px-2 py-0.5 rounded-full not-italic shrink-0"
-                  style={{
-                    fontFamily: 'var(--font-display)',
-                    fontSize: 9,
-                    fontWeight: 700,
-                    letterSpacing: '0.08em',
-                    color: 'var(--color-sub)',
-                    background: 'var(--color-elev)',
-                    border: '1px solid var(--border-base)',
-                    textDecoration: 'none',
-                  }}
+            <div key={entry.id}>
+              {isDanger && rank === dangerStartRank && (
+                <div
+                  className="flex items-center gap-1.5 px-3 py-1.5"
+                  style={{ background: 'rgba(239,79,91,0.12)', borderTop: '1px solid rgba(239,79,91,0.3)' }}
                 >
-                  VS
-                </Link>
+                  <span className="text-[11px]">⚠️</span>
+                  <span
+                    className="text-[9px] font-bold uppercase tracking-widest"
+                    style={{ color: 'var(--color-danger)' }}
+                  >Danger zone · pays extra</span>
+                </div>
               )}
               <div
-                className="font-bold text-[13px]"
-                style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-text)' }}
+                className="flex items-center gap-3"
+                style={{
+                  padding: '10px 12px',
+                  background: isDanger
+                    ? 'rgba(239,79,91,0.06)'
+                    : isMe ? 'var(--color-accent-soft)' : 'transparent',
+                  borderBottom: '1px solid var(--border-base)',
+                  borderLeft: isMe ? '2px solid var(--color-accent)' : isDanger ? '2px solid rgba(239,79,91,0.4)' : '2px solid transparent',
+                  opacity: isAutomated(entry) ? 0.6 : 1,
+                  fontStyle: isAutomated(entry) ? 'italic' : 'normal',
+                }}
               >
-                {score(entry).toFixed(1)}
+                <div
+                  className="font-bold text-[12px] w-[22px]"
+                  style={{ fontFamily: 'var(--font-mono)', color: isDanger ? 'var(--color-danger)' : isMe ? 'var(--color-accent)' : 'var(--color-muted)' }}
+                >{rank}.</div>
+                <div
+                  className="flex items-center justify-center rounded-full text-base shrink-0"
+                  style={{ width: 28, height: 28, background: 'var(--color-elev)', fontSize: 14 }}
+                >{av}</div>
+                <div
+                  className="flex-1 font-bold text-[13px]"
+                  style={{ color: isMe ? 'var(--color-accent)' : 'var(--color-text)' }}
+                >
+                  {entry.display_name}
+                  {automationLabel && (
+                    <span className="ml-1 text-[9px] not-italic" style={{ color: 'var(--color-muted)' }}>
+                      · {automationLabel}
+                    </span>
+                  )}
+                </div>
+                {!isMe && (
+                  <Link
+                    href={`/h2h/${entry.id}`}
+                    className="px-2 py-0.5 rounded-full not-italic shrink-0"
+                    style={{
+                      fontFamily: 'var(--font-display)',
+                      fontSize: 9,
+                      fontWeight: 700,
+                      letterSpacing: '0.08em',
+                      color: 'var(--color-sub)',
+                      background: 'var(--color-elev)',
+                      border: '1px solid var(--border-base)',
+                      textDecoration: 'none',
+                    }}
+                  >
+                    VS
+                  </Link>
+                )}
+                <div
+                  className="font-bold text-[13px]"
+                  style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-text)' }}
+                >
+                  {score(entry).toFixed(1)}
+                </div>
+                {fine && (
+                  <div
+                    className="font-bold text-[11px] w-12 text-right"
+                    style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-danger)' }}
+                  >{fine}</div>
+                )}
               </div>
             </div>
           )
         })}
       </div>
-
-      {/* Danger zone */}
-      {entries.length >= 2 && (
-        <div
-          className="rounded-xl p-3"
-          style={{ background: 'var(--color-danger-soft)', border: '1px solid var(--border-danger)' }}
-        >
-          <div className="flex items-center gap-1.5 mb-2">
-            <span className="text-xs">⚠️</span>
-            <span
-              className="text-[10px] font-bold uppercase tracking-widest"
-              style={{ color: 'var(--color-danger)' }}
-            >Danger zone · pays extra</span>
-          </div>
-          {dangerZone.map((e, i) => {
-            const rank = sorted.length - 1 + i
-            const fine = i === 0 ? '+₪200' : '+₪100'
-            const av = e.is_monkey ? getAvatar(e) : getAvatarFromName(e.display_name)
-            return (
-              <div
-                key={e.id}
-                className="flex items-center gap-2.5"
-                style={{ padding: '6px 0', borderBottom: i === 0 ? '1px dashed var(--border-danger)' : 'none' }}
-              >
-                <div
-                  className="font-bold text-[11px] w-[22px]"
-                  style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-danger)' }}
-                >{rank}.</div>
-                <div
-                  className="flex items-center justify-center rounded-full shrink-0"
-                  style={{ width: 22, height: 22, background: 'var(--color-elev)', fontSize: 12 }}
-                >{av}</div>
-                <div className="flex-1 text-[12px] font-semibold text-text">{e.display_name}</div>
-                <div
-                  className="text-[12px]"
-                  style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-sub)' }}
-                >{score(e).toFixed(1)}</div>
-                <div
-                  className="font-bold text-[11px] w-12 text-right"
-                  style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-danger)' }}
-                >{fine}</div>
-              </div>
-            )
-          })}
-        </div>
-      )}
     </div>
   )
 }
