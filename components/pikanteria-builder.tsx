@@ -13,7 +13,7 @@ interface Props {
 
 const inputBase = {
   background: 'var(--color-bg)',
-  border: '1px solid rgba(255,255,255,0.1)',
+  border: '1px solid var(--border-base)',
   color: 'var(--color-text)',
 }
 
@@ -84,7 +84,7 @@ export function PicanteriaBuilder({ questionIndex: qi }: Props) {
         type="button"
         onClick={addOption}
         className="text-xs font-semibold px-3 py-1.5 rounded-lg mt-1"
-        style={{ color: 'var(--color-amber)', background: 'rgba(245,166,35,0.1)' }}
+        style={{ color: 'var(--color-amber)', background: 'var(--color-amber-soft)' }}
       >
         + Add option
       </button>

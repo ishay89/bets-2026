@@ -43,7 +43,7 @@ async function scoreTournamentEnd(formData: FormData) {
 
 const inputStyle = {
   background: 'var(--color-bg)',
-  border: '1px solid rgba(255,255,255,0.1)',
+  border: '1px solid var(--border-base)',
   color: 'var(--color-text)',
 }
 
@@ -61,7 +61,7 @@ export default function TournamentEndPage() {
 
       <form action={scoreTournamentEnd} className="space-y-4">
         <div className="rounded-xl p-4 space-y-2"
-          style={{ background: 'var(--color-panel)', border: '1px solid rgba(255,255,255,0.06)' }}>
+          style={{ background: 'var(--color-panel)', border: '1px solid var(--border-base)' }}>
           <label className="text-sm font-semibold text-text block">🥇 Tournament Winner</label>
           <select name="winner" required style={inputStyle} className={cls} defaultValue="">
             <option value="" disabled>Select winning team...</option>
@@ -72,7 +72,7 @@ export default function TournamentEndPage() {
         </div>
 
         <div className="rounded-xl p-4 space-y-2"
-          style={{ background: 'var(--color-panel)', border: '1px solid rgba(255,255,255,0.06)' }}>
+          style={{ background: 'var(--color-panel)', border: '1px solid var(--border-base)' }}>
           <label className="text-sm font-semibold text-text block">🥈 Runner-Up</label>
           <select name="runner_up" required style={inputStyle} className={cls} defaultValue="">
             <option value="" disabled>Select runner-up team...</option>
@@ -83,7 +83,7 @@ export default function TournamentEndPage() {
         </div>
 
         <div className="rounded-xl p-4 space-y-2"
-          style={{ background: 'var(--color-panel)', border: '1px solid rgba(255,255,255,0.06)' }}>
+          style={{ background: 'var(--color-panel)', border: '1px solid var(--border-base)' }}>
           <label className="text-sm font-semibold text-text block">⚽ Top Scorer</label>
           <select name="top_scorer" required style={inputStyle} className={cls} defaultValue="">
             <option value="" disabled>Select top scorer...</option>
@@ -94,7 +94,7 @@ export default function TournamentEndPage() {
         </div>
 
         <div className="rounded-xl p-4"
-          style={{ background: 'rgba(245,166,35,0.08)', border: '1px solid rgba(245,166,35,0.25)' }}>
+          style={{ background: 'var(--color-amber-soft)', border: '1px solid var(--border-warn)' }}>
           <div className="text-[11px] font-semibold" style={{ color: 'var(--color-amber)' }}>
             ⚠️ This action scores all pre-tournament picks for everyone. Cannot be undone.
           </div>

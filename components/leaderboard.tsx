@@ -62,7 +62,7 @@ export function Leaderboard({ entries, currentUserId }: Props) {
       <div className="flex justify-center mb-5 mt-1">
         <div
           className="relative flex rounded-full p-[3px]"
-          style={{ background: 'var(--color-elev)', border: '1px solid rgba(255,255,255,0.08)' }}
+          style={{ background: 'var(--color-elev)', border: '1px solid var(--border-base)' }}
         >
           {/* sliding pill */}
           <div
@@ -134,8 +134,8 @@ export function Leaderboard({ entries, currentUserId }: Props) {
               className="flex items-center gap-3"
               style={{
                 padding: '10px 12px',
-                background: isMe ? 'rgba(0,217,126,0.06)' : 'transparent',
-                borderBottom: '1px solid rgba(255,255,255,0.06)',
+                background: isMe ? 'var(--color-accent-soft)' : 'transparent',
+                borderBottom: '1px solid var(--border-base)',
                 borderLeft: isMe ? '2px solid var(--color-accent)' : '2px solid transparent',
                 opacity: isAutomated(entry) ? 0.6 : 1,
                 fontStyle: isAutomated(entry) ? 'italic' : 'normal',
@@ -193,7 +193,7 @@ export function Leaderboard({ entries, currentUserId }: Props) {
       {entries.length >= 2 && (
         <div
           className="rounded-xl p-3"
-          style={{ background: 'rgba(239,79,91,0.08)', border: '1px solid rgba(239,79,91,0.25)' }}
+          style={{ background: 'var(--color-danger-soft)', border: '1px solid var(--border-danger)' }}
         >
           <div className="flex items-center gap-1.5 mb-2">
             <span className="text-xs">⚠️</span>
@@ -210,7 +210,7 @@ export function Leaderboard({ entries, currentUserId }: Props) {
               <div
                 key={e.id}
                 className="flex items-center gap-2.5"
-                style={{ padding: '6px 0', borderBottom: i === 0 ? '1px dashed rgba(239,79,91,0.18)' : 'none' }}
+                style={{ padding: '6px 0', borderBottom: i === 0 ? '1px dashed var(--border-danger)' : 'none' }}
               >
                 <div
                   className="font-bold text-[11px] w-[22px]"

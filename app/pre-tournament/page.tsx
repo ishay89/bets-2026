@@ -110,7 +110,7 @@ export default async function PreTournamentPage() {
 
   const inputStyle = {
     background: 'var(--color-bg)',
-    border: '1px solid rgba(255,255,255,0.1)',
+    border: '1px solid var(--border-base)',
     color: 'var(--color-text)',
   }
   const cls = 'rounded-lg px-3 py-2 text-sm w-full'
@@ -127,7 +127,7 @@ export default async function PreTournamentPage() {
       <main className="px-4 pb-28 space-y-6">
         {isLocked && (
           <div className="rounded-lg px-4 py-3"
-            style={{ background: 'rgba(239,79,91,0.08)', border: '1px solid rgba(239,79,91,0.25)' }}>
+            style={{ background: 'var(--color-danger-soft)', border: '1px solid var(--border-danger)' }}>
             <span className="text-[12px] font-bold" style={{ color: 'var(--color-danger)' }}>
               🔒 Pre-tournament picks are locked
             </span>
@@ -144,7 +144,7 @@ export default async function PreTournamentPage() {
               <div className="superstar-panel p-[18px]">
                 <div className="relative flex items-center gap-4">
                   <div className="w-14 h-14 rounded-full flex items-center justify-center text-3xl"
-                    style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                    style={{ background: 'var(--color-elev)', border: '1px solid var(--border-base)' }}>
                     {FLAGS[pick.winner_team] ?? '🏆'}
                   </div>
                   <div className="flex-1">

@@ -46,7 +46,7 @@ export default async function ProfilePage() {
       <main className="px-4 pb-28 space-y-4">
         {/* Hero card */}
         <div className="rounded-[14px] p-4"
-          style={{ background: 'var(--color-panel)', border: '1px solid rgba(255,255,255,0.06)' }}>
+          style={{ background: 'var(--color-panel)', border: '1px solid var(--border-base)' }}>
           <div className="flex items-center gap-4">
             <div className="w-14 h-14 rounded-full flex items-center justify-center text-2xl shrink-0"
               style={{ background: 'var(--color-elev)', border: '2px solid var(--color-accent)' }}>
@@ -94,7 +94,7 @@ export default async function ProfilePage() {
           Where your points came from
         </div>
         <div className="rounded-[14px] p-4 space-y-3"
-          style={{ background: 'var(--color-panel)', border: '1px solid rgba(255,255,255,0.06)' }}>
+          style={{ background: 'var(--color-panel)', border: '1px solid var(--border-base)' }}>
           {rows.map(row => (
             <div key={row.label}>
               <div className="flex justify-between mb-1.5">
@@ -119,7 +119,7 @@ export default async function ProfilePage() {
               Pre-tournament picks
             </div>
             <div className="rounded-[14px] p-4 space-y-3"
-              style={{ background: 'var(--color-panel)', border: '1px solid rgba(255,255,255,0.06)' }}>
+              style={{ background: 'var(--color-panel)', border: '1px solid var(--border-base)' }}>
               <div className="flex items-center justify-between py-1">
                 <span className="text-[12px] text-sub">🏆 Winner</span>
                 <div className="flex items-center gap-2">
@@ -133,7 +133,7 @@ export default async function ProfilePage() {
                 </div>
               </div>
               <div className="flex items-center justify-between py-1"
-                style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+                style={{ borderTop: '1px solid var(--border-base)' }}>
                 <span className="text-[12px] text-sub">⚽ Top Scorer</span>
                 <div className="flex items-center gap-2">
                   <span className="text-[13px] font-semibold text-text">{pick.top_scorer}</span>
@@ -147,7 +147,7 @@ export default async function ProfilePage() {
               </div>
               <Link href="/pre-tournament"
                 className="block text-center text-[11px] font-bold py-2 rounded-lg transition-colors"
-                style={{ color: 'var(--color-muted)', border: '1px solid rgba(255,255,255,0.06)', background: 'var(--color-elev)' }}>
+                style={{ color: 'var(--color-muted)', border: '1px solid var(--border-base)', background: 'var(--color-elev)' }}>
                 Edit picks →
               </Link>
             </div>
@@ -158,7 +158,7 @@ export default async function ProfilePage() {
         {profile?.is_admin && (
           <Link href="/admin"
             className="block w-full text-center py-2.5 rounded-xl font-bold text-[13px] transition-colors"
-            style={{ background: 'rgba(245,166,35,0.13)', border: '1px solid rgba(245,166,35,0.3)', color: 'var(--color-amber)' }}>
+            style={{ background: 'var(--color-amber-soft)', border: '1px solid var(--border-warn)', color: 'var(--color-amber)' }}>
             ⚙️ Go to Admin Panel
           </Link>
         )}

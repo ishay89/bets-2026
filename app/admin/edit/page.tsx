@@ -49,7 +49,7 @@ async function toggleMatchLock(formData: FormData) {
 
 const inputBase = {
   background: 'var(--color-bg)',
-  border: '1px solid rgba(255,255,255,0.1)',
+  border: '1px solid var(--border-base)',
   color: 'var(--color-text)',
 }
 const cls = 'rounded-lg px-3 py-2 text-sm w-full outline-none focus:ring-1'
@@ -108,7 +108,7 @@ export default async function EditPage({
 
       {/* Date select — GET form */}
       <form method="GET" className="rounded-xl p-4 space-y-4"
-        style={{ background: 'var(--color-panel)', border: '1px solid rgba(255,255,255,0.06)' }}>
+        style={{ background: 'var(--color-panel)', border: '1px solid var(--border-base)' }}>
         <div className="font-bold text-xs uppercase tracking-wider" style={{ color: 'var(--color-amber)' }}>
           Select Date
         </div>
@@ -133,7 +133,7 @@ export default async function EditPage({
 
       {date && !matchDay && (
         <div className="rounded-xl p-4"
-          style={{ background: 'rgba(245,166,35,0.08)', border: '1px solid rgba(245,166,35,0.25)' }}>
+          style={{ background: 'var(--color-amber-soft)', border: '1px solid var(--border-warn)' }}>
           <div className="text-sm font-semibold" style={{ color: 'var(--color-amber)' }}>
             No published match day found for {date}
           </div>
@@ -142,7 +142,7 @@ export default async function EditPage({
 
       {hasScored && (
         <div className="rounded-xl p-4"
-          style={{ background: 'rgba(239,79,91,0.08)', border: '1px solid rgba(239,79,91,0.25)' }}>
+          style={{ background: 'var(--color-danger-soft)', border: '1px solid var(--border-danger)' }}>
           <div className="text-[11px] font-semibold" style={{ color: 'var(--color-danger)' }}>
             ⚠️ Some matches are already scored. Changing odds will not recalculate existing points — go to Results to re-score.
           </div>
@@ -153,7 +153,7 @@ export default async function EditPage({
         <>
           {/* Day-level lock toggle */}
           <form action={toggleDayLock} className="rounded-xl p-4 flex items-center justify-between"
-            style={{ background: 'var(--color-panel)', border: '1px solid rgba(255,255,255,0.06)' }}>
+            style={{ background: 'var(--color-panel)', border: '1px solid var(--border-base)' }}>
             <input type="hidden" name="match_day_id" value={matchDay.id} />
             <input type="hidden" name="date" value={matchDay.date} />
             <input type="hidden" name="locked" value={String(matchDay.locked)} />
@@ -164,9 +164,9 @@ export default async function EditPage({
             <button type="submit"
               className="px-4 py-2 rounded-lg text-sm font-bold"
               style={{
-                background: matchDay.locked ? 'rgba(0,217,126,0.15)' : 'rgba(239,79,91,0.15)',
+                background: matchDay.locked ? 'var(--color-accent-soft)' : 'var(--color-danger-soft)',
                 color: matchDay.locked ? 'var(--color-accent)' : 'var(--color-danger)',
-                border: `1px solid ${matchDay.locked ? 'rgba(0,217,126,0.3)' : 'rgba(239,79,91,0.3)'}`,
+                border: `1px solid ${matchDay.locked ? 'var(--border-accent)' : 'var(--border-danger)'}`,
               }}>
               {matchDay.locked ? '🔓 Unlock Day' : '🔒 Lock Day'}
             </button>
@@ -175,7 +175,7 @@ export default async function EditPage({
           {/* Odds + per-match lock */}
           <form action={saveOdds} className="space-y-6">
             <div className="rounded-xl p-3 flex items-center gap-3"
-              style={{ background: 'rgba(0,217,126,0.08)', border: '1px solid rgba(0,217,126,0.2)' }}>
+              style={{ background: 'var(--color-accent-soft)', border: '1px solid var(--border-accent)' }}>
               <div className="text-lg">📅</div>
               <div>
                 <div className="text-sm font-bold text-text">{matchDay.date} · {matchDay.stage}</div>
@@ -190,7 +190,7 @@ export default async function EditPage({
               }) + ' UTC'
               return (
                 <div key={match.id} className="rounded-xl p-4 space-y-3"
-                  style={{ background: 'var(--color-panel)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                  style={{ background: 'var(--color-panel)', border: '1px solid var(--border-base)' }}>
                   <input type="hidden" name={`match_id_${i}`} value={match.id} />
                   <div className="flex items-center justify-between">
                     <div className="font-bold text-sm text-text">
@@ -242,7 +242,7 @@ export default async function EditPage({
               return (
                 <form key={match.id} action={toggleMatchLock}
                   className="rounded-xl p-3 flex items-center justify-between"
-                  style={{ background: 'var(--color-panel)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                  style={{ background: 'var(--color-panel)', border: '1px solid var(--border-base)' }}>
                   <input type="hidden" name="match_id" value={match.id} />
                   <input type="hidden" name="date" value={matchDay!.date} />
                   <input type="hidden" name="locked" value={String(match.locked)} />
@@ -255,9 +255,9 @@ export default async function EditPage({
                   <button type="submit"
                     className="px-3 py-1.5 rounded-lg text-xs font-bold"
                     style={{
-                      background: match.locked ? 'rgba(0,217,126,0.15)' : 'rgba(239,79,91,0.15)',
+                      background: match.locked ? 'var(--color-accent-soft)' : 'var(--color-danger-soft)',
                       color: match.locked ? 'var(--color-accent)' : 'var(--color-danger)',
-                      border: `1px solid ${match.locked ? 'rgba(0,217,126,0.3)' : 'rgba(239,79,91,0.3)'}`,
+                      border: `1px solid ${match.locked ? 'var(--border-accent)' : 'var(--border-danger)'}`,
                     }}>
                     {match.locked ? '🔓 Unlock' : '🔒 Lock'}
                   </button>

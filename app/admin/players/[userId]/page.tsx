@@ -116,7 +116,7 @@ export default async function PlayerDetailPage({
               return (
                 <div key={match.id}
                   className="flex items-center justify-between rounded-xl px-4 py-3"
-                  style={{ background: 'var(--color-panel)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                  style={{ background: 'var(--color-panel)', border: '1px solid var(--border-base)' }}>
                   <div className="flex-1 min-w-0">
                     <div className="font-semibold text-[13px] text-text truncate">
                       {match.home_team} vs {match.away_team}
@@ -138,7 +138,7 @@ export default async function PlayerDetailPage({
               return (
                 <div key={item.id}
                   className="flex items-center justify-between rounded-xl px-4 py-3"
-                  style={{ background: 'var(--color-panel)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                  style={{ background: 'var(--color-panel)', border: '1px solid var(--border-base)' }}>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1.5">
                       <span>🌶️</span>
@@ -160,14 +160,14 @@ function StatusBadge({ submitted, label }: { submitted: boolean; label?: string 
   if (submitted) {
     return (
       <span className="text-[11px] font-bold px-2.5 py-1 rounded-full shrink-0 ml-3 truncate max-w-[45%]"
-        style={{ color: 'var(--color-accent)', background: 'rgba(0,217,126,0.13)', border: '1px solid rgba(0,217,126,0.3)' }}>
+        style={{ color: 'var(--color-accent)', background: 'var(--color-accent-soft)', border: '1px solid var(--border-accent)' }}>
         ✓ {label}
       </span>
     )
   }
   return (
     <span className="text-[11px] font-bold px-2.5 py-1 rounded-full shrink-0 ml-3"
-      style={{ color: 'var(--color-danger)', background: 'rgba(239,79,91,0.08)', border: '1px solid rgba(239,79,91,0.25)' }}>
+      style={{ color: 'var(--color-danger)', background: 'var(--color-danger-soft)', border: '1px solid var(--border-danger)' }}>
       ✗ Missing
     </span>
   )

@@ -7,7 +7,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     <div className="min-h-screen bg-bg">
       <header
         className="px-4 py-3 flex justify-between items-center sticky top-0 z-10"
-        style={{ background: 'var(--color-panel)', borderBottom: '1px solid rgba(255,255,255,0.06)' }}
+        style={{ background: 'var(--color-panel)', borderBottom: '1px solid var(--border-base)' }}
       >
         <span className="font-black text-sm tracking-wide" style={{ color: 'var(--color-amber)' }}>⚙️ ADMIN</span>
       </header>

@@ -18,7 +18,7 @@ export default function AdminHome() {
           key={s.href}
           href={s.href}
           className="block rounded-xl p-4 transition-colors"
-          style={{ background: 'var(--color-panel)', border: '1px solid rgba(255,255,255,0.06)' }}
+          style={{ background: 'var(--color-panel)', border: '1px solid var(--border-base)' }}
         >
           <div className="flex items-center gap-3">
             <span className="text-2xl">{s.icon}</span>
