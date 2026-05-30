@@ -60,7 +60,7 @@ export default async function HistoryPage() {
 
       <main className="px-4 pb-28 space-y-4">
         {streak.length > 0 && (
-          <div className="rounded-[14px] p-4" style={{ background: 'var(--color-panel)', border: '1px solid rgba(255,255,255,0.06)' }}>
+          <div className="rounded-[14px] p-4" style={{ background: 'var(--color-panel)', border: '1px solid var(--border-base)' }}>
             <div className="flex items-center justify-between mb-3">
               <span className="text-[10px] font-bold uppercase tracking-[1.2px] text-muted">
                 Last {streak.length} picks
@@ -74,8 +74,8 @@ export default async function HistoryPage() {
                 <div key={i}
                   className="flex-1 h-7 rounded flex items-center justify-center text-[10px] font-extrabold"
                   style={{
-                    background: s === 'W' ? 'rgba(0,217,126,0.14)' : 'rgba(239,79,91,0.13)',
-                    border: `1px solid ${s === 'W' ? 'rgba(0,217,126,0.32)' : 'rgba(239,79,91,0.3)'}`,
+                    background: s === 'W' ? 'var(--color-accent-soft)' : 'var(--color-danger-soft)',
+                    border: `1px solid ${s === 'W' ? 'var(--border-accent)' : 'var(--border-danger)'}`,
                     color: s === 'W' ? 'var(--color-accent)' : 'var(--color-danger)',
                   }}
                 >{s}</div>
@@ -112,9 +112,9 @@ export default async function HistoryPage() {
 
           return (
             <div key={day.id} className="rounded-[14px] overflow-hidden"
-              style={{ background: 'var(--color-panel)', border: '1px solid rgba(255,255,255,0.06)' }}>
+              style={{ background: 'var(--color-panel)', border: '1px solid var(--border-base)' }}>
               <div className="flex items-center justify-between px-4 py-3"
-                style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                style={{ borderBottom: '1px solid var(--border-base)' }}>
                 <div>
                   <div className="font-bold text-[13px] text-text">{day.date}</div>
                   <div className="text-[10px] font-bold uppercase tracking-wide text-muted mt-0.5">
@@ -129,12 +129,12 @@ export default async function HistoryPage() {
               <div className="px-4 py-2 space-y-1.5">
                 {myMatchPreds.map((m) => (
                   <div key={m.id} className="flex items-center gap-2 py-1.5"
-                    style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}>
+                    style={{ borderTop: '1px solid var(--border-subtle)' }}>
                     <span className="text-base">{/* flag */}</span>
                     <span className="text-[12px] text-sub flex-1">{m.home_team} vs {m.away_team}</span>
                     <div className="flex items-center gap-2">
                       <span className="text-[11px] font-bold px-2 py-0.5 rounded"
-                        style={{ background: 'var(--color-elev)', border: '1px solid rgba(255,255,255,0.06)', color: 'var(--color-text)' }}>
+                        style={{ background: 'var(--color-elev)', border: '1px solid var(--border-base)', color: 'var(--color-text)' }}>
                         {m.myPick?.pick ?? '—'}
                       </span>
                       <span className="text-[11px]" style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-muted)' }}>
@@ -156,7 +156,7 @@ export default async function HistoryPage() {
                 ))}
                 {myPikaAnswers.filter((p): p is typeof p & { myAnswer: PikaAnswerRow } => p.myAnswer !== undefined).map((p) => (
                   <div key={p.id} className="flex items-center gap-2 py-1.5"
-                    style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}>
+                    style={{ borderTop: '1px solid var(--border-subtle)' }}>
                     <span className="text-[11px] flex-1" style={{ color: 'var(--color-amber)' }}>
                       🌶️ {p.question}
                     </span>

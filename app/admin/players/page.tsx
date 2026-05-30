@@ -38,13 +38,13 @@ export default async function PlayersPage() {
         {realPlayers.map((player) => (
           <div key={player.id}
             className="flex items-center justify-between rounded-xl px-4 py-3"
-            style={{ background: 'var(--color-panel)', border: '1px solid rgba(255,255,255,0.06)' }}>
+            style={{ background: 'var(--color-panel)', border: '1px solid var(--border-base)' }}>
             <Link href={`/admin/players/${player.id}`} className="flex-1 min-w-0 group">
               <div className="flex items-center gap-2">
                 <span className="font-semibold text-[13px] text-text truncate group-hover:text-amber transition-colors">{player.display_name}</span>
                 {player.is_admin && (
                   <span className="text-[9px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full shrink-0"
-                    style={{ color: 'var(--color-amber)', background: 'rgba(245,166,35,0.13)', border: '1px solid rgba(245,166,35,0.3)' }}>
+                    style={{ color: 'var(--color-amber)', background: 'var(--color-amber-soft)', border: '1px solid var(--border-warn)' }}>
                     admin
                   </span>
                 )}
@@ -58,7 +58,7 @@ export default async function PlayersPage() {
                 className="text-[11px] font-bold px-3 py-1.5 rounded-lg transition-colors"
                 style={{
                   color: player.is_admin ? 'var(--color-danger)' : 'var(--color-muted)',
-                  border: '1px solid rgba(255,255,255,0.1)',
+                  border: '1px solid var(--border-base)',
                   background: 'var(--color-elev)',
                 }}>
                 {player.is_admin ? 'Demote' : 'Make admin'}
@@ -72,7 +72,7 @@ export default async function PlayersPage() {
         <div className="space-y-2">
           {automatedPlayers.map(player => (
             <div key={player.id} className="rounded-xl px-4 py-3 opacity-60"
-              style={{ background: 'var(--color-panel)', border: '1px solid rgba(255,255,255,0.06)' }}>
+              style={{ background: 'var(--color-panel)', border: '1px solid var(--border-base)' }}>
               <div className="flex items-center gap-2">
                 <span className="text-lg">{automationIcon(player)}</span>
                 <div>

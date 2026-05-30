@@ -299,12 +299,12 @@ export default async function PredictPage() {
 
                 {isDayLocked ? (
                   <div className="text-[10px] font-bold px-2.5 py-1 rounded-full"
-                    style={{ background: 'rgba(239,79,91,0.08)', color: 'var(--color-danger)', border: '1px solid rgba(239,79,91,0.25)' }}>
+                    style={{ background: 'var(--color-danger-soft)', color: 'var(--color-danger)', border: '1px solid var(--border-danger)' }}>
                     🔒 Locked
                   </div>
                 ) : (
                   <div className="flex flex-col items-end rounded-[10px] px-2.5 py-1.5"
-                    style={{ background: 'rgba(245,166,35,0.13)', border: '1px solid rgba(245,166,35,0.3)' }}>
+                    style={{ background: 'var(--color-amber-soft)', border: '1px solid var(--border-warn)' }}>
                     <div className="text-[9px] font-bold uppercase tracking-wide" style={{ color: 'var(--color-amber)' }}>Locks</div>
                     <div className="text-[13px] font-bold" style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-amber)' }}>
                       <LockTimer lockTime={earliestLockTime} />
@@ -364,7 +364,7 @@ export default async function PredictPage() {
               )}
 
               {idx < matchDays.length - 1 && (
-                <div className="border-t mt-2" style={{ borderColor: 'rgba(255,255,255,0.04)' }} />
+                <div className="border-t mt-2" style={{ borderColor: 'var(--border-subtle)' }} />
               )}
             </div>
           )

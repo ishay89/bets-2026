@@ -45,7 +45,7 @@ function ValidationBadge({ snapshot }: { snapshot: SnapshotRow }) {
   }
   return (
     <span className="text-[10px] font-bold px-2 py-0.5 rounded-full"
-      style={{ color: '#ff5555', background: 'rgba(255,85,85,0.1)', border: '1px solid rgba(255,85,85,0.3)' }}>
+      style={{ color: 'var(--color-danger)', background: 'var(--color-danger-soft)', border: '1px solid var(--border-danger)' }}>
       ✗ off by {snapshot.discrepancy != null ? fmt(Math.abs(snapshot.discrepancy)) : '?'} pts
     </span>
   )
@@ -89,7 +89,7 @@ export default async function ScoresPage() {
 
   const sectionStyle = {
     background: 'var(--color-panel)',
-    border: '1px solid rgba(255,255,255,0.06)',
+    border: '1px solid var(--border-base)',
   }
 
   const thStyle = {
@@ -98,14 +98,14 @@ export default async function ScoresPage() {
     fontSize: '11px',
     textAlign: 'left' as const,
     padding: '8px 12px',
-    borderBottom: '1px solid rgba(255,255,255,0.06)',
+    borderBottom: '1px solid var(--border-base)',
   }
 
   const tdStyle = {
     padding: '8px 12px',
     fontSize: '12px',
     color: 'var(--color-text)',
-    borderBottom: '1px solid rgba(255,255,255,0.04)',
+    borderBottom: '1px solid var(--border-subtle)',
   }
 
   return (
@@ -123,7 +123,7 @@ export default async function ScoresPage() {
         <div className="flex items-center gap-3">
           {totalInvalid > 0 && (
             <span className="text-[11px] font-bold px-2 py-1 rounded-lg"
-              style={{ color: '#ff5555', background: 'rgba(255,85,85,0.1)', border: '1px solid rgba(255,85,85,0.3)' }}>
+              style={{ color: 'var(--color-danger)', background: 'var(--color-danger-soft)', border: '1px solid var(--border-danger)' }}>
               {totalInvalid} invalid
             </span>
           )}
@@ -148,7 +148,7 @@ export default async function ScoresPage() {
       {preTournament.length > 0 && (
         <div className="rounded-xl overflow-hidden" style={sectionStyle}>
           <div className="px-4 py-3 flex items-center justify-between"
-            style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+            style={{ borderBottom: '1px solid var(--border-base)' }}>
             <div>
               <span className="font-bold text-sm" style={{ color: 'var(--color-amber)' }}>
                 🏆 Pre-Tournament
@@ -157,7 +157,7 @@ export default async function ScoresPage() {
             </div>
             {preTournament.some(s => !s.is_valid) && (
               <span className="text-[10px] font-bold px-2 py-0.5 rounded-full"
-                style={{ color: '#ff5555', background: 'rgba(255,85,85,0.1)', border: '1px solid rgba(255,85,85,0.3)' }}>
+                style={{ color: 'var(--color-danger)', background: 'var(--color-danger-soft)', border: '1px solid var(--border-danger)' }}>
                 {preTournament.filter(s => !s.is_valid).length} invalid
               </span>
             )}
@@ -203,7 +203,7 @@ export default async function ScoresPage() {
         return (
           <div key={dayId} className="rounded-xl overflow-hidden" style={sectionStyle}>
             <div className="px-4 py-3 flex items-center justify-between"
-              style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+              style={{ borderBottom: '1px solid var(--border-base)' }}>
               <div>
                 <span className="font-bold text-sm uppercase tracking-wider" style={{ color: 'var(--color-amber)' }}>
                   {day?.stage ?? ''}
@@ -214,7 +214,7 @@ export default async function ScoresPage() {
                 <span className="text-[10px] text-muted">{rows.length} players</span>
                 {invalidCount > 0 && (
                   <span className="text-[10px] font-bold px-2 py-0.5 rounded-full"
-                    style={{ color: '#ff5555', background: 'rgba(255,85,85,0.1)', border: '1px solid rgba(255,85,85,0.3)' }}>
+                    style={{ color: 'var(--color-danger)', background: 'var(--color-danger-soft)', border: '1px solid var(--border-danger)' }}>
                     {invalidCount} invalid
                   </span>
                 )}

@@ -80,7 +80,7 @@ export default async function AuditPage() {
 
   const panelStyle = {
     background: 'var(--color-panel)',
-    border: '1px solid rgba(255,255,255,0.06)',
+    border: '1px solid var(--border-base)',
   }
 
   return (
@@ -114,7 +114,7 @@ export default async function AuditPage() {
                 {['Time', 'Player', 'Type', 'Context', 'Change'].map((heading) => (
                   <th key={heading}
                     className="text-left text-[11px] font-semibold px-3 py-2"
-                    style={{ color: 'var(--color-muted)', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                    style={{ color: 'var(--color-muted)', borderBottom: '1px solid var(--border-base)' }}>
                     {heading}
                   </th>
                 ))}
@@ -124,27 +124,27 @@ export default async function AuditPage() {
               {events.map((event) => (
                 <tr key={event.id}>
                   <td className="px-3 py-2 align-top text-[12px] whitespace-nowrap"
-                    style={{ color: 'var(--color-sub)', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                    style={{ color: 'var(--color-sub)', borderBottom: '1px solid var(--border-subtle)' }}>
                     {formatTimestamp(event.committed_at)}
                   </td>
                   <td className="px-3 py-2 align-top text-[12px]"
-                    style={{ color: 'var(--color-text)', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                    style={{ color: 'var(--color-text)', borderBottom: '1px solid var(--border-subtle)' }}>
                     <div className="font-semibold">{event.users.display_name}</div>
                     <div className="text-[10px] text-muted">{event.users.email}</div>
                   </td>
                   <td className="px-3 py-2 align-top"
-                    style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                    style={{ borderBottom: '1px solid var(--border-subtle)' }}>
                     <div className="text-[11px] font-bold" style={{ color: 'var(--color-amber)' }}>
                       {typeLabels[event.event_type]}
                     </div>
                     <div className="text-[10px] uppercase tracking-wide text-muted">{event.action}</div>
                   </td>
                   <td className="px-3 py-2 align-top text-[12px]"
-                    style={{ color: 'var(--color-text)', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                    style={{ color: 'var(--color-text)', borderBottom: '1px solid var(--border-subtle)' }}>
                     {contextLabel(event)}
                   </td>
                   <td className="px-3 py-2 align-top text-[12px]"
-                    style={{ color: 'var(--color-text)', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                    style={{ color: 'var(--color-text)', borderBottom: '1px solid var(--border-subtle)' }}>
                     <span className="text-muted">{valueLabel(event, event.old_value)}</span>
                     <span className="mx-2" style={{ color: 'var(--color-amber)' }}>-&gt;</span>
                     <span className="font-semibold">{valueLabel(event, event.new_value)}</span>

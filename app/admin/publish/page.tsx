@@ -149,7 +149,7 @@ async function publishMatchDay(formData: FormData) {
 
 const inputBase = {
   background: 'var(--color-bg)',
-  border: '1px solid rgba(255,255,255,0.1)',
+  border: '1px solid var(--border-base)',
   color: 'var(--color-text)',
 }
 const cls = 'rounded-lg px-3 py-2 text-sm w-full outline-none focus:ring-1'
@@ -201,7 +201,7 @@ export default async function PublishPage({
 
       {/* Date picker — GET form loads the draft */}
       <form method="GET" className="rounded-xl p-4 space-y-4"
-        style={{ background: 'var(--color-panel)', border: '1px solid rgba(255,255,255,0.06)' }}>
+        style={{ background: 'var(--color-panel)', border: '1px solid var(--border-base)' }}>
         <div className="font-bold text-xs uppercase tracking-wider" style={{ color: 'var(--color-amber)' }}>
           Select Date
         </div>
@@ -226,7 +226,7 @@ export default async function PublishPage({
 
       {date && !draft && (
         <div className="rounded-xl p-4"
-          style={{ background: 'rgba(245,166,35,0.08)', border: '1px solid rgba(245,166,35,0.25)' }}>
+          style={{ background: 'var(--color-amber-soft)', border: '1px solid var(--border-warn)' }}>
           <div className="text-sm font-semibold" style={{ color: 'var(--color-amber)' }}>
             No unpublished draft found for {date}
           </div>
@@ -242,7 +242,7 @@ export default async function PublishPage({
           <input type="hidden" name="date" value={draft.date} />
 
           <div className="rounded-xl p-3 flex items-center gap-3"
-            style={{ background: 'rgba(0,217,126,0.08)', border: '1px solid rgba(0,217,126,0.2)' }}>
+            style={{ background: 'var(--color-accent-soft)', border: '1px solid var(--border-accent)' }}>
             <div className="text-lg">📅</div>
             <div>
               <div className="text-sm font-bold text-text">{draft.date} — {draft.stage}</div>
@@ -260,7 +260,7 @@ export default async function PublishPage({
               k === 'home' ? match.odds_home : k === 'draw' ? match.odds_draw : match.odds_away
             return (
               <div key={match.id} className="rounded-xl p-4 space-y-3"
-                style={{ background: 'var(--color-panel)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                style={{ background: 'var(--color-panel)', border: '1px solid var(--border-base)' }}>
                 <input type="hidden" name={`match_id_${i}`} value={match.id} />
                 <div className="flex items-center justify-between">
                   <div className="font-bold text-sm text-text">
@@ -292,7 +292,7 @@ export default async function PublishPage({
           </div>
           {[1, 2, 3].map(i => (
             <div key={i} className="rounded-xl p-4 space-y-3"
-              style={{ background: 'var(--color-panel)', border: '1px solid rgba(255,255,255,0.06)' }}>
+              style={{ background: 'var(--color-panel)', border: '1px solid var(--border-base)' }}>
               <div className="space-y-1">
                 <label className="text-muted text-xs">Question {i}{i > 1 ? ' (optional)' : ''}</label>
                 <input type="text" name={`pik_q_${i}`} placeholder="e.g. Will Mbappé score?"

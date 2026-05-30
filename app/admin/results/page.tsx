@@ -142,7 +142,7 @@ async function enterResults(formData: FormData) {
 
 const inputStyle = {
   background: 'var(--color-bg)',
-  border: '1px solid rgba(255,255,255,0.1)',
+  border: '1px solid var(--border-base)',
   color: 'var(--color-text)',
 }
 
@@ -190,7 +190,7 @@ export default async function ResultsPage() {
                 <div className="font-bold text-sm text-text">{matchDay.date} · {matchDay.stage}</div>
               </div>
               <div className="rounded-xl px-3 py-1 text-xs font-bold"
-                style={{ background: 'rgba(245,166,35,0.08)', border: '1px solid rgba(245,166,35,0.25)', color: 'var(--color-amber)' }}>
+                style={{ background: 'var(--color-amber-soft)', border: '1px solid var(--border-warn)', color: 'var(--color-amber)' }}>
                 {done}/{total} scored
               </div>
             </div>
@@ -203,7 +203,7 @@ export default async function ResultsPage() {
                 <div key={match.id} className="rounded-xl p-4 space-y-3"
                   style={{
                     background: 'var(--color-panel)',
-                    border: '1px solid rgba(255,255,255,0.06)',
+                    border: '1px solid var(--border-base)',
                   }}>
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-bold text-text">
@@ -245,7 +245,7 @@ export default async function ResultsPage() {
                       )
                       return (
                         <div key={pika.id} className="rounded-xl p-4 space-y-3"
-                          style={{ background: 'var(--color-panel)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                          style={{ background: 'var(--color-panel)', border: '1px solid var(--border-base)' }}>
                           <p className="text-sm font-semibold text-text">{pika.question}</p>
                           <div className="flex gap-2 flex-wrap">
                             {options.map(opt => (
@@ -277,7 +277,7 @@ export default async function ResultsPage() {
               </button>
             </form>
 
-            <hr style={{ borderColor: 'rgba(255,255,255,0.06)' }} />
+            <hr style={{ borderColor: 'var(--border-base)' }} />
           </div>
         )
       })}
