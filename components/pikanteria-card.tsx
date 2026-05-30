@@ -1,13 +1,14 @@
 'use client'
-import { useState, useTransition } from 'react'
+import { useRef, useState, useTransition } from 'react'
 import type { Pikanteria, PicanteriaOption } from '@/lib/types'
 import { largestRemainder } from '@/lib/crowd'
+import type { SaveResult } from '@/lib/prediction-saves'
 
 interface Props {
   item: Pikanteria & { options: PicanteriaOption[] }
   currentAnswer: string | null
   isLocked: boolean
-  onSave: (picanteriaId: string, optionId: string) => Promise<void>
+  onSave: (picanteriaId: string, optionId: string) => Promise<SaveResult>
   /** Per-option crowd counts, revealed only once the day is locked. */
   crowd?: Record<string, number> | null
   crowdTotal?: number
@@ -18,12 +19,33 @@ const SEG_COLORS = ['var(--color-amber)', 'var(--color-accent)', 'var(--color-di
 
 export function PicanteriaCard({ item, currentAnswer, isLocked, onSave, crowd, crowdTotal = 0 }: Props) {
   const [selected, setSelected] = useState<string | null>(currentAnswer)
+  const [error, setError] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
   const [pending, startTransition] = useTransition()
+  const inFlightRef = useRef(false)
 
   function handleSelect(optionId: string) {
-    if (isLocked) return
+    if (isLocked || inFlightRef.current || selected === optionId) return
+    const previous = selected
+    inFlightRef.current = true
+    setSaving(true)
+    setError(null)
     setSelected(optionId)
-    startTransition(() => onSave(item.id, optionId))
+    startTransition(async () => {
+      try {
+        const result = await onSave(item.id, optionId)
+        if (!result.ok) {
+          setSelected(previous)
+          setError(result.message)
+        }
+      } catch {
+        setSelected(previous)
+        setError('Could not save pikanteria answer. Please try again.')
+      } finally {
+        inFlightRef.current = false
+        setSaving(false)
+      }
+    })
   }
 
   const showCrowd = isLocked && crowd && crowdTotal > 0
@@ -82,14 +104,14 @@ export function PicanteriaCard({ item, currentAnswer, isLocked, onSave, crowd, c
               <button
                 key={opt.id}
                 onClick={() => handleSelect(opt.id)}
-                disabled={isLocked || pending}
+                disabled={isLocked || pending || saving}
                 className="flex-1 flex items-center justify-center gap-1.5 rounded-xl py-3 transition-all duration-150"
                 style={{
                   background: sel ? 'var(--color-amber)' : 'var(--color-elev)',
                   color: sel ? '#000' : 'var(--color-text)',
                   border: sel ? '1px solid transparent' : '1px solid var(--border-base)',
                   opacity: isLocked ? 0.55 : 1,
-                  cursor: isLocked ? 'not-allowed' : 'pointer',
+                  cursor: isLocked || saving ? 'not-allowed' : 'pointer',
                   minWidth: 72,
                   transform: sel ? 'scale(1.03)' : 'scale(1)',
                   boxShadow: sel ? '0 4px 14px rgba(245,166,35,0.35)' : 'none',
@@ -118,6 +140,16 @@ export function PicanteriaCard({ item, currentAnswer, isLocked, onSave, crowd, c
             )
           })}
         </div>
+
+        {error && (
+          <div
+            role="alert"
+            className="mt-3 text-[11px] font-semibold"
+            style={{ color: 'var(--color-danger)' }}
+          >
+            {error}
+          </div>
+        )}
 
         {/* Crowd picks — revealed only after lock */}
         {showCrowd && (

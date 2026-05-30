@@ -1,7 +1,8 @@
 'use client'
-import { useState, useTransition } from 'react'
+import { useRef, useState, useTransition } from 'react'
 import type { Match, Pick } from '@/lib/types'
 import type { CrowdPct, Insight } from '@/lib/crowd'
+import type { SaveResult } from '@/lib/prediction-saves'
 import { CrowdInsight } from './crowd-insight'
 
 const FLAGS: Record<string, string> = {
@@ -17,7 +18,7 @@ interface Props {
   currentPick: Pick | null
   isLocked: boolean
   stageLabel: string
-  onSave: (matchId: string, pick: Pick) => Promise<void>
+  onSave: (matchId: string, pick: Pick) => Promise<SaveResult>
   /** Crowd-pick percentages, revealed only once the match is locked. */
   crowd?: CrowdPct | null
   crowdTotal?: number
@@ -31,12 +32,33 @@ const SEG_COLOR: Record<Pick, string> = {
 
 export function MatchCard({ match, currentPick, isLocked, stageLabel, onSave, crowd, crowdTotal = 0, insight }: Props) {
   const [selected, setSelected] = useState<Pick | null>(currentPick)
+  const [error, setError] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
   const [pending, startTransition] = useTransition()
+  const inFlightRef = useRef(false)
 
   function handleSelect(pick: Pick) {
-    if (isLocked) return
+    if (isLocked || inFlightRef.current || selected === pick) return
+    const previous = selected
+    inFlightRef.current = true
+    setSaving(true)
+    setError(null)
     setSelected(pick)
-    startTransition(() => onSave(match.id, pick))
+    startTransition(async () => {
+      try {
+        const result = await onSave(match.id, pick)
+        if (!result.ok) {
+          setSelected(previous)
+          setError(result.message)
+        }
+      } catch {
+        setSelected(previous)
+        setError('Could not save prediction. Please try again.')
+      } finally {
+        inFlightRef.current = false
+        setSaving(false)
+      }
+    })
   }
 
   const kickoff = new Date(match.kickoff_time).toLocaleTimeString('he-IL', {
@@ -156,14 +178,14 @@ export function MatchCard({ match, currentPick, isLocked, stageLabel, onSave, cr
             <button
               key={pick}
               onClick={() => handleSelect(pick)}
-              disabled={isLocked || pending}
+              disabled={isLocked || pending || saving}
               className="flex flex-col items-center rounded-xl py-3 transition-all duration-150"
               style={{
                 background: sel ? 'var(--color-accent)' : 'var(--color-elev)',
                 color: sel ? '#000' : 'var(--color-text)',
                 border: sel ? '1px solid transparent' : '1px solid var(--border-base)',
                 opacity: isLocked ? 0.55 : 1,
-                cursor: isLocked ? 'not-allowed' : 'pointer',
+                cursor: isLocked || saving ? 'not-allowed' : 'pointer',
                 transform: sel ? 'scale(1.03)' : 'scale(1)',
                 boxShadow: sel ? '0 4px 16px rgba(0,217,126,0.35)' : 'none',
               }}
@@ -193,6 +215,16 @@ export function MatchCard({ match, currentPick, isLocked, stageLabel, onSave, cr
           )
         })}
       </div>
+
+      {error && (
+        <div
+          role="alert"
+          className="px-4 pb-3 text-[11px] font-semibold"
+          style={{ color: 'var(--color-danger)' }}
+        >
+          {error}
+        </div>
+      )}
 
       {/* Crowd picks — revealed only after lock */}
       {isLocked && crowd && crowdTotal > 0 ? (
