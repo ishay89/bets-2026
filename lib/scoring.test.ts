@@ -22,8 +22,8 @@ describe('calcMatchPoints', () => {
   it('final: odds × 3', () => {
     expect(calcMatchPoints(2.4, 'final', true)).toBe(7.20)
   })
-  it('rounds to 2 decimal places', () => {
-    expect(calcMatchPoints(1.85, 'sf', true)).toBe(3.70)
+  it('rounds to 4 decimal places', () => {
+    expect(calcMatchPoints(1.0001, 'r16', true)).toBe(1.5002)
   })
 })
 
