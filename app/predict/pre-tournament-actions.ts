@@ -5,7 +5,7 @@ import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { TEAMS, SCORERS } from '@/lib/pre-tournament'
 import { parseTeamName, parseScorerName } from '@/lib/validation'
-import { getFirstPublishedLockTime } from '@/lib/data'
+import { isFuturesLocked } from '@/lib/data'
 
 export async function savePreTournamentPick(formData: FormData) {
   const supabase = await createClient()
@@ -20,20 +20,18 @@ export async function savePreTournamentPick(formData: FormData) {
   const service = await createServiceClient()
   const [
     { data: existing, error: existingError },
-    firstDay,
+    locked,
   ] = await Promise.all([
     service
       .from('pre_tournament_picks')
       .select('id, winner_team, winner_odds, top_scorer, top_scorer_odds')
       .eq('user_id', user.id)
       .maybeSingle(),
-    getFirstPublishedLockTime(service),
+    isFuturesLocked(service),
   ])
 
   if (existingError) throw existingError
-  if (firstDay && new Date() >= new Date(firstDay.lock_time)) {
-    throw new Error('Pre-tournament picks are locked')
-  }
+  if (locked) throw new Error('Pre-tournament picks are locked')
 
   const oldValue: AuditJson | null = existing ? {
     winner_team: existing.winner_team,
@@ -86,20 +84,18 @@ export async function saveWinnerPick(formData: FormData) {
   const winner = TEAMS.find(t => t.name === winnerName)!
 
   const service = await createServiceClient()
-  const [{ data: existing, error: existingError }, firstDay] = await Promise.all([
+  const [{ data: existing, error: existingError }, locked] = await Promise.all([
     service
       .from('pre_tournament_picks')
       .select('id, winner_team, winner_odds, top_scorer, top_scorer_odds')
       .eq('user_id', user.id)
       .maybeSingle(),
-    getFirstPublishedLockTime(service),
+    isFuturesLocked(service),
   ])
 
   if (existingError) throw existingError
   if (!existing) throw new Error('No existing pick to update')
-  if (firstDay && new Date() >= new Date(firstDay.lock_time)) {
-    throw new Error('Pre-tournament picks are locked')
-  }
+  if (locked) throw new Error('Pre-tournament picks are locked')
 
   const oldValue: AuditJson = {
     winner_team: existing.winner_team,
@@ -150,20 +146,18 @@ export async function saveScorerPick(formData: FormData) {
   const scorer = SCORERS.find(s => s.name === scorerName)!
 
   const service = await createServiceClient()
-  const [{ data: existing, error: existingError }, firstDay] = await Promise.all([
+  const [{ data: existing, error: existingError }, locked] = await Promise.all([
     service
       .from('pre_tournament_picks')
       .select('id, winner_team, winner_odds, top_scorer, top_scorer_odds')
       .eq('user_id', user.id)
       .maybeSingle(),
-    getFirstPublishedLockTime(service),
+    isFuturesLocked(service),
   ])
 
   if (existingError) throw existingError
   if (!existing) throw new Error('No existing pick to update')
-  if (firstDay && new Date() >= new Date(firstDay.lock_time)) {
-    throw new Error('Pre-tournament picks are locked')
-  }
+  if (locked) throw new Error('Pre-tournament picks are locked')
 
   const oldValue: AuditJson = {
     winner_team: existing.winner_team,
