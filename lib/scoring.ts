@@ -10,30 +10,30 @@ export const STAGE_MULTIPLIERS: Record<Stage, number> = {
   final: 3,
 }
 
-function round2(n: number): number {
-  return Math.round(n * 100) / 100
+function round4(n: number): number {
+  return Math.round(n * 10000) / 10000
 }
 
 export function calcMatchPoints(odds: number, stage: Stage, isCorrect: boolean): number {
   if (!isCorrect) return 0
-  return round2(odds * (STAGE_MULTIPLIERS[stage] ?? 1))
+  return round4(odds * (STAGE_MULTIPLIERS[stage] ?? 1))
 }
 
 export function calcPicanteriaPoints(odds: number, isCorrect: boolean): number {
   if (!isCorrect) return 0
-  return round2(odds)
+  return round4(odds)
 }
 
 export function calcPreTournamentWinnerPoints(
   odds: number,
   placement: 'winner' | 'runner-up' | 'other'
 ): number {
-  if (placement === 'winner') return round2(odds * 1.5)
-  if (placement === 'runner-up') return odds * 0.75
+  if (placement === 'winner') return round4(odds * 1.5)
+  if (placement === 'runner-up') return round4(odds * 0.75)
   return 0
 }
 
 export function calcTopScorerPoints(odds: number, isCorrect: boolean): number {
   if (!isCorrect) return 0
-  return round2(odds)
+  return round4(odds)
 }
