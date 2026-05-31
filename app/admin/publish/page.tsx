@@ -1,7 +1,5 @@
 import { createAdminClient, assertAdmin } from '@/lib/supabase/server'
 import { parseUUID, parseOdds } from '@/lib/validation'
-import { earliestPublishedLockTime } from '@/lib/lock'
-import { shouldDayBeVisible } from '@/lib/publishing'
 import {
   buildAutomatedMatchRows,
   buildAutomatedPikaRows,
@@ -23,29 +21,9 @@ async function getAutomatedUsers(supabase: AdminClient): Promise<AutomatedUser[]
   return data ?? []
 }
 
-// match_days.published_at is a derived "this day has >= 1 published item" flag.
-// Recompute it (and lock_time from published matches) after any item's publish
-// state changes. lock_time is NOT NULL, so fall back to all matches' kickoffs
-// when no match is published yet (e.g. a pikanteria-only day).
-async function refreshDayPublishState(supabase: AdminClient, matchDayId: string) {
-  const [{ data: day }, { data: pubMatches }, { data: allMatches }, { count: pubPikaCount }] =
-    await Promise.all([
-      supabase.from('match_days').select('published_at').eq('id', matchDayId).single(),
-      supabase.from('matches').select('kickoff_time').eq('match_day_id', matchDayId).not('published_at', 'is', null),
-      supabase.from('matches').select('kickoff_time').eq('match_day_id', matchDayId),
-      supabase.from('pikanteria').select('id', { count: 'exact', head: true }).eq('match_day_id', matchDayId).not('published_at', 'is', null),
-    ])
-
-  const visible = shouldDayBeVisible(pubMatches?.length ?? 0, pubPikaCount ?? 0)
-  const lockSource = (pubMatches?.length ? pubMatches : allMatches) ?? []
-  const lockTime = earliestPublishedLockTime(lockSource.map(m => m.kickoff_time as string))
-
-  const update: { published_at: string | null; lock_time?: string } = {
-    published_at: visible ? (day?.published_at ?? new Date().toISOString()) : null,
-  }
-  if (lockTime) update.lock_time = lockTime
-  await supabase.from('match_days').update(update).eq('id', matchDayId)
-}
+// A database trigger keeps match_days.published_at + lock_time in sync whenever
+// an item's published_at flips, so these actions only flip the item flag and
+// (where relevant) generate the per-item automated benchmark picks.
 
 async function publishMatch(formData: FormData) {
   'use server'
@@ -53,7 +31,6 @@ async function publishMatch(formData: FormData) {
   const supabase = createAdminClient()
 
   const matchId = parseUUID(formData.get('match_id'), 'match_id')
-  const matchDayId = parseUUID(formData.get('match_day_id'), 'match_day_id')
   const date = formData.get('date') as string
 
   const odds = {
@@ -66,8 +43,6 @@ async function publishMatch(formData: FormData) {
     .from('matches')
     .update({ ...odds, published_at: new Date().toISOString() })
     .eq('id', matchId)
-
-  await refreshDayPublishState(supabase, matchDayId)
 
   // Automated benchmark picks for this one match.
   const users = await getAutomatedUsers(supabase)
@@ -86,7 +61,6 @@ async function unpublishMatch(formData: FormData) {
   const supabase = createAdminClient()
 
   const matchId = parseUUID(formData.get('match_id'), 'match_id')
-  const matchDayId = parseUUID(formData.get('match_day_id'), 'match_day_id')
   const date = formData.get('date') as string
 
   // Refuse to hide an already-scored match — its points are on the leaderboard.
@@ -96,7 +70,6 @@ async function unpublishMatch(formData: FormData) {
   }
 
   await supabase.from('matches').update({ published_at: null }).eq('id', matchId)
-  await refreshDayPublishState(supabase, matchDayId)
 
   revalidatePath('/predict')
   redirect(`/admin/publish?date=${date}`)
@@ -108,15 +81,12 @@ async function publishExistingPikanteria(formData: FormData) {
   const supabase = createAdminClient()
 
   const pikanteriaId = parseUUID(formData.get('pikanteria_id'), 'pikanteria_id')
-  const matchDayId = parseUUID(formData.get('match_day_id'), 'match_day_id')
   const date = formData.get('date') as string
 
   await supabase
     .from('pikanteria')
     .update({ published_at: new Date().toISOString() })
     .eq('id', pikanteriaId)
-
-  await refreshDayPublishState(supabase, matchDayId)
 
   const users = await getAutomatedUsers(supabase)
   if (users.length) {
@@ -141,7 +111,6 @@ async function unpublishPikanteria(formData: FormData) {
   const supabase = createAdminClient()
 
   const pikanteriaId = parseUUID(formData.get('pikanteria_id'), 'pikanteria_id')
-  const matchDayId = parseUUID(formData.get('match_day_id'), 'match_day_id')
   const date = formData.get('date') as string
 
   // Refuse to hide an already-resolved question (one with a correct option).
@@ -156,7 +125,6 @@ async function unpublishPikanteria(formData: FormData) {
   }
 
   await supabase.from('pikanteria').update({ published_at: null }).eq('id', pikanteriaId)
-  await refreshDayPublishState(supabase, matchDayId)
 
   revalidatePath('/predict')
   redirect(`/admin/publish?date=${date}`)
@@ -198,7 +166,6 @@ async function publishNewPikanteria(formData: FormData) {
   const inserted = pikaResult as { id: string; options: { id: string; odds: number; sort_order: number }[] }
 
   await supabase.from('pikanteria').update({ published_at: new Date().toISOString() }).eq('id', inserted.id)
-  await refreshDayPublishState(supabase, matchDayId)
 
   const users = await getAutomatedUsers(supabase)
   if (users.length) {
@@ -365,7 +332,6 @@ export default async function PublishPage({
                 className="rounded-xl p-4 space-y-3"
                 style={{ background: 'var(--color-panel)', border: '1px solid var(--border-base)' }}>
                 <input type="hidden" name="match_id" value={match.id} />
-                <input type="hidden" name="match_day_id" value={day!.id} />
                 <input type="hidden" name="date" value={day!.date} />
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
@@ -413,7 +379,6 @@ export default async function PublishPage({
                 className="rounded-xl p-4 space-y-3"
                 style={{ background: 'var(--color-panel)', border: '1px solid var(--border-base)' }}>
                 <input type="hidden" name="pikanteria_id" value={pika.id} />
-                <input type="hidden" name="match_day_id" value={day!.id} />
                 <input type="hidden" name="date" value={day!.date} />
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-semibold text-text">{pika.question}</span>
