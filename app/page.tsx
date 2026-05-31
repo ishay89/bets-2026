@@ -369,7 +369,7 @@ export default async function HomePage() {
                     color: 'var(--color-text)',
                   }}
                 >
-                  {entry.total_points.toFixed(1)}
+                  {entry.total_points.toFixed(2)}
                 </div>
               </div>
             )

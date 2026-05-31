@@ -243,7 +243,7 @@ export default async function H2HComparePage({
           />
           <StatTile
             label="Lead"
-            value={deadHeat ? 'DEAD HEAT' : `${iLead ? '+' : '−'}${gap.toFixed(1)}`}
+            value={deadHeat ? 'DEAD HEAT' : `${iLead ? '+' : '−'}${gap.toFixed(2)}`}
             valueColor={
               deadHeat
                 ? 'var(--color-muted)'
@@ -328,7 +328,7 @@ export default async function H2HComparePage({
                     color: winner === 'me' ? 'var(--color-accent)' : 'var(--color-text)',
                   }}
                 >
-                  {myPts.toFixed(1)}
+                  {myPts.toFixed(2)}
                 </span>
                 <span style={{ color: 'var(--color-dim)', fontSize: 11 }}>vs</span>
                 <span
@@ -339,7 +339,7 @@ export default async function H2HComparePage({
                     color: winner === 'them' ? 'var(--color-accent)' : 'var(--color-text)',
                   }}
                 >
-                  {theirPts.toFixed(1)}
+                  {theirPts.toFixed(2)}
                 </span>
               </div>
 
@@ -409,7 +409,7 @@ function HeroSide({
           color: isLeader ? 'var(--color-accent)' : 'var(--color-sub)',
         }}
       >
-        {total.toFixed(1)}
+        {total.toFixed(2)}
       </div>
     </div>
   )

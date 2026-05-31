@@ -103,7 +103,7 @@ export default async function HistoryPage() {
                 </div>
                 <div className="font-bold text-[18px]"
                   style={{ fontFamily: 'var(--font-mono)', color: dayPoints > 0 ? 'var(--color-accent)' : 'var(--color-muted)' }}>
-                  +{dayPoints.toFixed(1)}
+                  +{dayPoints.toFixed(2)}
                 </div>
               </div>
               <div className="px-4 py-2 space-y-1.5">

@@ -128,7 +128,7 @@ function PlayerList({ players, muted = false }: { players: LeaderboardEntry[]; m
               <div
                 style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--color-muted)', marginTop: 1 }}
               >
-                {p.total_points.toFixed(1)} pts
+                {p.total_points.toFixed(2)} pts
               </div>
             </div>
             <div
