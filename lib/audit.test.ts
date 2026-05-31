@@ -24,7 +24,7 @@ describe('audit event RLS migration', () => {
       'utf8'
     )
     const forwardMigration = readFileSync(
-      join(process.cwd(), 'supabase/migrations/011_user_prediction_audit_events_rls.sql'),
+      join(process.cwd(), 'supabase/migrations/20260530071748_user_prediction_audit_events_rls.sql'),
       'utf8'
     )
 
