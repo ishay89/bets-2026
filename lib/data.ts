@@ -112,6 +112,36 @@ export async function getFirstPublishedLockTime(
   return data as { lock_time: string } | null
 }
 
+/**
+ * Returns true if futures picks (winner / top scorer) are locked.
+ * Locked when: admin manually locked via tournament_settings, OR any published
+ * match day is manually locked, OR any published match is manually locked, OR
+ * the first published day's lock_time has passed.
+ */
+export async function isFuturesLocked(supabase: Db): Promise<boolean> {
+  const [{ data: settings }, { data: days }] = await Promise.all([
+    supabase.from('tournament_settings').select('futures_locked').eq('id', true).single(),
+    supabase
+      .from('match_days')
+      .select('locked, lock_time, matches(locked, kickoff_time)')
+      .not('published_at', 'is', null)
+      .order('date', { ascending: true }),
+  ])
+
+  if (settings?.futures_locked) return true
+
+  const now = Date.now()
+  for (const day of (days ?? []) as { locked: boolean; lock_time: string; matches: { locked: boolean; kickoff_time: string }[] }[]) {
+    if (day.locked) return true
+    if (now >= new Date(day.lock_time).getTime()) return true
+    for (const m of day.matches ?? []) {
+      if (m.locked) return true
+    }
+  }
+
+  return false
+}
+
 export async function getLeaderboardEntries(supabase: Db): Promise<LeaderboardEntry[]> {
   const { data, error } = await supabase
     .from('leaderboard')

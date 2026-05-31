@@ -15,7 +15,6 @@ import {
   getPublishedMatchDaysWithAll,
   getUserPredictions,
   getUserPikanteriaAnswers,
-  getFirstPublishedLockTime,
 } from '@/lib/data'
 import {
   saveMatchPrediction,
@@ -56,21 +55,25 @@ export default async function PredictPage() {
     { data: crowdMatchRows, error: crowdMatchError },
     { data: crowdPikRows, error: crowdPikError },
     { data: futuresPick, error: futuresPickError },
-    futuresFirstDay,
+    { data: tournamentSettings },
   ] = await Promise.all([
     getUserPredictions(supabase, user.id),
     getUserPikanteriaAnswers(supabase, user.id),
     supabase.rpc('crowd_match_picks'),
     supabase.rpc('crowd_pikanteria_picks'),
     supabase.from('pre_tournament_picks').select('*').eq('user_id', user.id).maybeSingle(),
-    getFirstPublishedLockTime(supabase),
+    supabase.from('tournament_settings').select('futures_locked').eq('id', true).single(),
   ])
   if (crowdMatchError) throw crowdMatchError
   if (crowdPikError) throw crowdPikError
   if (futuresPickError) throw futuresPickError
 
   const hasEntryPick = hasCompletedPreTournamentPick(futuresPick)
-  const futuresLocked = futuresFirstDay ? new Date() >= new Date(futuresFirstDay.lock_time) : false
+  // Futures lock: manual admin flag OR any published match is locked (manually or by kickoff time).
+  const anyMatchLocked = matchDays.some(day =>
+    day.locked || day.matches.some(m => isMatchLocked(m, day.locked))
+  )
+  const futuresLocked = (tournamentSettings?.futures_locked ?? false) || anyMatchLocked
 
   // Surface the most recently published match days first, so a returning player
   // lands on the matches they still need to bet without scrolling.
