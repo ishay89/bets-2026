@@ -32,6 +32,10 @@ const SEG_COLOR: Record<Pick, string> = {
 
 export function MatchCard({ match, currentPick, isLocked, stageLabel, onSave, crowd, crowdTotal = 0, insight }: Props) {
   const [selected, setSelected] = useState<Pick | null>(currentPick)
+
+  const hasResult = match.result !== null
+  const isCorrect = hasResult && selected !== null && selected === match.result
+  const isWrong = hasResult && selected !== null && selected !== match.result
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [pending, startTransition] = useTransition()
@@ -108,7 +112,33 @@ export function MatchCard({ match, currentPick, isLocked, stageLabel, onSave, cr
           {stageLabel}
         </span>
 
-        {selected ? (
+        {isCorrect ? (
+          <span
+            className="text-[10px] px-2 py-0.5 rounded-full font-bold"
+            style={{
+              color: '#000',
+              background: 'var(--color-accent)',
+              border: '1px solid transparent',
+              fontFamily: 'var(--font-display)',
+              letterSpacing: '0.06em',
+            }}
+          >
+            ✓ Correct
+          </span>
+        ) : isWrong ? (
+          <span
+            className="text-[10px] px-2 py-0.5 rounded-full font-bold"
+            style={{
+              color: '#fff',
+              background: 'var(--color-danger)',
+              border: '1px solid var(--border-danger)',
+              fontFamily: 'var(--font-display)',
+              letterSpacing: '0.06em',
+            }}
+          >
+            ✗ Wrong
+          </span>
+        ) : selected ? (
           <span
             className="text-[10px] px-2 py-0.5 rounded-full font-bold"
             style={{

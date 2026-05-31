@@ -167,39 +167,6 @@ async function scorePikanteria(formData: FormData) {
   redirect('/admin/results')
 }
 
-async function enterResults(formData: FormData) {
-  'use server'
-  await assertAdmin()
-  const supabase = await createServiceClient()
-  const matchDayId = parseUUID(formData.get('match_day_id'), 'match_day_id')
-
-  const { data: matches } = await supabase
-    .from('matches')
-    .select('id')
-    .eq('match_day_id', matchDayId)
-
-  const scoredMatches = (matches ?? []).flatMap(m => {
-    const raw = formData.get(`result_${m.id}`)
-    if (raw === null) return []
-    return [{ matchId: m.id as string, result: parsePick(raw, `match ${m.id}`) }]
-  })
-
-  const { data: pikaItems } = await supabase
-    .from('pikanteria')
-    .select('id')
-    .eq('match_day_id', matchDayId)
-
-  const resolvedPikas = (pikaItems ?? []).flatMap(p => {
-    const raw = formData.get(`pik_${p.id}`)
-    if (raw === null) return []
-    return [{ pikanteriaId: p.id as string, optionId: parseUUID(raw, `pikanteria option for ${p.id}`) }]
-  })
-
-  if (scoredMatches.length || resolvedPikas.length) {
-    await scoreItems(supabase, matchDayId, scoredMatches, resolvedPikas)
-  }
-  redirect('/admin/results')
-}
 
 const inputStyle = {
   background: 'var(--color-bg)',
@@ -215,17 +182,16 @@ export default async function ResultsPage() {
 
   const matchDays = await getPublishedMatchDaysWithAll(supabase)
 
-  const unscoredDays = (matchDays as MatchDayRow[]).filter(d =>
-    d.matches.some(m => m.result === null) ||
-    d.pikanteria.some(p => !p.pikanteria_options.some(o => o.is_correct))
+  const daysWithContent = (matchDays as MatchDayRow[]).filter(d =>
+    d.matches.length > 0 || d.pikanteria.length > 0
   )
 
-  if (unscoredDays.length === 0) {
+  if (daysWithContent.length === 0) {
     return (
       <div className="text-center py-16">
-        <div className="text-4xl mb-3">✅</div>
-        <div className="text-text font-semibold">All match days scored</div>
-        <div className="text-muted text-sm mt-1">No pending results to enter</div>
+        <div className="text-4xl mb-3">📋</div>
+        <div className="text-text font-semibold">No match days published yet</div>
+        <div className="text-muted text-sm mt-1">Publish match days to enter results</div>
       </div>
     )
   }
@@ -237,15 +203,18 @@ export default async function ResultsPage() {
           ✅ Enter Results
         </div>
         <div className="text-muted text-xs">
-          {unscoredDays.length} match day{unscoredDays.length > 1 ? 's' : ''} with pending results · score items one at a time or all at once
+          Score or update individual matches and pikanteria below
         </div>
       </div>
 
-      {unscoredDays.map(matchDay => {
+      {daysWithContent.map(matchDay => {
         const total = matchDay.matches.length
         const done = matchDay.matches.filter(m => m.result !== null).length
-        const unscoredMatches = matchDay.matches.filter(m => m.result === null)
-        const unresolvedPikas = matchDay.pikanteria.filter(p => !p.pikanteria_options.some(o => o.is_correct))
+        // Sort all matches: later kickoff first so most-recent games are at the top
+        const sortedMatches = [...matchDay.matches].sort(
+          (a, b) => new Date(b.kickoff_time).getTime() - new Date(a.kickoff_time).getTime()
+        )
+        const sortedPikas = matchDay.pikanteria
 
         return (
           <div key={matchDay.id} className="space-y-4">
@@ -258,12 +227,20 @@ export default async function ResultsPage() {
             </div>
 
             {/* Per-match scoring — each its own form */}
-            {unscoredMatches.map(match => (
+            {sortedMatches.map(match => (
               <form key={match.id} action={scoreMatch} className="rounded-xl p-4 space-y-3"
                 style={{ background: 'var(--color-panel)', border: '1px solid var(--border-base)' }}>
                 <input type="hidden" name="match_day_id" value={matchDay.id} />
                 <input type="hidden" name="match_id" value={match.id} />
-                <div className="text-sm font-bold text-text">{match.home_team} vs {match.away_team}</div>
+                <div className="flex items-center justify-between">
+                  <div className="text-sm font-bold text-text">{match.home_team} vs {match.away_team}</div>
+                  {match.result && (
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full"
+                      style={{ background: 'var(--color-accent-soft)', color: 'var(--color-accent)', border: '1px solid var(--border-accent)' }}>
+                      ✓ {match.result}
+                    </span>
+                  )}
+                </div>
                 <div className="flex gap-2">
                   {[
                     { value: '1', label: `1 — ${match.home_team}` },
@@ -273,37 +250,48 @@ export default async function ResultsPage() {
                     <label key={value}
                       className="flex-1 flex items-center gap-1.5 rounded-lg p-2 cursor-pointer"
                       style={inputStyle}>
-                      <input type="radio" name={`result_${match.id}`} value={value} required />
+                      <input type="radio" name={`result_${match.id}`} value={value} required
+                        defaultChecked={match.result === value} />
                       <span className="text-xs text-text font-medium">{label}</span>
                     </label>
                   ))}
                 </div>
                 <button type="submit" className={`${scoreBtn} w-full py-2`} style={scoreBtnStyle}>
-                  ⚡ Score this match
+                  {match.result ? '✏️ Update result' : '⚡ Score this match'}
                 </button>
               </form>
             ))}
 
             {/* Per-pikanteria scoring — each its own form */}
-            {unresolvedPikas.length > 0 && (
+            {sortedPikas.length > 0 && (
               <div className="font-bold text-xs uppercase tracking-wider mt-2" style={{ color: 'var(--color-amber)' }}>
                 🌶️ Pikanteria Results
               </div>
             )}
-            {unresolvedPikas.map(pika => {
+            {sortedPikas.map(pika => {
               const options = [...pika.pikanteria_options].sort((a, b) => a.sort_order - b.sort_order)
+              const correctOption = options.find(o => o.is_correct)
               return (
                 <form key={pika.id} action={scorePikanteria} className="rounded-xl p-4 space-y-3"
                   style={{ background: 'var(--color-panel)', border: '1px solid var(--border-base)' }}>
                   <input type="hidden" name="match_day_id" value={matchDay.id} />
                   <input type="hidden" name="pikanteria_id" value={pika.id} />
-                  <p className="text-sm font-semibold text-text">{pika.question}</p>
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-semibold text-text">{pika.question}</p>
+                    {correctOption && (
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full"
+                        style={{ background: 'var(--color-accent-soft)', color: 'var(--color-accent)', border: '1px solid var(--border-accent)' }}>
+                        ✓ {correctOption.label}
+                      </span>
+                    )}
+                  </div>
                   <div className="flex gap-2 flex-wrap">
                     {options.map(opt => (
                       <label key={opt.id}
                         className="flex-1 flex items-center gap-1.5 rounded-lg p-2 cursor-pointer min-w-[80px]"
                         style={inputStyle}>
-                        <input type="radio" name={`pik_${pika.id}`} value={opt.id} required />
+                        <input type="radio" name={`pik_${pika.id}`} value={opt.id} required
+                          defaultChecked={opt.is_correct} />
                         <span className="text-xs text-text font-medium">{opt.label}</span>
                         <span className="text-[10px] text-muted" style={{ fontFamily: 'var(--font-mono)' }}>
                           {opt.odds.toFixed(2)}
@@ -312,53 +300,11 @@ export default async function ResultsPage() {
                     ))}
                   </div>
                   <button type="submit" className={`${scoreBtn} w-full py-2`} style={scoreBtnStyle}>
-                    ⚡ Score this question
+                    {correctOption ? '✏️ Update answer' : '⚡ Score this question'}
                   </button>
                 </form>
               )
             })}
-
-            {/* Day-wide "Score All" — scores every item filled in below at once */}
-            <form action={enterResults} className="space-y-4 rounded-xl p-4"
-              style={{ background: 'var(--color-bg)', border: '1px dashed var(--border-base)' }}>
-              <input type="hidden" name="match_day_id" value={matchDay.id} />
-              <div className="text-[11px] text-muted">
-                Or fill every item above and score the whole day in one transaction:
-              </div>
-              {unscoredMatches.map(match => (
-                <div key={match.id} className="flex items-center gap-2 flex-wrap">
-                  <span className="text-xs text-text font-medium flex-1 min-w-[120px]">
-                    {match.home_team} vs {match.away_team}
-                  </span>
-                  {['1', 'X', '2'].map(value => (
-                    <label key={value} className="flex items-center gap-1 rounded-lg px-2 py-1 cursor-pointer" style={inputStyle}>
-                      <input type="radio" name={`result_${match.id}`} value={value} />
-                      <span className="text-xs text-text font-medium">{value}</span>
-                    </label>
-                  ))}
-                </div>
-              ))}
-              {unresolvedPikas.map(pika => {
-                const options = [...pika.pikanteria_options].sort((a, b) => a.sort_order - b.sort_order)
-                return (
-                  <div key={pika.id} className="space-y-1">
-                    <div className="text-xs text-text font-medium">{pika.question}</div>
-                    <div className="flex gap-2 flex-wrap">
-                      {options.map(opt => (
-                        <label key={opt.id} className="flex items-center gap-1 rounded-lg px-2 py-1 cursor-pointer" style={inputStyle}>
-                          <input type="radio" name={`pik_${pika.id}`} value={opt.id} />
-                          <span className="text-xs text-text font-medium">{opt.label}</span>
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-                )
-              })}
-              <button type="submit" className="w-full py-2.5 rounded-xl font-black text-sm"
-                style={{ background: 'var(--color-amber)', color: 'var(--color-bg)' }}>
-                ⚡ Score All Filled Items
-              </button>
-            </form>
 
             <hr style={{ borderColor: 'var(--border-base)' }} />
           </div>
