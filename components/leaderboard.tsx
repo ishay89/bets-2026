@@ -105,7 +105,7 @@ export function Leaderboard({ entries, currentUserId }: Props) {
                 >{av}</div>
                 <div className="font-extrabold text-[13px] text-text truncate">{entry.display_name}</div>
                 <div className="font-mono text-[11px] text-sub mb-1" style={{ fontFamily: 'var(--font-mono)' }}>
-                  {score(entry).toFixed(1)}
+                  {score(entry).toFixed(2)}
                 </div>
                 <div
                   className="flex items-start justify-center pt-2 rounded-t-lg font-black text-[18px]"
@@ -194,7 +194,7 @@ export function Leaderboard({ entries, currentUserId }: Props) {
                   className="font-bold text-[13px]"
                   style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-text)' }}
                 >
-                  {score(entry).toFixed(1)}
+                  {score(entry).toFixed(2)}
                 </div>
                 {fine && (
                   <div

@@ -60,7 +60,7 @@ export default async function ProfilePage() {
             <div className="text-right shrink-0">
               <div className="font-bold text-[24px]"
                 style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-accent)' }}>
-                {total.toFixed(1)}
+                {total.toFixed(2)}
               </div>
               <div className="text-[10px] font-bold uppercase tracking-wide text-muted">pts · {rank > 0 ? `${rank}th` : '—'}</div>
             </div>
@@ -69,9 +69,9 @@ export default async function ProfilePage() {
           {/* Stats grid */}
           <div className="grid grid-cols-3 gap-2 mt-4">
             {[
-              { label: 'Match pts', value: matchPoints.toFixed(1) },
-              { label: 'Pikanteria', value: pikaPoints.toFixed(1) },
-              { label: 'Pre-tourney', value: (preWinner + preScorer).toFixed(1) },
+              { label: 'Match pts', value: matchPoints.toFixed(2) },
+              { label: 'Pikanteria', value: pikaPoints.toFixed(2) },
+              { label: 'Pre-tourney', value: (preWinner + preScorer).toFixed(2) },
             ].map(s => (
               <div key={s.label} className="rounded-[10px] p-3"
                 style={{ background: 'var(--color-elev)' }}>
@@ -102,7 +102,7 @@ export default async function ProfilePage() {
                 <span className="text-[12px] text-sub">{row.label}</span>
                 <span className="font-bold text-[12px]"
                   style={{ fontFamily: 'var(--font-mono)', color: row.color }}>
-                  {row.value.toFixed(1)}
+                  {row.value.toFixed(2)}
                 </span>
               </div>
               <div className="h-1 rounded-full" style={{ background: 'var(--color-elev)' }}>
