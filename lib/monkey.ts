@@ -88,3 +88,41 @@ export function automatedPikanteriaPick(options: OptionOdds[], strategy: MarkerS
   if (strategy === 'min') return sorted[sorted.length - 1].id
   return sorted[Math.floor(sorted.length / 2)].id
 }
+
+export type AutomatedUser = { id: string; automation_strategy: AutomationStrategy }
+
+// Build the automated benchmark prediction rows for a set of matches — one row
+// per automated user per match. Used when publishing individual matches.
+export function buildAutomatedMatchRows(
+  users: AutomatedUser[],
+  matches: (MatchOdds & { id: string })[],
+  date: string,
+): { user_id: string; match_id: string; pick: Pick }[] {
+  return users.flatMap(user =>
+    matches.map(match => ({
+      user_id: user.id,
+      match_id: match.id,
+      pick: user.automation_strategy === 'monkey'
+        ? monkeyMatchPick(match.id, date)
+        : automatedMatchPick(match, user.automation_strategy),
+    }))
+  )
+}
+
+// Build the automated benchmark answer rows for a set of pikanteria — one row
+// per automated user per question. Used when publishing individual pikanteria.
+export function buildAutomatedPikaRows(
+  users: AutomatedUser[],
+  pikas: { id: string; options: OptionOdds[] }[],
+  date: string,
+): { user_id: string; pikanteria_id: string; option_id: string }[] {
+  return users.flatMap(user =>
+    pikas.map(pika => ({
+      user_id: user.id,
+      pikanteria_id: pika.id,
+      option_id: user.automation_strategy === 'monkey'
+        ? monkeyPikanteriaPick(pika.id, date, pika.options.map(o => o.id))
+        : automatedPikanteriaPick(pika.options, user.automation_strategy),
+    }))
+  )
+}

@@ -33,6 +33,7 @@ export interface Match {
   odds_away: number
   result: Pick | null
   locked: boolean
+  published_at: string | null
 }
 
 export interface PicanteriaOption {
@@ -49,6 +50,7 @@ export interface Pikanteria {
   match_day_id: string
   question: string
   created_at: string
+  published_at: string | null
   options?: PicanteriaOption[]
 }
 
