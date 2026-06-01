@@ -52,14 +52,14 @@ function hashCode(str: string): number {
   return hash
 }
 
-export function monkeyMatchPick(matchId: string, date: string): Pick {
+function monkeyMatchPick(matchId: string, date: string): Pick {
   const picks = ['1', 'X', '2'] as const
   return picks[Math.abs(hashCode(`${matchId}-${date}`)) % 3]
 }
 
 // Returns the id of a randomly chosen option (seeded, reproducible).
 // optionIds must be non-empty; caller is responsible for ensuring this.
-export function monkeyPikanteriaPick(picanteriaId: string, date: string, optionIds: string[]): string {
+function monkeyPikanteriaPick(picanteriaId: string, date: string, optionIds: string[]): string {
   return optionIds[Math.abs(hashCode(`${picanteriaId}-${date}`)) % optionIds.length]
 }
 
@@ -80,7 +80,7 @@ export function automatedPikanteriaPick(options: OptionOdds[], strategy: MarkerS
     throw new Error('automatedPikanteriaPick requires at least one option')
   }
 
-  const sorted = [...options].sort((a, b) =>
+  const sorted = options.toSorted((a, b) =>
     b.odds - a.odds || (a.sort_order ?? 0) - (b.sort_order ?? 0) || a.id.localeCompare(b.id)
   )
 

@@ -122,7 +122,7 @@ export function computeSnapshotValidity(
   return { isValid, discrepancy }
 }
 
-export async function computeMatchPoints(
+async function computeMatchPoints(
   supabase: SupabaseClient,
   userId: string,
   matchDayId: string,
@@ -137,7 +137,7 @@ export async function computeMatchPoints(
   return (data ?? []).reduce((sum, row: { points: number | null }) => sum + Number(row.points), 0)
 }
 
-export async function computePicanteriaPoints(
+async function computePicanteriaPoints(
   supabase: SupabaseClient,
   userId: string,
   matchDayId: string,
@@ -152,7 +152,7 @@ export async function computePicanteriaPoints(
   return (data ?? []).reduce((sum, row: { points: number | null }) => sum + Number(row.points), 0)
 }
 
-export async function computePreTournamentPoints(
+async function computePreTournamentPoints(
   supabase: SupabaseClient,
   userId: string,
 ): Promise<{ winnerPts: number; scorerPts: number }> {
@@ -168,7 +168,7 @@ export async function computePreTournamentPoints(
   }
 }
 
-export async function computeCumulativeFromRaw(
+async function computeCumulativeFromRaw(
   supabase: SupabaseClient,
   userId: string,
 ): Promise<number> {
@@ -215,7 +215,7 @@ async function getSnapshotSum(
   return (data ?? []).reduce((s, r: { day_points: number }) => s + Number(r.day_points), 0)
 }
 
-export async function upsertMatchDaySnapshot(
+async function upsertMatchDaySnapshot(
   supabase: SupabaseClient,
   userId: string,
   matchDayId: string,
@@ -387,13 +387,16 @@ export async function recalculateAllSnapshots(
   await Promise.all(allPicks.map(p => upsertPreTournamentSnapshot(supabase, p.user_id)))
   written += allPicks.length
 
-  // Pass 2: match-day snapshots in chronological order (pre-tournament rows now exist)
-  for (const day of scoredDays) {
-    await Promise.all(
-      allUsers.map((u: { id: string }) => upsertMatchDaySnapshot(supabase, u.id, day.id, day.stage))
-    )
-    written += allUsers.length
-  }
+  // Pass 2: match-day snapshots in chronological order (pre-tournament rows now exist).
+  // Days must be processed sequentially: each day's cumulative snapshot builds on
+  // the previous day's rows. Per-day user work is parallelized inside each step.
+  await scoredDays.reduce(
+    (p, day) => p.then(() =>
+      Promise.all(allUsers.map((u: { id: string }) => upsertMatchDaySnapshot(supabase, u.id, day.id, day.stage)))
+    ),
+    Promise.resolve<unknown>(undefined)
+  )
+  written += scoredDays.length * allUsers.length
 
   // Pass 3: re-run pre-tournament so is_valid reflects the now-present match-day rows
   await Promise.all(allPicks.map(p => upsertPreTournamentSnapshot(supabase, p.user_id)))

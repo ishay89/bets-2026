@@ -98,20 +98,6 @@ export async function getUserPikanteriaAnswers(
   return (data ?? []) as { pikanteria_id: string; option_id: string }[]
 }
 
-export async function getFirstPublishedLockTime(
-  supabase: Db,
-): Promise<{ lock_time: string } | null> {
-  const { data, error } = await supabase
-    .from('match_days')
-    .select('lock_time')
-    .not('published_at', 'is', null)
-    .order('date', { ascending: true })
-    .limit(1)
-    .maybeSingle()
-  if (error) throw error
-  return data as { lock_time: string } | null
-}
-
 /**
  * Returns true if futures picks (winner / top scorer) are locked.
  * Locked when: admin manually locked via tournament_settings, OR any published

@@ -3,11 +3,14 @@ import { LeaderboardRealtime } from '@/components/leaderboard-realtime'
 import { BottomNav } from '@/components/bottom-nav'
 import { getLeaderboardEntries } from '@/lib/data'
 
+export const metadata = { title: 'Leaderboard | Mondial Bets 2026', description: 'Full player leaderboard' }
+
 export default async function LeaderboardPage() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-
-  const entries = await getLeaderboardEntries(supabase)
+  const [{ data: { user } }, entries] = await Promise.all([
+    supabase.auth.getUser(),
+    getLeaderboardEntries(supabase),
+  ])
 
   return (
     <div className="min-h-screen bg-bg">

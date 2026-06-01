@@ -1,5 +1,30 @@
 'use client'
+import React from 'react'
 import { createClient } from '@/lib/supabase/client'
+
+export const metadata = { title: 'Login | Mondial Bets 2026', description: 'Sign in to your account' }
+
+const TITLE_STYLE: React.CSSProperties = {
+  fontFamily: 'var(--font-display)',
+  fontSize: 40,
+  fontWeight: 700,
+  letterSpacing: '0.04em',
+  textTransform: 'uppercase',
+  color: 'var(--color-text)',
+  textAlign: 'center',
+  lineHeight: 0.95,
+}
+
+const BUTTON_STYLE: React.CSSProperties = {
+  background: 'var(--color-panel)',
+  border: '1px solid var(--border-base)',
+  color: 'var(--color-text)',
+  fontFamily: 'var(--font-display)',
+  fontSize: 14,
+  letterSpacing: '0.08em',
+  textTransform: 'uppercase',
+  boxShadow: 'var(--shadow-card)',
+}
 
 export default function LoginPage() {
   const supabase = createClient()
@@ -48,18 +73,7 @@ export default function LoginPage() {
         </div>
 
         {/* Title */}
-        <div
-          style={{
-            fontFamily: 'var(--font-display)',
-            fontSize: 40,
-            fontWeight: 700,
-            letterSpacing: '0.04em',
-            textTransform: 'uppercase',
-            color: 'var(--color-text)',
-            textAlign: 'center',
-            lineHeight: 0.95,
-          }}
-        >
+        <div style={TITLE_STYLE}>
           Mondial
           <br />
           <span style={{ color: 'var(--color-accent)' }}>Bets</span>
@@ -77,7 +91,7 @@ export default function LoginPage() {
           <span
             style={{
               fontFamily: 'var(--font-display)',
-              fontSize: 11,
+              fontSize: 12,
               letterSpacing: '0.16em',
               textTransform: 'uppercase',
               color: 'var(--color-sub)',
@@ -89,18 +103,10 @@ export default function LoginPage() {
 
         {/* Sign in button */}
         <button
+          type="button"
           onClick={signInWithGoogle}
           className="w-full flex items-center justify-center gap-3 rounded-xl py-4 font-bold transition-all"
-          style={{
-            background: 'var(--color-panel)',
-            border: '1px solid var(--border-base)',
-            color: 'var(--color-text)',
-            fontFamily: 'var(--font-display)',
-            fontSize: 14,
-            letterSpacing: '0.08em',
-            textTransform: 'uppercase',
-            boxShadow: 'var(--shadow-card)',
-          }}
+          style={BUTTON_STYLE}
           onMouseEnter={e => {
             e.currentTarget.style.borderColor = 'var(--border-accent)'
             e.currentTarget.style.background = 'var(--color-accent-soft)'

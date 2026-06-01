@@ -4,6 +4,8 @@ import { createClient } from '@/lib/supabase/server'
 import { BottomNav } from '@/components/bottom-nav'
 import { getLeaderboardEntries } from '@/lib/data'
 
+export const metadata = { title: 'Profile | Mondial Bets 2026', description: 'Your profile and stats' }
+
 const AVATARS = ['🦁','🐯','🦊','🐺','🦅','🐻','🐼','🦝','🦄','🐉','🦋','🌟','🔥','⚡','🎯']
 
 export default async function ProfilePage() {
@@ -49,7 +51,7 @@ export default async function ProfilePage() {
         <div className="rounded-[14px] p-4"
           style={{ background: 'var(--color-panel)', border: '1px solid var(--border-base)' }}>
           <div className="flex items-center gap-4">
-            <div className="w-14 h-14 rounded-full flex items-center justify-center text-2xl shrink-0"
+            <div className="size-14 rounded-full flex items-center justify-center text-2xl shrink-0"
               style={{ background: 'var(--color-elev)', border: '2px solid var(--color-accent)' }}>
               {av}
             </div>

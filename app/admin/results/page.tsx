@@ -93,12 +93,18 @@ async function scoreItems(
       .in('id', pikIds)
     if (pikaError) throw pikaError
 
+    const optionsByPika = new Map<string, Map<string, { id: string; odds: number }>>(
+      (pikaItems ?? []).map(pika => [
+        pika.id,
+        new Map((pika.pikanteria_options as { id: string; odds: number }[]).map(o => [o.id, o])),
+      ])
+    )
+
     const pikInputs: PikanteriaInput[] = []
     for (const pika of pikaItems ?? []) {
       const winningOptionId = optionById.get(pika.id)
       if (!winningOptionId) continue
-      const winningOption = (pika.pikanteria_options as { id: string; odds: number }[])
-        .find(o => o.id === winningOptionId)
+      const winningOption = optionsByPika.get(pika.id)?.get(winningOptionId)
       if (!winningOption) continue
       pikInputs.push({ id: pika.id, winningOptionId, winningOdds: Number(winningOption.odds), answers: [] })
     }
@@ -232,7 +238,7 @@ export default async function ResultsPage() {
         const total = matchDay.matches.length
         const done = matchDay.matches.filter(m => m.result !== null).length
         // Sort all matches: later kickoff first so most-recent games are at the top
-        const sortedMatches = [...matchDay.matches].sort(
+        const sortedMatches = matchDay.matches.toSorted(
           (a, b) => new Date(b.kickoff_time).getTime() - new Date(a.kickoff_time).getTime()
         )
         const sortedPikas = matchDay.pikanteria
@@ -302,7 +308,7 @@ export default async function ResultsPage() {
               </div>
             )}
             {sortedPikas.map(pika => {
-              const options = [...pika.pikanteria_options].sort((a, b) => a.sort_order - b.sort_order)
+              const options = pika.pikanteria_options.toSorted((a, b) => a.sort_order - b.sort_order)
               const correctOption = options.find(o => o.is_correct)
               return (
                 <form key={pika.id} action={scorePikanteria} className="rounded-xl p-4 space-y-3"

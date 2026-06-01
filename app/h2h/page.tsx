@@ -5,11 +5,14 @@ import { getAvatar, getAutomationLabel, isAutomated } from '@/lib/display'
 import type { LeaderboardEntry } from '@/lib/types'
 import { getLeaderboardEntries } from '@/lib/data'
 
+export const metadata = { title: 'Head to Head | Mondial Bets 2026', description: 'Compare your picks against other players' }
+
 export default async function H2HPickerPage() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-
-  const entries = await getLeaderboardEntries(supabase)
+  const [{ data: { user } }, entries] = await Promise.all([
+    supabase.auth.getUser(),
+    getLeaderboardEntries(supabase),
+  ])
 
   const others = entries.filter(e => e.id !== user?.id)
   const humans = others.filter(e => !isAutomated(e))
@@ -40,7 +43,7 @@ export default async function H2HPickerPage() {
           >
             <div className="text-3xl mb-2">🤝</div>
             <div className="text-sub text-[13px] font-semibold">
-              No one to compare with yet — invite some friends.
+              No one to compare with yet. Invite some friends.
             </div>
           </div>
         )}
@@ -71,7 +74,7 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
       className="px-0.5"
       style={{
         fontFamily: 'var(--font-display)',
-        fontSize: 10,
+        fontSize: 12,
         letterSpacing: '0.16em',
         textTransform: 'uppercase',
         color: 'var(--color-muted)',
@@ -80,6 +83,17 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
       {children}
     </div>
   )
+}
+
+const vsButtonStyle: React.CSSProperties = {
+  fontFamily: 'var(--font-display)',
+  fontSize: 12,
+  fontWeight: 700,
+  letterSpacing: '0.04em',
+  color: 'var(--color-accent)',
+  background: 'var(--color-accent-soft)',
+  border: '1px solid var(--border-accent)',
+  fontStyle: 'normal',
 }
 
 function PlayerList({ players, muted = false }: { players: LeaderboardEntry[]; muted?: boolean }) {
@@ -119,30 +133,21 @@ function PlayerList({ players, muted = false }: { players: LeaderboardEntry[]; m
                 {label && (
                   <span
                     className="ml-1 not-italic"
-                    style={{ fontSize: 9, color: 'var(--color-muted)' }}
+                    style={{ fontSize: 12, color: 'var(--color-muted)' }}
                   >
                     · {label}
                   </span>
                 )}
               </div>
               <div
-                style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--color-muted)', marginTop: 1 }}
+                style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--color-muted)', marginTop: 1 }}
               >
                 {p.total_points.toFixed(2)} pts
               </div>
             </div>
             <div
               className="px-3 py-1 rounded-full shrink-0"
-              style={{
-                fontFamily: 'var(--font-display)',
-                fontSize: 11,
-                fontWeight: 700,
-                letterSpacing: '0.08em',
-                color: 'var(--color-accent)',
-                background: 'var(--color-accent-soft)',
-                border: '1px solid var(--border-accent)',
-                fontStyle: 'normal',
-              }}
+              style={vsButtonStyle}
             >
               VS →
             </div>
