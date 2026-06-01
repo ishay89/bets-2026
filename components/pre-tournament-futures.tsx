@@ -18,19 +18,20 @@ type FuturesPick = {
   top_scorer_odds: number
 } | null
 
+const inputStyle = {
+  background: 'var(--color-bg)',
+  border: '1px solid var(--border-base)',
+  color: 'var(--color-text)',
+}
+
 export function PreTournamentFutures({ pick, isLocked }: { pick: FuturesPick; isLocked: boolean }) {
-  const inputStyle = {
-    background: 'var(--color-bg)',
-    border: '1px solid var(--border-base)',
-    color: 'var(--color-text)',
-  }
   const cls = 'rounded-lg px-3 py-2 text-sm w-full'
 
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-2">
         <span className="text-lg">🏆</span>
-        <span className="text-[10px] font-bold uppercase tracking-[1.2px]"
+        <span className="text-[12px] font-bold uppercase tracking-[1.2px]"
           style={{ color: 'var(--color-gold)' }}>
           Futures · Champion & top scorer
         </span>
@@ -50,11 +51,11 @@ export function PreTournamentFutures({ pick, isLocked }: { pick: FuturesPick; is
         <>
           {/* Winner section */}
           <div>
-            <div className="text-[10px] font-bold uppercase tracking-[1.2px] mb-2 px-0.5"
+            <div className="text-[12px] font-bold uppercase tracking-[1.2px] mb-2 px-0.5"
               style={{ color: 'var(--color-muted)' }}>Your champion · 1.5× bonus</div>
             <div className="superstar-panel p-[18px]">
               <div className="relative flex items-center gap-4">
-                <div className="w-14 h-14 rounded-full flex items-center justify-center text-3xl"
+                <div className="size-14 rounded-full flex items-center justify-center text-3xl"
                   style={{ background: 'var(--color-elev)', border: '1px solid var(--border-base)' }}>
                   {FLAGS[pick.winner_team] ?? '🏆'}
                 </div>
@@ -78,7 +79,7 @@ export function PreTournamentFutures({ pick, isLocked }: { pick: FuturesPick; is
                 <select name="winner" defaultValue={pick.winner_team} required style={inputStyle} className={cls}>
                   {TEAMS.map(t => (
                     <option key={t.name} value={t.name}>
-                      {FLAGS[t.name] ?? ''} {t.name} — {t.odds.toFixed(2)}
+                      {FLAGS[t.name] ?? ''} {t.name} - {t.odds.toFixed(2)}
                     </option>
                   ))}
                 </select>
@@ -93,11 +94,11 @@ export function PreTournamentFutures({ pick, isLocked }: { pick: FuturesPick; is
 
           {/* Scorer section */}
           <div>
-            <div className="text-[10px] font-bold uppercase tracking-[1.2px] mb-2 px-0.5"
+            <div className="text-[12px] font-bold uppercase tracking-[1.2px] mb-2 px-0.5"
               style={{ color: 'var(--color-muted)' }}>Top scorer · fixed bonus</div>
             <div className="bet-card p-4">
               <div className="flex items-center gap-4">
-                <div className="ball-mark w-16 h-16 rounded-lg shrink-0" aria-hidden="true" />
+                <div className="ball-mark size-16 rounded-lg shrink-0" aria-hidden="true" />
                 <div className="flex-1">
                   <div className="text-[18px] font-extrabold tracking-tight text-text">{pick.top_scorer}</div>
                   <div className="text-[11px] text-sub mt-1">
@@ -110,7 +111,7 @@ export function PreTournamentFutures({ pick, isLocked }: { pick: FuturesPick; is
                   <div className="font-bold text-[22px]" style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-accent)' }}>
                     {pick.top_scorer_odds.toFixed(2)}
                   </div>
-                  <div className="text-[10px] font-bold uppercase tracking-wide text-muted">Odds</div>
+                  <div className="text-[12px] font-bold uppercase tracking-wide text-muted">Odds</div>
                 </div>
               </div>
             </div>
@@ -118,7 +119,7 @@ export function PreTournamentFutures({ pick, isLocked }: { pick: FuturesPick; is
               <form action={saveScorerPick} className="mt-3 space-y-2">
                 <select name="scorer" defaultValue={pick.top_scorer} required style={inputStyle} className={cls}>
                   {SCORERS.map(s => (
-                    <option key={s.name} value={s.name}>{s.name} — {s.odds.toFixed(2)}</option>
+                    <option key={s.name} value={s.name}>{s.name} - {s.odds.toFixed(2)}</option>
                   ))}
                 </select>
                 <button type="submit"
@@ -135,17 +136,17 @@ export function PreTournamentFutures({ pick, isLocked }: { pick: FuturesPick; is
       {/* Initial combined form (no existing pick yet) */}
       {!pick && !isLocked && (
         <form action={savePreTournamentPick} className="space-y-4">
-          <div className="text-[10px] font-bold uppercase tracking-[1.2px] px-0.5" style={{ color: 'var(--color-muted)' }}>
+          <div className="text-[12px] font-bold uppercase tracking-[1.2px] px-0.5" style={{ color: 'var(--color-muted)' }}>
             Make your picks
           </div>
 
           <div className="bet-card p-4 space-y-2">
-            <label className="text-sm font-semibold text-text block">🏆 Tournament Winner</label>
-            <select name="winner" defaultValue="" required style={inputStyle} className={cls}>
+            <label htmlFor="winner" className="text-sm font-semibold text-text block">🏆 Tournament Winner</label>
+            <select id="winner" name="winner" defaultValue="" required style={inputStyle} className={cls}>
               <option value="">Select a team...</option>
               {TEAMS.map(t => (
                 <option key={t.name} value={t.name}>
-                  {FLAGS[t.name] ?? ''} {t.name} — {t.odds.toFixed(2)}
+                  {FLAGS[t.name] ?? ''} {t.name} - {t.odds.toFixed(2)}
                 </option>
               ))}
             </select>
@@ -153,11 +154,11 @@ export function PreTournamentFutures({ pick, isLocked }: { pick: FuturesPick; is
           </div>
 
           <div className="bet-card p-4 space-y-2">
-            <label className="text-sm font-semibold text-text block">⚽ Top Scorer</label>
-            <select name="scorer" defaultValue="" required style={inputStyle} className={cls}>
+            <label htmlFor="scorer" className="text-sm font-semibold text-text block">⚽ Top Scorer</label>
+            <select id="scorer" name="scorer" defaultValue="" required style={inputStyle} className={cls}>
               <option value="">Select a player...</option>
               {SCORERS.map(s => (
-                <option key={s.name} value={s.name}>{s.name} — {s.odds.toFixed(2)}</option>
+                <option key={s.name} value={s.name}>{s.name} - {s.odds.toFixed(2)}</option>
               ))}
             </select>
           </div>
