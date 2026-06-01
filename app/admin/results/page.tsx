@@ -167,6 +167,33 @@ async function scorePikanteria(formData: FormData) {
   redirect('/admin/results')
 }
 
+async function resetMatch(formData: FormData) {
+  'use server'
+  await assertAdmin()
+  const supabase = await createServiceClient()
+  const matchDayId = parseUUID(formData.get('match_day_id'), 'match_day_id')
+  const matchId = parseUUID(formData.get('match_id'), 'match_id')
+
+  const { error: matchError } = await supabase
+    .from('matches')
+    .update({ result: null })
+    .eq('id', matchId)
+  if (matchError) throw matchError
+
+  const { error: predsError } = await supabase
+    .from('predictions')
+    .update({ points: null })
+    .eq('match_id', matchId)
+  if (predsError) throw predsError
+
+  await snapshotMatchDay(supabase, matchDayId)
+
+  revalidatePath('/')
+  revalidatePath('/leaderboard')
+  revalidatePath('/admin/scores')
+  redirect('/admin/results')
+}
+
 
 const inputStyle = {
   background: 'var(--color-bg)',
@@ -256,9 +283,20 @@ export default async function ResultsPage() {
                     </label>
                   ))}
                 </div>
-                <button type="submit" className={`${scoreBtn} w-full py-2`} style={scoreBtnStyle}>
-                  {match.result ? '✏️ Update result' : '⚡ Score this match'}
-                </button>
+                <div className="flex gap-2">
+                  <button type="submit" className={`${scoreBtn} py-2`} style={{ ...scoreBtnStyle, flex: 1 }}>
+                    {match.result ? '✏️ Update result' : '⚡ Score this match'}
+                  </button>
+                  {match.result && (
+                    <button
+                      formAction={resetMatch}
+                      className={`${scoreBtn} py-2 px-4`}
+                      style={{ background: 'var(--color-danger)', color: '#fff' }}
+                    >
+                      ↺ Reset
+                    </button>
+                  )}
+                </div>
               </form>
             ))}
 
