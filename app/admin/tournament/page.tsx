@@ -62,9 +62,9 @@ export default function TournamentEndPage() {
       <form action={scoreTournamentEnd} className="space-y-4">
         <div className="rounded-xl p-4 space-y-2"
           style={{ background: 'var(--color-panel)', border: '1px solid var(--border-base)' }}>
-          <label className="text-sm font-semibold text-text block">🥇 Tournament Winner</label>
-          <select name="winner" required style={inputStyle} className={cls} defaultValue="">
-            <option value="" disabled>Select winning team...</option>
+          <label htmlFor="tournament-winner" className="text-sm font-semibold text-text block">🥇 Tournament Winner</label>
+          <select id="tournament-winner" name="winner" required style={inputStyle} className={cls} defaultValue="">
+            <option value="" disabled>Select winning team…</option>
             {TEAMS.map(t => (
               <option key={t.name} value={t.name}>{t.name}</option>
             ))}
@@ -73,9 +73,9 @@ export default function TournamentEndPage() {
 
         <div className="rounded-xl p-4 space-y-2"
           style={{ background: 'var(--color-panel)', border: '1px solid var(--border-base)' }}>
-          <label className="text-sm font-semibold text-text block">🥈 Runner-Up</label>
-          <select name="runner_up" required style={inputStyle} className={cls} defaultValue="">
-            <option value="" disabled>Select runner-up team...</option>
+          <label htmlFor="tournament-runner-up" className="text-sm font-semibold text-text block">🥈 Runner-Up</label>
+          <select id="tournament-runner-up" name="runner_up" required style={inputStyle} className={cls} defaultValue="">
+            <option value="" disabled>Select runner-up team…</option>
             {TEAMS.map(t => (
               <option key={t.name} value={t.name}>{t.name}</option>
             ))}
@@ -84,9 +84,9 @@ export default function TournamentEndPage() {
 
         <div className="rounded-xl p-4 space-y-2"
           style={{ background: 'var(--color-panel)', border: '1px solid var(--border-base)' }}>
-          <label className="text-sm font-semibold text-text block">⚽ Top Scorer</label>
-          <select name="top_scorer" required style={inputStyle} className={cls} defaultValue="">
-            <option value="" disabled>Select top scorer...</option>
+          <label htmlFor="tournament-top-scorer" className="text-sm font-semibold text-text block">⚽ Top Scorer</label>
+          <select id="tournament-top-scorer" name="top_scorer" required style={inputStyle} className={cls} defaultValue="">
+            <option value="" disabled>Select top scorer…</option>
             {SCORERS.map(s => (
               <option key={s.name} value={s.name}>{s.name}</option>
             ))}

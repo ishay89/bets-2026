@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useReducer, useTransition } from 'react'
+import { useReducer, useTransition, type CSSProperties, type ChangeEvent } from 'react'
 import { fetchAuditEvents } from './actions'
 import { PAGE_SIZE, type AuditRow, type AuditValue } from './types'
 
@@ -48,7 +48,7 @@ const panelStyle = {
   border: '1px solid var(--border-base)',
 }
 
-const inputStyle: React.CSSProperties = {
+const inputStyle: CSSProperties = {
   background: 'var(--color-elev)',
   border: '1px solid var(--border-base)',
   color: 'var(--color-text)',
@@ -153,7 +153,7 @@ export default function AuditClient({ initialEvents }: { initialEvents: AuditRow
             id="audit-from"
             type="datetime-local"
             value={from}
-            onChange={(e: React.ChangeEvent<HTMLInputElement>) => dispatch({ type: 'SET_FROM', value: e.target.value })}
+            onChange={(e: ChangeEvent<HTMLInputElement>) => dispatch({ type: 'SET_FROM', value: e.target.value })}
             style={inputStyle}
           />
         </div>
@@ -163,7 +163,7 @@ export default function AuditClient({ initialEvents }: { initialEvents: AuditRow
             id="audit-to"
             type="datetime-local"
             value={to}
-            onChange={(e: React.ChangeEvent<HTMLInputElement>) => dispatch({ type: 'SET_TO', value: e.target.value })}
+            onChange={(e: ChangeEvent<HTMLInputElement>) => dispatch({ type: 'SET_TO', value: e.target.value })}
             style={inputStyle}
           />
         </div>

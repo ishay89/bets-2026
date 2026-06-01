@@ -177,7 +177,7 @@ export default async function EditPage() {
       {(days ?? []).length === 0 && (
         <div className="rounded-xl p-4"
           style={{ background: 'var(--color-panel)', border: '1px solid var(--border-base)' }}>
-          <div className="text-sm text-muted text-center">No actionable matches — all published matches are either locked or already scored.</div>
+          <div className="text-sm text-muted text-center">No actionable matches: all published matches are either locked or already scored.</div>
         </div>
       )}
 
@@ -235,8 +235,8 @@ export default async function EditPage() {
                     <div className="grid grid-cols-3 gap-2">
                       {(['home', 'draw', 'away'] as const).map(k => (
                         <div key={k} className="space-y-1">
-                          <label className="text-muted text-xs capitalize">Odds {k}</label>
-                          <input type="number" step="0.01" name={`odds_${k}`} required
+                          <label htmlFor={`odds_${k}_${match.id}`} className="text-muted text-xs capitalize">Odds {k}</label>
+                          <input id={`odds_${k}_${match.id}`} type="number" step="0.01" name={`odds_${k}`} required
                             defaultValue={(k === 'home' ? match.odds_home : k === 'draw' ? match.odds_draw : match.odds_away).toFixed(2)}
                             style={{ ...inputBase, color: 'var(--color-accent)', fontFamily: 'var(--font-mono)' }}
                             className={cls} />
@@ -273,7 +273,7 @@ export default async function EditPage() {
               </div>
             )}
             {dayPikanteria.map(pika => {
-              const options = [...pika.pikanteria_options].sort((a, b) => a.sort_order - b.sort_order)
+              const options = pika.pikanteria_options.toSorted((a, b) => a.sort_order - b.sort_order)
               return (
                 <form key={pika.id} action={editPikanteria} className="rounded-xl p-4 space-y-3"
                   style={{ background: 'var(--color-panel)', border: '1px solid var(--border-base)' }}>
@@ -286,8 +286,8 @@ export default async function EditPage() {
                     )}
                   </div>
                   <div className="space-y-1">
-                    <label className="text-muted text-xs">Question</label>
-                    <input type="text" name="question" defaultValue={pika.question} style={inputBase} className={cls} />
+                    <label htmlFor={`pik-question-${pika.id}`} className="text-muted text-xs">Question</label>
+                    <input id={`pik-question-${pika.id}`} type="text" name="question" defaultValue={pika.question} style={inputBase} className={cls} />
                   </div>
                   <div className="space-y-2">
                     {options.map((opt, idx) => {
@@ -296,8 +296,10 @@ export default async function EditPage() {
                         <div key={opt.id} className="flex gap-2 items-center">
                           <input type="hidden" name={`opt_id_${k}`} value={opt.id} />
                           <input type="text" name={`opt_label_${k}`} defaultValue={opt.label}
+                            aria-label={`Option ${k} label`}
                             style={inputBase} className="rounded-lg px-3 py-2 text-sm outline-none focus:ring-1 flex-1" />
                           <input type="number" step="0.01" name={`opt_odds_${k}`} defaultValue={opt.odds.toFixed(2)}
+                            aria-label={`Option ${k} odds`}
                             style={{ ...inputBase, color: 'var(--color-amber)', fontFamily: 'var(--font-mono)' }}
                             className="rounded-lg px-3 py-2 text-sm outline-none focus:ring-1 w-24" />
                         </div>
@@ -320,8 +322,8 @@ export default async function EditPage() {
               style={{ background: 'var(--color-panel)', border: '1px solid var(--border-base)' }}>
               <input type="hidden" name="match_day_id" value={day.id} />
               <div className="space-y-1">
-                <label className="text-muted text-xs">Question</label>
-                <input type="text" name="pik_q_1" placeholder="e.g. Will Mbappé score?" style={inputBase} className={cls} />
+                <label htmlFor="new-pik-question" className="text-muted text-xs">Question</label>
+                <input id="new-pik-question" type="text" name="pik_q_1" placeholder="e.g. Will Mbappé score?" style={inputBase} className={cls} />
               </div>
               <PicanteriaBuilder questionIndex={1} />
               <button type="submit" className="w-full py-2 rounded-lg font-bold text-sm"
