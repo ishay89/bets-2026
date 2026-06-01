@@ -80,17 +80,17 @@ export function MatchCard({ match, currentPick, isLocked, stageLabel, onSave, cr
       className="pitch-stripes rounded-2xl overflow-hidden"
       style={{
         background: isCorrect
-          ? 'color-mix(in srgb, var(--color-accent) 14%, var(--color-panel))'
+          ? 'color-mix(in srgb, var(--color-accent) 40%, var(--color-panel))'
           : isWrong
             ? 'color-mix(in srgb, var(--color-danger) 14%, var(--color-panel))'
             : 'var(--color-panel)',
         border: isCorrect
-          ? '1px solid var(--border-accent)'
+          ? '2px solid rgba(0,217,126,0.65)'
           : isWrong
             ? '1px solid var(--border-danger)'
             : '1px solid var(--border-base)',
         boxShadow: isCorrect
-          ? '0 4px 24px rgba(0,217,126,0.22)'
+          ? '0 4px 32px rgba(0,217,126,0.55)'
           : isWrong
             ? '0 4px 24px rgba(220,38,38,0.22)'
             : 'var(--shadow-card)',

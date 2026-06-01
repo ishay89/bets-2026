@@ -174,17 +174,11 @@ async function resetMatch(formData: FormData) {
   const matchDayId = parseUUID(formData.get('match_day_id'), 'match_day_id')
   const matchId = parseUUID(formData.get('match_id'), 'match_id')
 
-  const { error: matchError } = await supabase
-    .from('matches')
-    .update({ result: null })
-    .eq('id', matchId)
-  if (matchError) throw matchError
-
-  const { error: predsError } = await supabase
-    .from('predictions')
-    .update({ points: null })
-    .eq('match_id', matchId)
-  if (predsError) throw predsError
+  const { error } = await supabase.rpc('reset_match_result', {
+    p_match_id: matchId,
+    p_match_day_id: matchDayId,
+  })
+  if (error) throw new Error(`Reset failed and was rolled back: ${error.message}`)
 
   await snapshotMatchDay(supabase, matchDayId)
 
@@ -290,6 +284,7 @@ export default async function ResultsPage() {
                   {match.result && (
                     <button
                       formAction={resetMatch}
+                      formNoValidate
                       className={`${scoreBtn} py-2 px-4`}
                       style={{ background: 'var(--color-danger)', color: '#fff' }}
                     >
