@@ -184,132 +184,204 @@ export default async function H2HComparePage({
 
   return (
     <div className="min-h-screen bg-bg">
-      <div className="px-4 pt-4 pb-3 flex items-center justify-between">
-        <div>
-          <div
-            className="text-[12px]"
-            style={{
-              fontFamily: 'var(--font-display)',
-              letterSpacing: '0.04em',
-              textTransform: 'uppercase',
-              color: 'var(--color-accent)',
-            }}
-          >
-            Head to head
-          </div>
-          <div className="text-[22px] font-extrabold text-text tracking-tight">Rivalry</div>
-        </div>
-        <Link
-          href="/h2h"
-          style={{
-            fontFamily: 'var(--font-display)',
-            fontSize: 12,
-            letterSpacing: '0.04em',
-            color: 'var(--color-sub)',
-            textDecoration: 'none',
-          }}
-        >
-          Switch →
-        </Link>
-      </div>
+      <RivalryHeader />
 
       <main className="px-4 pb-28 space-y-4">
-        {/* ── Versus hero ── */}
-        <div
-          className="pitch-stripes rounded-2xl p-5 relative overflow-hidden"
-          style={{ background: 'var(--color-panel)', border: '1px solid var(--border-base)' }}
-        >
-          <div className="absolute inset-0 pointer-events-none" style={{ background: 'var(--hero-glow)' }} />
-          <div className="relative z-10 flex items-stretch">
-            <HeroSide
-              name={me?.display_name ?? 'You'}
-              avatar={me ? getAvatar(me) : '🙂'}
-              total={myTotal}
-              isLeader={iLead || deadHeat}
-              borderColor="var(--color-accent)"
-            />
-            <div className="flex items-center justify-center px-2">
-              <span
-                style={{
-                  fontFamily: 'var(--font-display)',
-                  fontSize: 26,
-                  fontWeight: 700,
-                  letterSpacing: '0.04em',
-                  color: 'var(--color-dim)',
-                }}
-              >
-                VS
-              </span>
-            </div>
-            <HeroSide
-              name={them.display_name}
-              avatar={getAvatar(them)}
-              total={theirTotal}
-              isLeader={!iLead || deadHeat}
-              borderColor="var(--color-silver)"
-              automated={themAutomated}
-              automationLabel={themLabel}
-            />
-          </div>
-        </div>
+        <VersusHero
+          myName={me?.display_name ?? 'You'}
+          myAvatar={me ? getAvatar(me) : '🙂'}
+          myTotal={myTotal}
+          theirName={them.display_name}
+          theirAvatar={getAvatar(them)}
+          theirTotal={theirTotal}
+          iLead={iLead}
+          deadHeat={deadHeat}
+          themAutomated={themAutomated}
+          themLabel={themLabel}
+        />
 
-        {/* ── Rivalry record strip ── */}
-        <div className="grid grid-cols-3 gap-2">
-          <StatTile
-            label="Rounds won"
-            value={`${summary.roundsWon.me}–${summary.roundsWon.them}`}
-          />
-          <StatTile
-            label="Agreement"
-            value={summary.agreements + summary.disagreements === 0 ? '-' : `${summary.agreementRate}%`}
-          />
-          <StatTile
-            label="Lead"
-            value={deadHeat ? 'DEAD HEAT' : `${iLead ? '+' : '−'}${gap.toFixed(2)}`}
-            valueColor={
-              deadHeat
-                ? 'var(--color-muted)'
-                : iLead
-                  ? 'var(--color-accent)'
-                  : 'var(--color-danger)'
-            }
-            small={deadHeat}
-          />
-        </div>
+        <RivalryStats summary={summary} iLead={iLead} deadHeat={deadHeat} gap={gap} />
 
-        {/* ── By round ── */}
-        <div
-          className="px-0.5"
-          style={{
-            fontFamily: 'var(--font-display)',
-            fontSize: 12,
-            letterSpacing: '0.04em',
-            textTransform: 'uppercase',
-            color: 'var(--color-muted)',
-          }}
-        >
-          By round
-        </div>
-
-        {roundsVM.length === 0 && (
-          <div
-            className="rounded-2xl p-6 text-center"
-            style={{ background: 'var(--color-panel)', border: '1px solid var(--border-base)' }}
-          >
-            <div className="text-3xl mb-2">⚽</div>
-            <div className="text-sub text-[13px] font-semibold">
-              No rounds played yet. Check back after kickoff.
-            </div>
-          </div>
-        )}
-
-        {roundsVM.map(round => (
-          <RoundCard key={round.matchDayId} round={round} result={roundResultById.get(round.matchDayId)} />
-        ))}
+        <ByRoundSection roundsVM={roundsVM} roundResultById={roundResultById} />
       </main>
 
       <BottomNav />
     </div>
+  )
+}
+
+function RivalryHeader() {
+  return (
+    <div className="px-4 pt-4 pb-3 flex items-center justify-between">
+      <div>
+        <div
+          className="text-[12px]"
+          style={{
+            fontFamily: 'var(--font-display)',
+            letterSpacing: '0.04em',
+            textTransform: 'uppercase',
+            color: 'var(--color-accent)',
+          }}
+        >
+          Head to head
+        </div>
+        <div className="text-[22px] font-extrabold text-text tracking-tight">Rivalry</div>
+      </div>
+      <Link
+        href="/h2h"
+        style={{
+          fontFamily: 'var(--font-display)',
+          fontSize: 12,
+          letterSpacing: '0.04em',
+          color: 'var(--color-sub)',
+          textDecoration: 'none',
+        }}
+      >
+        Switch →
+      </Link>
+    </div>
+  )
+}
+
+function VersusHero({
+  myName,
+  myAvatar,
+  myTotal,
+  theirName,
+  theirAvatar,
+  theirTotal,
+  iLead,
+  deadHeat,
+  themAutomated,
+  themLabel,
+}: {
+  myName: string
+  myAvatar: string
+  myTotal: number
+  theirName: string
+  theirAvatar: string
+  theirTotal: number
+  iLead: boolean
+  deadHeat: boolean
+  themAutomated: boolean
+  themLabel: string | null
+}) {
+  return (
+    <div
+      className="pitch-stripes rounded-2xl p-5 relative overflow-hidden"
+      style={{ background: 'var(--color-panel)', border: '1px solid var(--border-base)' }}
+    >
+      <div className="absolute inset-0 pointer-events-none" style={{ background: 'var(--hero-glow)' }} />
+      <div className="relative z-10 flex items-stretch">
+        <HeroSide
+          name={myName}
+          avatar={myAvatar}
+          total={myTotal}
+          isLeader={iLead || deadHeat}
+          borderColor="var(--color-accent)"
+        />
+        <div className="flex items-center justify-center px-2">
+          <span
+            style={{
+              fontFamily: 'var(--font-display)',
+              fontSize: 26,
+              fontWeight: 700,
+              letterSpacing: '0.04em',
+              color: 'var(--color-dim)',
+            }}
+          >
+            VS
+          </span>
+        </div>
+        <HeroSide
+          name={theirName}
+          avatar={theirAvatar}
+          total={theirTotal}
+          isLeader={!iLead || deadHeat}
+          borderColor="var(--color-silver)"
+          automated={themAutomated}
+          automationLabel={themLabel}
+        />
+      </div>
+    </div>
+  )
+}
+
+function RivalryStats({
+  summary,
+  iLead,
+  deadHeat,
+  gap,
+}: {
+  summary: ReturnType<typeof buildH2H>['summary']
+  iLead: boolean
+  deadHeat: boolean
+  gap: number
+}) {
+  return (
+    <div className="grid grid-cols-3 gap-2">
+      <StatTile
+        label="Rounds won"
+        value={`${summary.roundsWon.me}–${summary.roundsWon.them}`}
+      />
+      <StatTile
+        label="Agreement"
+        value={summary.agreements + summary.disagreements === 0 ? '-' : `${summary.agreementRate}%`}
+      />
+      <StatTile
+        label="Lead"
+        value={deadHeat ? 'DEAD HEAT' : `${iLead ? '+' : '−'}${gap.toFixed(2)}`}
+        valueColor={
+          deadHeat
+            ? 'var(--color-muted)'
+            : iLead
+              ? 'var(--color-accent)'
+              : 'var(--color-danger)'
+        }
+        small={deadHeat}
+      />
+    </div>
+  )
+}
+
+function ByRoundSection({
+  roundsVM,
+  roundResultById,
+}: {
+  roundsVM: RoundVM[]
+  roundResultById: Map<string, H2HRoundResult>
+}) {
+  return (
+    <>
+      <div
+        className="px-0.5"
+        style={{
+          fontFamily: 'var(--font-display)',
+          fontSize: 12,
+          letterSpacing: '0.04em',
+          textTransform: 'uppercase',
+          color: 'var(--color-muted)',
+        }}
+      >
+        By round
+      </div>
+
+      {roundsVM.length === 0 && (
+        <div
+          className="rounded-2xl p-6 text-center"
+          style={{ background: 'var(--color-panel)', border: '1px solid var(--border-base)' }}
+        >
+          <div className="text-3xl mb-2">⚽</div>
+          <div className="text-sub text-[13px] font-semibold">
+            No rounds played yet. Check back after kickoff.
+          </div>
+        </div>
+      )}
+
+      {roundsVM.map(round => (
+        <RoundCard key={round.matchDayId} round={round} result={roundResultById.get(round.matchDayId)} />
+      ))}
+    </>
   )
 }
 
