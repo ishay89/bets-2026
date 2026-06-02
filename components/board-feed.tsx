@@ -25,8 +25,16 @@ export interface BoardPost {
   users: BoardAuthor
 }
 
+export interface AiSocialPost {
+  id: string
+  title: string
+  body: string
+  created_at: string
+}
+
 interface Props {
   initialPosts: BoardPost[]
+  initialAiPosts: AiSocialPost[]
   currentUserId: string
 }
 
@@ -45,8 +53,10 @@ function getImageUrl(path: string): string {
   return `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/${IMAGE_BUCKET}/${path}`
 }
 
-export function BoardFeed({ initialPosts, currentUserId }: Props) {
+export function BoardFeed({ initialPosts, initialAiPosts, currentUserId }: Props) {
   const [posts, setPosts] = useState(initialPosts)
+  const [aiPosts, setAiPosts] = useState(initialAiPosts)
+  const [section, setSection] = useState<'ai' | 'users'>('ai')
   const [body, setBody] = useState('')
   const [image, setImage] = useState<File | null>(null)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
@@ -66,11 +76,24 @@ export function BoardFeed({ initialPosts, currentUserId }: Props) {
     if (data) setPosts(data)
   }
 
+  async function refreshAiPosts() {
+    const supabase = createClient()
+    const { data } = await supabase
+      .from('ai_social_posts')
+      .select('id, title, body, created_at')
+      .order('created_at', { ascending: false })
+      .limit(50)
+      .returns<AiSocialPost[]>()
+
+    if (data) setAiPosts(data)
+  }
+
   useEffect(() => {
     const supabase = createClient()
     const channel = supabase
       .channel('message-board-posts')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'message_board_posts' }, refreshPosts)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'ai_social_posts' }, refreshAiPosts)
       .subscribe()
 
     return () => { void channel.unsubscribe() }
@@ -154,6 +177,18 @@ export function BoardFeed({ initialPosts, currentUserId }: Props) {
 
   return (
     <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-2 rounded-[14px] p-1"
+        style={{ background: 'var(--color-panel)', border: '1px solid var(--border-base)' }}>
+        <SectionButton active={section === 'ai'} onClick={() => setSection('ai')}>
+          AI Recaps
+        </SectionButton>
+        <SectionButton active={section === 'users'} onClick={() => setSection('users')}>
+          User Board
+        </SectionButton>
+      </div>
+
+      {section === 'ai' ? <AiRecapFeed posts={aiPosts} /> : (
+        <>
       <form onSubmit={handleSubmit} className="rounded-[14px] p-3 space-y-3"
         style={{ background: 'var(--color-panel)', border: '1px solid var(--border-base)' }}>
         <textarea
@@ -229,6 +264,62 @@ export function BoardFeed({ initialPosts, currentUserId }: Props) {
           </article>
         ))}
       </div>
+        </>
+      )}
     </div>
+  )
+}
+
+function SectionButton({ active, children, onClick }: {
+  active: boolean
+  children: React.ReactNode
+  onClick: () => void
+}) {
+  return (
+    <button type="button" onClick={onClick}
+      className="rounded-[10px] px-3 py-2 text-[12px] font-extrabold transition-colors"
+      style={{
+        background: active ? 'var(--color-accent-soft)' : 'transparent',
+        color: active ? 'var(--color-accent)' : 'var(--color-muted)',
+        border: active ? '1px solid var(--border-accent)' : '1px solid transparent',
+      }}>
+      {children}
+    </button>
+  )
+}
+
+function AiRecapFeed({ posts }: { posts: AiSocialPost[] }) {
+  return (
+    <>
+      <div className="rounded-[14px] px-4 py-3"
+        style={{ background: 'var(--color-accent-soft)', border: '1px solid var(--border-accent)' }}>
+        <div className="text-[10px] font-extrabold uppercase tracking-[1.2px]" style={{ color: 'var(--color-accent)' }}>
+          AI Press Box
+        </div>
+        <div className="mt-1 text-[12px] leading-4 text-sub">
+          Generated recaps of the daily drama, glorious wins, and פחי הזהב.
+        </div>
+      </div>
+
+      {posts.length === 0 && (
+        <div className="rounded-[14px] py-10 text-center text-[13px] text-sub"
+          style={{ background: 'var(--color-panel)', border: '1px solid var(--border-base)' }}>
+          No AI recaps yet. The press box is gathering material.
+        </div>
+      )}
+
+      <div className="space-y-3">
+        {posts.map((post) => (
+          <article key={post.id} className="rounded-[14px] px-4 py-3"
+            style={{ background: 'var(--color-panel)', border: '1px solid var(--border-base)' }}>
+            <div className="flex items-start justify-between gap-3">
+              <div className="text-[15px] font-extrabold text-text">{post.title}</div>
+              <div className="shrink-0 text-[10px] font-semibold text-muted">{formatPostTime(post.created_at)}</div>
+            </div>
+            <p className="mt-2 whitespace-pre-wrap break-words text-[14px] leading-5 text-sub">{post.body}</p>
+          </article>
+        ))}
+      </div>
+    </>
   )
 }
