@@ -1,6 +1,9 @@
 export type Stage = 'group' | 'r32' | 'r16' | 'qf' | 'sf' | '3rd' | 'final'
 export type Pick = '1' | 'X' | '2'
 export type AutomationStrategy = 'monkey' | 'max' | 'mid' | 'min'
+// Account lifecycle: pending (awaiting admin approval), approved (full access),
+// blocked (removed by an admin but kept visible in the admin panel).
+export type UserStatus = 'pending' | 'approved' | 'blocked'
 
 export interface User {
   id: string
@@ -9,6 +12,7 @@ export interface User {
   is_admin: boolean
   is_monkey: boolean
   automation_strategy: AutomationStrategy | null
+  status: UserStatus
   created_at: string
 }
 

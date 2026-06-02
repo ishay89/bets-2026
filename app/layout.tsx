@@ -53,11 +53,15 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       .maybeSingle()
     if (!existingProfile) {
       const adminEmails = (process.env.ADMIN_EMAILS ?? '').split(',').map(e => e.trim())
+      const isAdmin = adminEmails.includes(user.email!)
       await supabase.from('users').insert({
         id: user.id,
         email: user.email!,
         display_name: (user.user_metadata?.full_name as string | undefined) ?? user.email!.split('@')[0],
-        is_admin: adminEmails.includes(user.email!),
+        is_admin: isAdmin,
+        // New players wait for admin approval before they can use the app.
+        // Configured admins are approved automatically.
+        status: isAdmin ? 'approved' : 'pending',
       })
     }
   }
