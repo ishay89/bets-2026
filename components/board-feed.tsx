@@ -56,12 +56,12 @@ function getImageUrl(path: string): string {
 export function BoardFeed({ initialPosts, initialAiPosts, currentUserId }: Props) {
   const [posts, setPosts] = useState(initialPosts)
   const [aiPosts, setAiPosts] = useState(initialAiPosts)
-  const [section, setSection] = useState<'ai' | 'users'>('ai')
   const [body, setBody] = useState('')
   const [image, setImage] = useState<File | null>(null)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [isPosting, setIsPosting] = useState(false)
+  const [deletingPostId, setDeletingPostId] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   async function refreshPosts() {
@@ -175,20 +175,39 @@ export function BoardFeed({ initialPosts, initialAiPosts, currentUserId }: Props
     }
   }
 
-  return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-2 rounded-[14px] p-1"
-        style={{ background: 'var(--color-panel)', border: '1px solid var(--border-base)' }}>
-        <SectionButton active={section === 'ai'} onClick={() => setSection('ai')}>
-          AI Recaps
-        </SectionButton>
-        <SectionButton active={section === 'users'} onClick={() => setSection('users')}>
-          User Board
-        </SectionButton>
-      </div>
+  async function handleDelete(post: BoardPost) {
+    if (!window.confirm('Delete this post?')) return
 
-      {section === 'ai' ? <AiRecapFeed posts={aiPosts} /> : (
-        <>
+    setError(null)
+    setDeletingPostId(post.id)
+    const supabase = createClient()
+
+    try {
+      const { error: deleteError } = await supabase
+        .from('message_board_posts')
+        .delete()
+        .eq('id', post.id)
+        .eq('user_id', currentUserId)
+      if (deleteError) throw deleteError
+
+      if (post.image_path) {
+        await supabase.storage
+          .from(IMAGE_BUCKET)
+          .remove([post.image_path])
+      }
+
+      await refreshPosts()
+    } catch (deleteError) {
+      setError(deleteError instanceof Error ? deleteError.message : 'Could not delete your post.')
+    } finally {
+      setDeletingPostId(null)
+    }
+  }
+
+  return (
+    <div className="grid gap-5 lg:grid-cols-2 lg:items-start">
+      <section className="space-y-4">
+        <BoardTitle>User Board</BoardTitle>
       <form onSubmit={handleSubmit} className="rounded-[14px] p-3 space-y-3"
         style={{ background: 'var(--color-panel)', border: '1px solid var(--border-base)' }}>
         <textarea
@@ -254,6 +273,14 @@ export function BoardFeed({ initialPosts, initialAiPosts, currentUserId }: Props
                 <div className="truncate text-[13px] font-extrabold text-text">{post.users.display_name}</div>
                 <div className="text-[10px] font-semibold text-muted">{formatPostTime(post.created_at)}</div>
               </div>
+              {post.user_id === currentUserId && (
+                <button type="button" onClick={() => handleDelete(post)}
+                  disabled={deletingPostId === post.id}
+                  className="shrink-0 rounded-lg px-2 py-1 text-[11px] font-bold disabled:opacity-50"
+                  style={{ color: 'var(--color-danger)', background: 'var(--color-danger-soft)' }}>
+                  {deletingPostId === post.id ? 'Deleting...' : 'Delete'}
+                </button>
+              )}
             </div>
 
             {post.body && <p className="whitespace-pre-wrap break-words px-3 py-3 text-[14px] leading-5 text-sub">{post.body}</p>}
@@ -265,27 +292,23 @@ export function BoardFeed({ initialPosts, initialAiPosts, currentUserId }: Props
           </article>
         ))}
       </div>
-        </>
-      )}
+      </section>
+
+      <section className="space-y-4">
+        <BoardTitle>AI Recaps</BoardTitle>
+        <AiRecapFeed posts={aiPosts} />
+      </section>
     </div>
   )
 }
 
-function SectionButton({ active, children, onClick }: {
-  active: boolean
+function BoardTitle({ children }: {
   children: React.ReactNode
-  onClick: () => void
 }) {
   return (
-    <button type="button" onClick={onClick}
-      className="rounded-[10px] px-3 py-2 text-[12px] font-extrabold transition-colors"
-      style={{
-        background: active ? 'var(--color-accent-soft)' : 'transparent',
-        color: active ? 'var(--color-accent)' : 'var(--color-muted)',
-        border: active ? '1px solid var(--border-accent)' : '1px solid transparent',
-      }}>
+    <div className="text-[10px] font-extrabold uppercase tracking-[1.2px] text-muted">
       {children}
-    </button>
+    </div>
   )
 }
 
