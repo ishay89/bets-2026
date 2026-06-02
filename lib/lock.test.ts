@@ -13,36 +13,36 @@ describe('matchLockMs', () => {
 describe('isMatchLocked', () => {
   it('is unlocked well before kickoff', () => {
     const now = kickoffMs - 60 * 60 * 1000 // 1 hour before
-    expect(isMatchLocked({ kickoff_time: KICKOFF }, false, now)).toBe(false)
+    expect(isMatchLocked({ kickoff_time: KICKOFF }, now)).toBe(false)
   })
 
   it('is unlocked 6 minutes before kickoff', () => {
     const now = kickoffMs - 6 * 60 * 1000
-    expect(isMatchLocked({ kickoff_time: KICKOFF }, false, now)).toBe(false)
+    expect(isMatchLocked({ kickoff_time: KICKOFF }, now)).toBe(false)
   })
 
   it('is locked exactly at kickoff − 5 minutes', () => {
     const now = kickoffMs - LOCK_LEAD_MS
-    expect(isMatchLocked({ kickoff_time: KICKOFF }, false, now)).toBe(true)
+    expect(isMatchLocked({ kickoff_time: KICKOFF }, now)).toBe(true)
   })
 
   it('is locked after kickoff − 5 minutes', () => {
     const now = kickoffMs - 4 * 60 * 1000
-    expect(isMatchLocked({ kickoff_time: KICKOFF }, false, now)).toBe(true)
+    expect(isMatchLocked({ kickoff_time: KICKOFF }, now)).toBe(true)
   })
 
   it('is locked when the match is manually locked, regardless of time', () => {
     const now = kickoffMs - 60 * 60 * 1000
-    expect(isMatchLocked({ kickoff_time: KICKOFF, locked: true }, false, now)).toBe(true)
+    expect(isMatchLocked({ kickoff_time: KICKOFF, locked: true }, now)).toBe(true)
   })
 
-  it('is locked when the day is locked, regardless of time', () => {
+  it('ignores legacy day lock state', () => {
     const now = kickoffMs - 60 * 60 * 1000
-    expect(isMatchLocked({ kickoff_time: KICKOFF, locked: false }, true, now)).toBe(true)
+    expect(isMatchLocked({ kickoff_time: KICKOFF, locked: false }, now)).toBe(false)
   })
 
   it('treats null locked as unlocked', () => {
     const now = kickoffMs - 60 * 60 * 1000
-    expect(isMatchLocked({ kickoff_time: KICKOFF, locked: null }, false, now)).toBe(false)
+    expect(isMatchLocked({ kickoff_time: KICKOFF, locked: null }, now)).toBe(false)
   })
 })

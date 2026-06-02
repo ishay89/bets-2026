@@ -29,12 +29,6 @@ const STAGE_LABELS: Record<string, string> = {
   sf: 'Semi Finals ×2', '3rd': 'Third Place ×1.5', final: 'Final ×3',
 }
 
-// Module-level helper keeps the impure Date.now() read out of the component
-// body, so the render stays pure (see app/h2h/[opponentId]/page.tsx).
-function nowMs(): number {
-  return Date.now()
-}
-
 function invalidSaveResult(error: unknown): SaveResult {
   const message = error instanceof Error ? error.message : 'Invalid prediction'
   return { ok: false, status: 'invalid', message }
@@ -123,11 +117,7 @@ export default async function PredictPage() {
   if (futuresPickError) throw futuresPickError
 
   const hasEntryPick = hasCompletedPreTournamentPick(futuresPick)
-  // Futures lock: manual admin flag OR any published match is locked (manually or by kickoff time).
-  const anyMatchLocked = matchDays.some(day =>
-    day.locked || day.matches.some(m => isMatchLocked(m, day.locked))
-  )
-  const futuresLocked = (tournamentSettings?.futures_locked ?? false) || anyMatchLocked
+  const futuresLocked = tournamentSettings?.futures_locked ?? false
 
   // Surface the most recently published match days first, so a returning player
   // lands on the matches they still need to bet without scrolling.
@@ -155,10 +145,6 @@ export default async function PredictPage() {
     e.counts[r.option_id] = r.cnt
     e.total += r.cnt
   }
-
-  // Server-rendered "now" for lock comparisons below. Computed once so the
-  // pikanteria-only lock check stays consistent across the render.
-  const now = nowMs()
 
   return (
     <div className="min-h-screen bg-bg">
@@ -191,12 +177,7 @@ export default async function PredictPage() {
             weekday: 'short', month: 'short', day: 'numeric',
           })
 
-          // Day is locked when manually locked or all matches have passed their lock time.
-          const dayManuallyLocked = matchDay.locked
-          const allMatchesLocked = sortedMatches.length > 0 && sortedMatches.every(m => isMatchLocked(m, dayManuallyLocked))
-          // A pikanteria-only day (no published matches) locks at the day's lock_time.
-          const pikaOnlyLocked = sortedMatches.length === 0 && now >= new Date(matchDay.lock_time).getTime()
-          const isDayLocked = dayManuallyLocked || allMatchesLocked || pikaOnlyLocked
+          const allMatchesLocked = sortedMatches.length > 0 && sortedMatches.every(m => isMatchLocked(m))
 
           // Lock timer points to the earliest match's lock time (kickoff − 5 min).
           const earliestLockTime = sortedMatches.length > 0
@@ -222,7 +203,7 @@ export default async function PredictPage() {
                   </div>
                 </div>
 
-                {isDayLocked ? (
+                {sortedMatches.length > 0 && (allMatchesLocked ? (
                   <div className="text-[10px] font-bold px-2.5 py-1 rounded-full"
                     style={{ background: 'var(--color-danger-soft)', color: 'var(--color-danger)', border: '1px solid var(--border-danger)' }}>
                     🔒 Locked
@@ -235,7 +216,7 @@ export default async function PredictPage() {
                       <LockTimer lockTime={earliestLockTime} />
                     </div>
                   </div>
-                )}
+                ))}
               </div>
 
               {/* Matches */}
@@ -252,7 +233,7 @@ export default async function PredictPage() {
                     key={`${match.id}:${predictionMap[match.id] ?? 'none'}`}
                     match={match}
                     currentPick={predictionMap[match.id] ?? null}
-                    isLocked={isMatchLocked(match, dayManuallyLocked)}
+                    isLocked={isMatchLocked(match)}
                     stageLabel={stageLabel}
                     onSave={savePick}
                     crowd={toPct(tally)}
@@ -281,7 +262,7 @@ export default async function PredictPage() {
                       key={`${item.id}:${answerMap[item.id] ?? 'none'}`}
                       item={{ ...item, options: (item.pikanteria_options ?? []).toSorted((a, b) => a.sort_order - b.sort_order) }}
                       currentAnswer={answerMap[item.id] ?? null}
-                      isLocked={isDayLocked}
+                      isLocked={item.locked}
                       onSave={saveAnswer}
                       crowd={crowdPik[item.id]?.counts ?? null}
                       crowdTotal={crowdPik[item.id]?.total ?? 0}
