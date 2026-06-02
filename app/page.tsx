@@ -6,6 +6,8 @@ import type { LeaderboardEntry } from '@/lib/types'
 import { PRE_TOURNAMENT_PATH, hasCompletedPreTournamentPick } from '@/lib/pre-tournament'
 import { getLeaderboardEntries } from '@/lib/data'
 
+export const metadata = { title: 'Home | Mondial Bets 2026', description: 'FIFA World Cup 2026 predictions' }
+
 type HomeMatchRow = {
   home_team: string
   away_team: string
@@ -13,6 +15,23 @@ type HomeMatchRow = {
   odds_home: number
   odds_draw: number
   odds_away: number
+}
+
+const rankColors: Record<number, string> = {
+  1: 'var(--color-gold)',
+  2: 'var(--color-silver)',
+  3: 'var(--color-bronze)',
+}
+
+const soccerBallStyle: React.CSSProperties = {
+  width: 32,
+  height: 32,
+  borderRadius: '50%',
+  background: 'var(--color-accent)',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  flexShrink: 0,
 }
 
 export default async function HomePage() {
@@ -59,383 +78,28 @@ export default async function HomePage() {
     ...(myEntry && myRank && myRank > 3 ? [{ ...myEntry, _rank: myRank }] : []),
   ]
 
-  const rankColors: Record<number, string> = {
-    1: 'var(--color-gold)',
-    2: 'var(--color-silver)',
-    3: 'var(--color-bronze)',
-  }
-
   return (
     <div className="min-h-screen bg-bg">
-      {/* ── Header ── */}
-      <header className="flex items-center justify-between px-4 pt-5 pb-3">
-        <div className="flex items-center gap-2.5">
-          <SoccerBallLogo />
-          <div>
-            <div
-              style={{
-                fontFamily: 'var(--font-display)',
-                fontSize: 18,
-                fontWeight: 700,
-                letterSpacing: '0.04em',
-                color: 'var(--color-text)',
-                lineHeight: 1,
-                textTransform: 'uppercase',
-              }}
-            >
-              Mondial Bets
-            </div>
-            <div
-              style={{
-                fontFamily: 'var(--font-display)',
-                fontSize: 9,
-                letterSpacing: '0.20em',
-                textTransform: 'uppercase',
-                color: 'var(--color-muted)',
-                marginTop: 2,
-              }}
-            >
-              USA · CAN · MEX 2026
-            </div>
-          </div>
-        </div>
-        {/* Host flags */}
-        <div className="flex items-center gap-1 text-base">🇺🇸🇨🇦🇲🇽</div>
-      </header>
+      <HeaderSection />
 
       <main className="px-4 pb-28 space-y-4">
-        {!hasEntryPick && (
-          <Link
-            href={PRE_TOURNAMENT_PATH}
-            className="block rounded-2xl p-4"
-            style={{
-              background: 'var(--color-panel)',
-              border: '1px solid var(--border-accent)',
-              textDecoration: 'none',
-            }}
-          >
-            <div
-              style={{
-                fontFamily: 'var(--font-display)',
-                fontSize: 10,
-                letterSpacing: '0.16em',
-                textTransform: 'uppercase',
-                color: 'var(--color-accent)',
-              }}
-            >
-              Entry required
-            </div>
-            <div className="mt-1 text-text text-base font-extrabold tracking-tight">
-              Pick champion and top scorer
-            </div>
-            <div className="mt-1 text-sub text-sm">
-              Complete these one-time picks before making daily predictions.
-            </div>
-          </Link>
-        )}
+        {!hasEntryPick && <PreTournamentCta />}
 
-        {/* ── Countdown hero ── */}
-        {todayDay ? (
-          <div
-            className="pitch-stripes rounded-2xl p-5 relative overflow-hidden"
-            style={{
-              background: 'var(--color-panel)',
-              border: `1px solid ${picksOpen ? 'var(--border-accent)' : 'var(--border-base)'}`,
-            }}
-          >
-            {/* Glow */}
-            <div
-              className="absolute inset-0 pointer-events-none"
-              style={{ background: 'var(--hero-glow)' }}
-            />
-            <div className="relative z-10">
-              <div className="flex items-center justify-between mb-3">
-                <span
-                  className="text-[10px] px-2.5 py-1 rounded-full font-bold"
-                  style={{
-                    color: picksOpen ? 'var(--color-accent)' : 'var(--color-muted)',
-                    background: picksOpen ? 'var(--color-accent-soft)' : 'var(--color-elev)',
-                    border: `1px solid ${picksOpen ? 'var(--border-accent)' : 'var(--border-base)'}`,
-                    fontFamily: 'var(--font-display)',
-                    letterSpacing: '0.10em',
-                    textTransform: 'uppercase',
-                  }}
-                >
-                  {picksOpen ? '⏱ Open' : '🔒 Locked'}
-                </span>
-                <span
-                  style={{
-                    fontFamily: 'var(--font-display)',
-                    fontSize: 11,
-                    letterSpacing: '0.12em',
-                    textTransform: 'uppercase',
-                    color: 'var(--color-sub)',
-                  }}
-                >
-                  {STAGE_LABELS[todayDay.stage] ?? todayDay.stage}
-                </span>
-              </div>
+        <CountdownSection
+          todayDay={todayDay}
+          picksOpen={picksOpen}
+          hours={hours}
+          mins={mins}
+          matchCount={todayMatches.length}
+        />
 
-              {picksOpen ? (
-                <>
-                  <div
-                    style={{
-                      fontFamily: 'var(--font-display)',
-                      fontSize: 10,
-                      letterSpacing: '0.16em',
-                      textTransform: 'uppercase',
-                      color: 'var(--color-sub)',
-                      marginBottom: 4,
-                    }}
-                  >
-                    Lock in
-                  </div>
-                  <div className="flex items-baseline gap-2">
-                    {[
-                      { n: String(hours).padStart(2, '0'), unit: 'HRS' },
-                      { n: String(mins).padStart(2, '0'), unit: 'MIN' },
-                    ].map(({ n, unit }) => (
-                      <span key={unit} className="flex items-baseline gap-1">
-                        <span
-                          style={{
-                            fontFamily: 'var(--font-display)',
-                            fontSize: 42,
-                            fontWeight: 700,
-                            color: 'var(--color-accent)',
-                            letterSpacing: '-0.02em',
-                            lineHeight: 1,
-                          }}
-                        >
-                          {n}
-                        </span>
-                        <span
-                          style={{
-                            fontFamily: 'var(--font-display)',
-                            fontSize: 10,
-                            letterSpacing: '0.14em',
-                            color: 'var(--color-muted)',
-                            marginRight: 4,
-                          }}
-                        >
-                          {unit}
-                        </span>
-                      </span>
-                    ))}
-                  </div>
-                </>
-              ) : (
-                <div
-                  style={{
-                    fontFamily: 'var(--font-display)',
-                    fontSize: 14,
-                    color: 'var(--color-sub)',
-                    letterSpacing: '0.04em',
-                  }}
-                >
-                  Predictions locked for today
-                </div>
-              )}
+        <StandingsSection
+          miniEntries={miniEntries}
+          totalPlayers={allEntries.length}
+          userId={user?.id}
+        />
 
-              <div className="mt-4 flex gap-2">
-                <Link
-                  href="/predict"
-                  className="flex-1 text-center rounded-xl py-3"
-                  style={{
-                    background: 'var(--color-accent)',
-                    color: '#000',
-                    fontFamily: 'var(--font-display)',
-                    fontSize: 14,
-                    fontWeight: 700,
-                    letterSpacing: '0.10em',
-                    textTransform: 'uppercase',
-                  }}
-                >
-                  {picksOpen ? 'Make Picks →' : 'View Picks →'}
-                </Link>
-                <div
-                  className="font-bold rounded-xl px-4 py-3"
-                  style={{
-                    background: 'var(--color-elev)',
-                    border: '1px solid var(--border-base)',
-                    fontFamily: 'var(--font-display)',
-                    fontSize: 13,
-                    letterSpacing: '0.06em',
-                    color: 'var(--color-sub)',
-                  }}
-                >
-                  {todayMatches.length} matches
-                </div>
-              </div>
-            </div>
-          </div>
-        ) : (
-          <div
-            className="rounded-2xl p-4 text-center"
-            style={{ background: 'var(--color-panel)', border: '1px solid var(--border-base)' }}
-          >
-            <div
-              style={{
-                fontFamily: 'var(--font-display)',
-                fontSize: 14,
-                color: 'var(--color-sub)',
-                letterSpacing: '0.06em',
-              }}
-            >
-              No matches scheduled today
-            </div>
-          </div>
-        )}
-
-        {/* ── Mini leaderboard ── */}
-        <div className="flex items-center justify-between px-0.5">
-          <span
-            style={{
-              fontFamily: 'var(--font-display)',
-              fontSize: 10,
-              letterSpacing: '0.20em',
-              textTransform: 'uppercase',
-              color: 'var(--color-muted)',
-            }}
-          >
-            🏆 Standings · {allEntries.length} players
-          </span>
-          <Link
-            href="/leaderboard"
-            style={{
-              fontFamily: 'var(--font-display)',
-              fontSize: 11,
-              letterSpacing: '0.08em',
-              color: 'var(--color-sub)',
-              textDecoration: 'none',
-            }}
-          >
-            See all →
-          </Link>
-        </div>
-
-        <div
-          className="rounded-2xl overflow-hidden"
-          style={{ background: 'var(--color-panel)', border: '1px solid var(--border-base)' }}
-        >
-          {miniEntries.map((entry, i, arr) => {
-            const isMe = entry.id === user?.id
-            const av = getAvatar(entry)
-            const rankColor = rankColors[entry._rank]
-            return (
-              <div
-                key={entry.id}
-                className="flex items-center gap-3"
-                style={{
-                  padding: '12px 14px',
-                  background: isMe ? 'var(--color-accent-soft)' : 'transparent',
-                  borderBottom: i < arr.length - 1 ? '1px solid var(--border-subtle)' : 'none',
-                  borderLeft: isMe ? '3px solid var(--color-accent)' : '3px solid transparent',
-                }}
-              >
-                <div
-                  style={{
-                    fontFamily: 'var(--font-display)',
-                    fontSize: 15,
-                    fontWeight: 700,
-                    width: 24,
-                    color: rankColor ?? (isMe ? 'var(--color-accent)' : 'var(--color-muted)'),
-                    letterSpacing: '0.02em',
-                  }}
-                >
-                  {entry._rank}
-                </div>
-                <div
-                  className="flex items-center justify-center rounded-full shrink-0"
-                  style={{ width: 28, height: 28, background: 'var(--color-elev)', fontSize: 14 }}
-                >
-                  {av}
-                </div>
-                <div
-                  className="flex-1"
-                  style={{
-                    fontFamily: 'var(--font-sans)',
-                    fontSize: 13,
-                    fontWeight: 700,
-                    color: isMe ? 'var(--color-accent)' : 'var(--color-text)',
-                  }}
-                >
-                  {isMe ? 'You' : entry.display_name}
-                </div>
-                <div
-                  style={{
-                    fontFamily: 'var(--font-mono)',
-                    fontSize: 14,
-                    fontWeight: 700,
-                    color: 'var(--color-text)',
-                  }}
-                >
-                  {entry.total_points.toFixed(2)}
-                </div>
-              </div>
-            )
-          })}
-        </div>
-
-        {/* ── Today's matches ── */}
-        {todayMatches.length > 0 && (
-          <>
-            <div
-              style={{
-                fontFamily: 'var(--font-display)',
-                fontSize: 10,
-                letterSpacing: '0.20em',
-                textTransform: 'uppercase',
-                color: 'var(--color-muted)',
-                paddingLeft: 2,
-              }}
-            >
-              ⚽ Today · {todayMatches.length} {todayMatches.length === 1 ? 'match' : 'matches'}
-            </div>
-            <div className="flex flex-col gap-2">
-              {todayMatches.map((m, i) => (
-                <div
-                  key={i}
-                  className="flex items-center gap-2.5 rounded-xl px-3 py-2.5"
-                  style={{ background: 'var(--color-panel)', border: '1px solid var(--border-base)' }}
-                >
-                  <div
-                    style={{
-                      fontFamily: 'var(--font-mono)',
-                      fontSize: 11,
-                      width: 40,
-                      flexShrink: 0,
-                      color: 'var(--color-sub)',
-                    }}
-                  >
-                    {formatTime(m.kickoff_time)}
-                  </div>
-                  <span className="text-base shrink-0">{getFlag(m.home_team)}</span>
-                  <span
-                    style={{
-                      fontFamily: 'var(--font-display)',
-                      fontSize: 10,
-                      letterSpacing: '0.12em',
-                      color: 'var(--color-dim)',
-                    }}
-                  >
-                    VS
-                  </span>
-                  <span className="text-base shrink-0">{getFlag(m.away_team)}</span>
-                  <div className="flex-1" />
-                  <div
-                    style={{
-                      fontFamily: 'var(--font-mono)',
-                      fontSize: 10,
-                      color: 'var(--color-muted)',
-                    }}
-                  >
-                    {m.odds_home?.toFixed(2)} · {m.odds_draw?.toFixed(2)} · {m.odds_away?.toFixed(2)}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </>
-        )}
+        <TodayMatchesSection matches={todayMatches} />
       </main>
 
       <BottomNav />
@@ -443,20 +107,418 @@ export default async function HomePage() {
   )
 }
 
-function SoccerBallLogo() {
+function HeaderSection() {
   return (
-    <div
+    <header className="flex items-center justify-between px-4 pt-5 pb-3">
+      <div className="flex items-center gap-2.5">
+        <SoccerBallLogo />
+        <div>
+          <div
+            style={{
+              fontFamily: 'var(--font-display)',
+              fontSize: 18,
+              fontWeight: 700,
+              letterSpacing: '0.04em',
+              color: 'var(--color-text)',
+              lineHeight: 1,
+              textTransform: 'uppercase',
+            }}
+          >
+            Mondial Bets
+          </div>
+          <div
+            style={{
+              fontFamily: 'var(--font-display)',
+              fontSize: 12,
+              letterSpacing: '0.04em',
+              textTransform: 'uppercase',
+              color: 'var(--color-muted)',
+              marginTop: 2,
+            }}
+          >
+            USA · CAN · MEX 2026
+          </div>
+        </div>
+      </div>
+      {/* Host flags */}
+      <div className="flex items-center gap-1 text-base">🇺🇸🇨🇦🇲🇽</div>
+    </header>
+  )
+}
+
+function PreTournamentCta() {
+  return (
+    <Link
+      href={PRE_TOURNAMENT_PATH}
+      className="block rounded-2xl p-4"
       style={{
-        width: 32,
-        height: 32,
-        borderRadius: '50%',
-        background: 'var(--color-accent)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        flexShrink: 0,
+        background: 'var(--color-panel)',
+        border: '1px solid var(--border-accent)',
+        textDecoration: 'none',
       }}
     >
+      <div
+        style={{
+          fontFamily: 'var(--font-display)',
+          fontSize: 12,
+          letterSpacing: '0.04em',
+          textTransform: 'uppercase',
+          color: 'var(--color-accent)',
+        }}
+      >
+        Entry required
+      </div>
+      <div className="mt-1 text-text text-base font-extrabold tracking-tight">
+        Pick champion and top scorer
+      </div>
+      <div className="mt-1 text-sub text-sm">
+        Complete these one-time picks before making daily predictions.
+      </div>
+    </Link>
+  )
+}
+
+function CountdownSection({
+  todayDay,
+  picksOpen,
+  hours,
+  mins,
+  matchCount,
+}: {
+  todayDay: { stage: string; lock_time: string | null } | null
+  picksOpen: boolean
+  hours: number
+  mins: number
+  matchCount: number
+}) {
+  if (!todayDay) {
+    return (
+      <div
+        className="rounded-2xl p-4 text-center"
+        style={{ background: 'var(--color-panel)', border: '1px solid var(--border-base)' }}
+      >
+        <div
+          style={{
+            fontFamily: 'var(--font-display)',
+            fontSize: 14,
+            color: 'var(--color-sub)',
+            letterSpacing: '0.04em',
+          }}
+        >
+          No matches scheduled today
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div
+      className="pitch-stripes rounded-2xl p-5 relative overflow-hidden"
+      style={{
+        background: 'var(--color-panel)',
+        border: `1px solid ${picksOpen ? 'var(--border-accent)' : 'var(--border-base)'}`,
+      }}
+    >
+      {/* Glow */}
+      <div
+        className="absolute inset-0 pointer-events-none"
+        style={{ background: 'var(--hero-glow)' }}
+      />
+      <div className="relative z-10">
+        <div className="flex items-center justify-between mb-3">
+          <span
+            className="text-[12px] px-2.5 py-1 rounded-full font-bold"
+            style={{
+              color: picksOpen ? 'var(--color-accent)' : 'var(--color-muted)',
+              background: picksOpen ? 'var(--color-accent-soft)' : 'var(--color-elev)',
+              border: `1px solid ${picksOpen ? 'var(--border-accent)' : 'var(--border-base)'}`,
+              fontFamily: 'var(--font-display)',
+              letterSpacing: '0.04em',
+              textTransform: 'uppercase',
+            }}
+          >
+            {picksOpen ? '⏱ Open' : '🔒 Locked'}
+          </span>
+          <span
+            style={{
+              fontFamily: 'var(--font-display)',
+              fontSize: 12,
+              letterSpacing: '0.04em',
+              textTransform: 'uppercase',
+              color: 'var(--color-sub)',
+            }}
+          >
+            {STAGE_LABELS[todayDay.stage] ?? todayDay.stage}
+          </span>
+        </div>
+
+        {picksOpen ? (
+          <>
+            <div
+              style={{
+                fontFamily: 'var(--font-display)',
+                fontSize: 12,
+                letterSpacing: '0.04em',
+                textTransform: 'uppercase',
+                color: 'var(--color-sub)',
+                marginBottom: 4,
+              }}
+            >
+              Lock in
+            </div>
+            <div className="flex items-baseline gap-2">
+              {[
+                { n: String(hours).padStart(2, '0'), unit: 'HRS' },
+                { n: String(mins).padStart(2, '0'), unit: 'MIN' },
+              ].map(({ n, unit }) => (
+                <span key={unit} className="flex items-baseline gap-1">
+                  <span
+                    style={{
+                      fontFamily: 'var(--font-display)',
+                      fontSize: 42,
+                      fontWeight: 700,
+                      color: 'var(--color-accent)',
+                      letterSpacing: '-0.02em',
+                      lineHeight: 1,
+                    }}
+                  >
+                    {n}
+                  </span>
+                  <span
+                    style={{
+                      fontFamily: 'var(--font-display)',
+                      fontSize: 12,
+                      letterSpacing: '0.04em',
+                      color: 'var(--color-muted)',
+                      marginRight: 4,
+                    }}
+                  >
+                    {unit}
+                  </span>
+                </span>
+              ))}
+            </div>
+          </>
+        ) : (
+          <div
+            style={{
+              fontFamily: 'var(--font-display)',
+              fontSize: 14,
+              color: 'var(--color-sub)',
+              letterSpacing: '0.04em',
+            }}
+          >
+            Predictions locked for today
+          </div>
+        )}
+
+        <div className="mt-4 flex gap-2">
+          <Link
+            href="/predict"
+            className="flex-1 text-center rounded-xl py-3"
+            style={{
+              background: 'var(--color-accent)',
+              color: '#000',
+              fontFamily: 'var(--font-display)',
+              fontSize: 14,
+              fontWeight: 700,
+              letterSpacing: '0.10em',
+              textTransform: 'uppercase',
+            }}
+          >
+            {picksOpen ? 'Make Picks →' : 'View Picks →'}
+          </Link>
+          <div
+            className="font-bold rounded-xl px-4 py-3"
+            style={{
+              background: 'var(--color-elev)',
+              border: '1px solid var(--border-base)',
+              fontFamily: 'var(--font-display)',
+              fontSize: 13,
+              letterSpacing: '0.04em',
+              color: 'var(--color-sub)',
+            }}
+          >
+            {matchCount} matches
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function StandingsSection({
+  miniEntries,
+  totalPlayers,
+  userId,
+}: {
+  miniEntries: (LeaderboardEntry & { _rank: number })[]
+  totalPlayers: number
+  userId: string | undefined
+}) {
+  return (
+    <>
+      {/* ── Mini leaderboard ── */}
+      <div className="flex items-center justify-between px-0.5">
+        <span
+          style={{
+            fontFamily: 'var(--font-display)',
+            fontSize: 12,
+            letterSpacing: '0.04em',
+            textTransform: 'uppercase',
+            color: 'var(--color-muted)',
+          }}
+        >
+          🏆 Standings · {totalPlayers} players
+        </span>
+        <Link
+          href="/leaderboard"
+          style={{
+            fontFamily: 'var(--font-display)',
+            fontSize: 12,
+            letterSpacing: '0.04em',
+            color: 'var(--color-sub)',
+            textDecoration: 'none',
+          }}
+        >
+          See all →
+        </Link>
+      </div>
+
+      <div
+        className="rounded-2xl overflow-hidden"
+        style={{ background: 'var(--color-panel)', border: '1px solid var(--border-base)' }}
+      >
+        {miniEntries.map((entry, i, arr) => {
+          const isMe = entry.id === userId
+          const av = getAvatar(entry)
+          const rankColor = rankColors[entry._rank]
+          return (
+            <div
+              key={entry.id}
+              className="flex items-center gap-3"
+              style={{
+                padding: '12px 14px',
+                background: isMe ? 'var(--color-accent-soft)' : 'transparent',
+                borderBottom: i < arr.length - 1 ? '1px solid var(--border-subtle)' : 'none',
+                borderLeft: isMe ? '3px solid var(--color-accent)' : '3px solid transparent',
+              }}
+            >
+              <div
+                style={{
+                  fontFamily: 'var(--font-display)',
+                  fontSize: 15,
+                  fontWeight: 700,
+                  width: 24,
+                  color: rankColor ?? (isMe ? 'var(--color-accent)' : 'var(--color-muted)'),
+                  letterSpacing: '0.02em',
+                }}
+              >
+                {entry._rank}
+              </div>
+              <div
+                className="flex items-center justify-center rounded-full shrink-0"
+                style={{ width: 28, height: 28, background: 'var(--color-elev)', fontSize: 14 }}
+              >
+                {av}
+              </div>
+              <div
+                className="flex-1"
+                style={{
+                  fontFamily: 'var(--font-sans)',
+                  fontSize: 13,
+                  fontWeight: 700,
+                  color: isMe ? 'var(--color-accent)' : 'var(--color-text)',
+                }}
+              >
+                {isMe ? 'You' : entry.display_name}
+              </div>
+              <div
+                style={{
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: 14,
+                  fontWeight: 700,
+                  color: 'var(--color-text)',
+                }}
+              >
+                {entry.total_points.toFixed(2)}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </>
+  )
+}
+
+function TodayMatchesSection({ matches }: { matches: HomeMatchRow[] }) {
+  if (matches.length === 0) return null
+
+  return (
+    <>
+      {/* ── Today's matches ── */}
+      <div
+        style={{
+          fontFamily: 'var(--font-display)',
+          fontSize: 12,
+          letterSpacing: '0.04em',
+          textTransform: 'uppercase',
+          color: 'var(--color-muted)',
+          paddingLeft: 2,
+        }}
+      >
+        ⚽ Today · {matches.length} {matches.length === 1 ? 'match' : 'matches'}
+      </div>
+      <div className="flex flex-col gap-2">
+        {matches.map(m => (
+          <div
+            key={`${m.home_team}-${m.away_team}-${m.kickoff_time}`}
+            className="flex items-center gap-2.5 rounded-xl px-3 py-2.5"
+            style={{ background: 'var(--color-panel)', border: '1px solid var(--border-base)' }}
+          >
+            <div
+              style={{
+                fontFamily: 'var(--font-mono)',
+                fontSize: 12,
+                width: 40,
+                flexShrink: 0,
+                color: 'var(--color-sub)',
+              }}
+            >
+              {formatTime(m.kickoff_time)}
+            </div>
+            <span className="text-base shrink-0">{getFlag(m.home_team)}</span>
+            <span
+              style={{
+                fontFamily: 'var(--font-display)',
+                fontSize: 12,
+                letterSpacing: '0.04em',
+                color: 'var(--color-dim)',
+              }}
+            >
+              VS
+            </span>
+            <span className="text-base shrink-0">{getFlag(m.away_team)}</span>
+            <div className="flex-1" />
+            <div
+              style={{
+                fontFamily: 'var(--font-mono)',
+                fontSize: 12,
+                color: 'var(--color-muted)',
+              }}
+            >
+              {m.odds_home?.toFixed(2)} · {m.odds_draw?.toFixed(2)} · {m.odds_away?.toFixed(2)}
+            </div>
+          </div>
+        ))}
+      </div>
+    </>
+  )
+}
+
+function SoccerBallLogo() {
+  return (
+    <div style={soccerBallStyle}>
       {/* Soccer ball icon */}
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
         <circle cx="12" cy="12" r="9" stroke="#000" strokeWidth="1.5" />

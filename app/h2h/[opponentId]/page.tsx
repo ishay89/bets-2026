@@ -1,9 +1,11 @@
+export const metadata = { title: 'H2H | Mondial Bets 2026', description: 'Head-to-head comparison' }
+
 import { redirect, notFound } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { BottomNav } from '@/components/bottom-nav'
 import { isMatchLocked } from '@/lib/lock'
-import { buildH2H, pickAgreement, type H2HMatch, type H2HRound, type RoundWinner } from '@/lib/h2h'
+import { buildH2H, pickAgreement, type H2HMatch, type H2HRound, type H2HRoundResult, type RoundWinner } from '@/lib/h2h'
 import { getAvatar, getAutomationLabel, getFlag, isAutomated, stageLabel } from '@/lib/display'
 import { getLeaderboardEntries, getMatchDaysWithUserData, type HistoryMatchDay } from '@/lib/data'
 
@@ -34,45 +36,29 @@ function nowMs(): number {
   return Date.now()
 }
 
-export default async function H2HComparePage({
-  params,
-}: {
-  params: Promise<{ opponentId: string }>
-}) {
-  const { opponentId } = await params
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  const myId = user?.id ?? ''
-
-  if (opponentId === myId) redirect('/h2h')
-
-  // Totals from the leaderboard view (consistent with standings) + identity.
-  const entries = await getLeaderboardEntries(supabase)
-  const me = entries.find(e => e.id === myId) ?? null
-  const them = entries.find(e => e.id === opponentId) ?? null
-  if (!them) notFound()
-
-  // Nested payload — mirror history. RLS (migration 009) already strips the
-  // opponent's unlocked rows; we keep only the two users' rows in JS.
-  const matchDaysRaw = await getMatchDaysWithUserData(supabase)
-
-  const now = nowMs()
-  const days = matchDaysRaw as HistoryMatchDay[]
-
+// Pure transform: turn the raw match days into the render view-models plus the
+// per-round H2H input. Kept at module scope so the component body stays small.
+function buildRoundsVM(
+  days: HistoryMatchDay[],
+  myId: string,
+  opponentId: string,
+  now: number,
+): { roundsVM: RoundVM[]; h2hRounds: H2HRound[] } {
   const roundsVM: RoundVM[] = []
   const h2hRounds: H2HRound[] = []
 
   for (const day of days) {
     const rows: RowVM[] = []
 
-    const matches = [...(day.matches ?? [])].sort(
+    const matches = (day.matches ?? []).toSorted(
       (a, b) => new Date(a.kickoff_time).getTime() - new Date(b.kickoff_time).getTime(),
     )
 
     for (const m of matches) {
       const locked = isMatchLocked(m, day.locked, now)
-      const myPred = m.predictions.find(p => p.user_id === myId)
-      const theirPred = m.predictions.find(p => p.user_id === opponentId)
+      const predByUser = new Map(m.predictions.map(p => [p.user_id, p]))
+      const myPred = predByUser.get(myId)
+      const theirPred = predByUser.get(opponentId)
       // Hidden = not locked & no opponent row reached us (RLS withheld it).
       const theirHidden = !locked && !theirPred
       const resolved = m.result !== null
@@ -107,14 +93,20 @@ export default async function H2HComparePage({
     // Pikanteria locks with the whole day (migration 009 gates on md.lock_time).
     const pikaLocked = day.locked || now >= new Date(day.lock_time).getTime()
     for (const pk of day.pikanteria ?? []) {
-      const correctOpt = pk.pikanteria_options.find(o => o.is_correct) ?? null
-      const myAns = pk.pikanteria_answers.find(a => a.user_id === myId)
-      const theirAns = pk.pikanteria_answers.find(a => a.user_id === opponentId)
+      const optById = new Map<string, { id: string; label: string; is_correct: boolean }>()
+      let correctOpt: { id: string; label: string; is_correct: boolean } | null = null
+      for (const o of pk.pikanteria_options) {
+        optById.set(o.id, o)
+        if (o.is_correct) correctOpt = o
+      }
+      const ansByUser = new Map(pk.pikanteria_answers.map(a => [a.user_id, a]))
+      const myAns = ansByUser.get(myId)
+      const theirAns = ansByUser.get(opponentId)
       const theirHidden = !pikaLocked && !theirAns
       const resolved = correctOpt !== null
 
       const labelFor = (optId: string | undefined) =>
-        optId ? (pk.pikanteria_options.find(o => o.id === optId)?.label ?? '?') : null
+        optId ? (optById.get(optId)?.label ?? '?') : null
 
       const h2h: H2HMatch = {
         id: pk.id,
@@ -146,6 +138,36 @@ export default async function H2HComparePage({
     h2hRounds.push({ matchDayId: day.id, items: rows.map(r => r.h2h) })
   }
 
+  return { roundsVM, h2hRounds }
+}
+
+export default async function H2HComparePage({
+  params,
+}: {
+  params: Promise<{ opponentId: string }>
+}) {
+  const [{ opponentId }, supabase] = await Promise.all([params, createClient()])
+  const { data: { user } } = await supabase.auth.getUser()
+  const myId = user?.id ?? ''
+
+  if (opponentId === myId) redirect('/h2h')
+
+  // Totals from the leaderboard view (consistent with standings) + identity.
+  // Nested payload — mirror history. RLS (migration 009) already strips the
+  // opponent's unlocked rows; we keep only the two users' rows in JS.
+  const [entries, matchDaysRaw] = await Promise.all([
+    getLeaderboardEntries(supabase),
+    getMatchDaysWithUserData(supabase),
+  ])
+  const me = entries.find(e => e.id === myId) ?? null
+  const them = entries.find(e => e.id === opponentId) ?? null
+  if (!them) notFound()
+
+  const now = nowMs()
+  const days = matchDaysRaw as HistoryMatchDay[]
+
+  const { roundsVM, h2hRounds } = buildRoundsVM(days, myId, opponentId, now)
+
   const { rounds: roundResults, summary } = buildH2H(h2hRounds, myId, opponentId)
   const roundResultById = new Map(roundResults.map(r => [r.matchDayId, r]))
 
@@ -165,10 +187,10 @@ export default async function H2HComparePage({
       <div className="px-4 pt-4 pb-3 flex items-center justify-between">
         <div>
           <div
-            className="text-[10px]"
+            className="text-[12px]"
             style={{
               fontFamily: 'var(--font-display)',
-              letterSpacing: '0.16em',
+              letterSpacing: '0.04em',
               textTransform: 'uppercase',
               color: 'var(--color-accent)',
             }}
@@ -181,8 +203,8 @@ export default async function H2HComparePage({
           href="/h2h"
           style={{
             fontFamily: 'var(--font-display)',
-            fontSize: 11,
-            letterSpacing: '0.08em',
+            fontSize: 12,
+            letterSpacing: '0.04em',
             color: 'var(--color-sub)',
             textDecoration: 'none',
           }}
@@ -239,7 +261,7 @@ export default async function H2HComparePage({
           />
           <StatTile
             label="Agreement"
-            value={summary.agreements + summary.disagreements === 0 ? '—' : `${summary.agreementRate}%`}
+            value={summary.agreements + summary.disagreements === 0 ? '-' : `${summary.agreementRate}%`}
           />
           <StatTile
             label="Lead"
@@ -260,8 +282,8 @@ export default async function H2HComparePage({
           className="px-0.5"
           style={{
             fontFamily: 'var(--font-display)',
-            fontSize: 10,
-            letterSpacing: '0.16em',
+            fontSize: 12,
+            letterSpacing: '0.04em',
             textTransform: 'uppercase',
             color: 'var(--color-muted)',
           }}
@@ -276,82 +298,14 @@ export default async function H2HComparePage({
           >
             <div className="text-3xl mb-2">⚽</div>
             <div className="text-sub text-[13px] font-semibold">
-              No rounds played yet — check back after kickoff
+              No rounds played yet. Check back after kickoff.
             </div>
           </div>
         )}
 
-        {roundsVM.map(round => {
-          const rr = roundResultById.get(round.matchDayId)
-          const winner: RoundWinner = rr?.winner ?? 'pending'
-          const myPts = rr?.myPoints ?? 0
-          const theirPts = rr?.theirPoints ?? 0
-          return (
-            <div
-              key={round.matchDayId}
-              className="rounded-[14px] overflow-hidden"
-              style={{ background: 'var(--color-panel)', border: '1px solid var(--border-base)' }}
-            >
-              {/* Round header */}
-              <div
-                className="flex items-center justify-between px-4 py-3"
-                style={{ borderBottom: '1px solid var(--border-subtle)' }}
-              >
-                <div>
-                  <div className="font-bold text-[13px] text-text">{round.date}</div>
-                  <div
-                    className="mt-0.5"
-                    style={{
-                      fontFamily: 'var(--font-display)',
-                      fontSize: 10,
-                      letterSpacing: '0.12em',
-                      textTransform: 'uppercase',
-                      color: 'var(--color-muted)',
-                    }}
-                  >
-                    {stageLabel(round.stage)}
-                  </div>
-                </div>
-                <WinnerChip winner={winner} />
-              </div>
-
-              {/* Round point totals */}
-              <div
-                className="flex items-center justify-center gap-3 px-4 py-2"
-                style={{ borderBottom: '1px solid var(--border-subtle)' }}
-              >
-                <span
-                  style={{
-                    fontFamily: 'var(--font-mono)',
-                    fontSize: 14,
-                    fontWeight: 700,
-                    color: winner === 'me' ? 'var(--color-accent)' : 'var(--color-text)',
-                  }}
-                >
-                  {myPts.toFixed(2)}
-                </span>
-                <span style={{ color: 'var(--color-dim)', fontSize: 11 }}>vs</span>
-                <span
-                  style={{
-                    fontFamily: 'var(--font-mono)',
-                    fontSize: 14,
-                    fontWeight: 700,
-                    color: winner === 'them' ? 'var(--color-accent)' : 'var(--color-text)',
-                  }}
-                >
-                  {theirPts.toFixed(2)}
-                </span>
-              </div>
-
-              {/* Per-item rows */}
-              <div className="px-3 py-2 space-y-1">
-                {round.rows.map(row => (
-                  <CompareRow key={row.h2h.id} row={row} />
-                ))}
-              </div>
-            </div>
-          )
-        })}
+        {roundsVM.map(round => (
+          <RoundCard key={round.matchDayId} round={round} result={roundResultById.get(round.matchDayId)} />
+        ))}
       </main>
 
       <BottomNav />
@@ -397,7 +351,7 @@ function HeroSide({
         {name}
       </div>
       {automationLabel && (
-        <div style={{ fontSize: 9, color: 'var(--color-muted)', marginTop: 1 }}>{automationLabel}</div>
+        <div style={{ fontSize: 12, color: 'var(--color-muted)', marginTop: 1 }}>{automationLabel}</div>
       )}
       <div
         className="mt-1"
@@ -443,8 +397,8 @@ function StatTile({
         className="mt-1"
         style={{
           fontFamily: 'var(--font-display)',
-          fontSize: 9.5,
-          letterSpacing: '0.10em',
+          fontSize: 12,
+          letterSpacing: '0.04em',
           textTransform: 'uppercase',
           color: 'var(--color-muted)',
         }}
@@ -455,23 +409,28 @@ function StatTile({
   )
 }
 
+const WINNER_CHIP_CONFIG: Record<RoundWinner, { text: string; color: string; bg: string; border: string }> = {
+  me: { text: 'You won', color: 'var(--color-accent)', bg: 'var(--color-accent-soft)', border: 'var(--border-accent)' },
+  them: { text: 'They won', color: 'var(--color-sub)', bg: 'var(--color-elev)', border: 'var(--border-base)' },
+  tie: { text: 'Tie', color: 'var(--color-amber)', bg: 'var(--color-amber-soft)', border: 'var(--border-warn)' },
+  pending: { text: 'Pending', color: 'var(--color-muted)', bg: 'transparent', border: 'var(--border-base)' },
+}
+
+const WINNER_CHIP_BASE_STYLE = {
+  fontFamily: 'var(--font-display)',
+  fontSize: 12,
+  fontWeight: 700,
+  letterSpacing: '0.08em',
+  textTransform: 'uppercase' as const,
+}
+
 function WinnerChip({ winner }: { winner: RoundWinner }) {
-  const config: Record<RoundWinner, { text: string; color: string; bg: string; border: string }> = {
-    me: { text: 'You won', color: 'var(--color-accent)', bg: 'var(--color-accent-soft)', border: 'var(--border-accent)' },
-    them: { text: 'They won', color: 'var(--color-sub)', bg: 'var(--color-elev)', border: 'var(--border-base)' },
-    tie: { text: 'Tie', color: 'var(--color-amber)', bg: 'var(--color-amber-soft)', border: 'var(--border-warn)' },
-    pending: { text: 'Pending', color: 'var(--color-muted)', bg: 'transparent', border: 'var(--border-base)' },
-  }
-  const c = config[winner]
+  const c = WINNER_CHIP_CONFIG[winner]
   return (
     <span
       className="px-2.5 py-1 rounded-full"
       style={{
-        fontFamily: 'var(--font-display)',
-        fontSize: 10,
-        fontWeight: 700,
-        letterSpacing: '0.08em',
-        textTransform: 'uppercase',
+        ...WINNER_CHIP_BASE_STYLE,
         color: c.color,
         background: c.bg,
         border: `1px solid ${c.border}`,
@@ -479,6 +438,76 @@ function WinnerChip({ winner }: { winner: RoundWinner }) {
     >
       {c.text}
     </span>
+  )
+}
+
+function RoundCard({ round, result }: { round: RoundVM; result: H2HRoundResult | undefined }) {
+  const winner: RoundWinner = result?.winner ?? 'pending'
+  const myPts = result?.myPoints ?? 0
+  const theirPts = result?.theirPoints ?? 0
+  return (
+    <div
+      className="rounded-[14px] overflow-hidden"
+      style={{ background: 'var(--color-panel)', border: '1px solid var(--border-base)' }}
+    >
+      {/* Round header */}
+      <div
+        className="flex items-center justify-between px-4 py-3"
+        style={{ borderBottom: '1px solid var(--border-subtle)' }}
+      >
+        <div>
+          <div className="font-bold text-[13px] text-text">{round.date}</div>
+          <div
+            className="mt-0.5"
+            style={{
+              fontFamily: 'var(--font-display)',
+              fontSize: 12,
+              letterSpacing: '0.04em',
+              textTransform: 'uppercase',
+              color: 'var(--color-muted)',
+            }}
+          >
+            {stageLabel(round.stage)}
+          </div>
+        </div>
+        <WinnerChip winner={winner} />
+      </div>
+
+      {/* Round point totals */}
+      <div
+        className="flex items-center justify-center gap-3 px-4 py-2"
+        style={{ borderBottom: '1px solid var(--border-subtle)' }}
+      >
+        <span
+          style={{
+            fontFamily: 'var(--font-mono)',
+            fontSize: 14,
+            fontWeight: 700,
+            color: winner === 'me' ? 'var(--color-accent)' : 'var(--color-text)',
+          }}
+        >
+          {myPts.toFixed(2)}
+        </span>
+        <span style={{ color: 'var(--color-dim)', fontSize: 12 }}>vs</span>
+        <span
+          style={{
+            fontFamily: 'var(--font-mono)',
+            fontSize: 14,
+            fontWeight: 700,
+            color: winner === 'them' ? 'var(--color-accent)' : 'var(--color-text)',
+          }}
+        >
+          {theirPts.toFixed(2)}
+        </span>
+      </div>
+
+      {/* Per-item rows */}
+      <div className="px-3 py-2 space-y-1">
+        {round.rows.map(row => (
+          <CompareRow key={row.h2h.id} row={row} />
+        ))}
+      </div>
+    </div>
   )
 }
 
@@ -494,7 +523,7 @@ function PickBadge({
   if (hidden) {
     return (
       <span
-        className="inline-flex items-center justify-center rounded text-[11px] font-bold px-2 py-0.5"
+        className="inline-flex items-center justify-center rounded text-[12px] font-bold px-2 py-0.5"
         style={{ background: 'var(--color-elev)', border: '1px solid var(--border-base)', color: 'var(--color-muted)' }}
         title="Locks at kickoff"
       >
@@ -503,7 +532,7 @@ function PickBadge({
     )
   }
   if (label == null) {
-    return <span className="text-[11px]" style={{ color: 'var(--color-muted)' }}>—</span>
+    return <span className="text-[12px]" style={{ color: 'var(--color-muted)' }}>-</span>
   }
   const color =
     correct === true ? 'var(--color-accent)' : correct === false ? 'var(--color-danger)' : 'var(--color-text)'
@@ -513,7 +542,7 @@ function PickBadge({
     correct === true ? 'var(--color-accent-soft)' : correct === false ? 'var(--color-danger-soft)' : 'var(--color-elev)'
   return (
     <span
-      className="inline-flex items-center justify-center rounded text-[11px] font-bold px-2 py-0.5 max-w-[88px] truncate"
+      className="inline-flex items-center justify-center rounded text-[12px] font-bold px-2 py-0.5 max-w-[88px] truncate"
       style={{ background: bg, border: `1px solid ${border}`, color }}
     >
       {label}
@@ -538,7 +567,7 @@ function CompareRow({ row }: { row: RowVM }) {
       {/* Item label */}
       <div className="flex items-center gap-1.5 mb-1.5">
         {isPika ? (
-          <span className="text-[11px] truncate" style={{ color: 'var(--color-amber)' }}>
+          <span className="text-[12px] truncate" style={{ color: 'var(--color-amber)' }}>
             🌶️ {row.label}
           </span>
         ) : (
@@ -556,7 +585,7 @@ function CompareRow({ row }: { row: RowVM }) {
         <div className="flex items-center gap-1.5 justify-start">
           <PickBadge label={row.myLabel} correct={h2h.mine.correct} />
           {h2h.mine.points > 0 && (
-            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--color-accent)' }}>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--color-accent)' }}>
               +{h2h.mine.points.toFixed(2)}
             </span>
           )}
@@ -568,15 +597,15 @@ function CompareRow({ row }: { row: RowVM }) {
             <span
               style={{
                 fontFamily: 'var(--font-mono)',
-                fontSize: 11,
+                fontSize: 12,
                 fontWeight: 700,
                 color: 'var(--color-text)',
               }}
             >
-              {row.resultLabel ?? '—'}
+              {row.resultLabel ?? '-'}
             </span>
           ) : (
-            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--color-muted)' }}>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--color-muted)' }}>
               pending
             </span>
           )}
@@ -585,7 +614,7 @@ function CompareRow({ row }: { row: RowVM }) {
         {/* Theirs */}
         <div className="flex items-center gap-1.5 justify-end">
           {h2h.theirs.points > 0 && (
-            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--color-accent)' }}>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--color-accent)' }}>
               +{h2h.theirs.points.toFixed(2)}
             </span>
           )}

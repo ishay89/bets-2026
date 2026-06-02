@@ -289,6 +289,7 @@ export default async function ResultsPage() {
                   </button>
                   {match.result && (
                     <button
+                      type="submit"
                       formAction={resetMatch}
                       formNoValidate
                       className={`${scoreBtn} py-2 px-4`}

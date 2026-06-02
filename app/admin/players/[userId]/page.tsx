@@ -24,15 +24,17 @@ function isPikLocked(day: MatchDay): boolean {
 }
 
 function filterOpenDays(matchDays: FullMatchDay[]) {
-  return matchDays
-    .map(day => {
-      const openMatches = (day.matches ?? [])
-        .filter(m => !isMatchLocked(m, day.locked))
-        .sort((a, b) => new Date(a.kickoff_time).getTime() - new Date(b.kickoff_time).getTime())
-      const openPikanteria = isPikLocked(day) ? [] : (day.pikanteria ?? [])
-      return { day, openMatches, openPikanteria }
-    })
-    .filter(d => d.openMatches.length > 0 || d.openPikanteria.length > 0)
+  const result = []
+  for (const day of matchDays) {
+    const openMatches = (day.matches ?? [])
+      .filter(m => !isMatchLocked(m, day.locked))
+      .toSorted((a, b) => new Date(a.kickoff_time).getTime() - new Date(b.kickoff_time).getTime())
+    const openPikanteria = isPikLocked(day) ? [] : (day.pikanteria ?? [])
+    if (openMatches.length > 0 || openPikanteria.length > 0) {
+      result.push({ day, openMatches, openPikanteria })
+    }
+  }
+  return result
 }
 
 export default async function PlayerDetailPage({

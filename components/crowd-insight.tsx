@@ -6,20 +6,24 @@ const TONE: Record<Insight['tone'], { color: string; background: string; border:
   neutral: { color: 'var(--color-sub)', background: 'var(--color-elev)', border: 'var(--border-base)' },
 }
 
+const staticBadgeStyle = {
+  fontFamily: 'var(--font-display)',
+  fontSize: 12,
+  fontWeight: 600,
+  letterSpacing: '0.12em',
+  textTransform: 'uppercase' as const,
+}
+
 export function CrowdInsight({ insight }: { insight: Insight }) {
   const t = TONE[insight.tone]
   return (
     <span
       className="inline-flex items-center rounded-full px-2 py-0.5"
       style={{
+        ...staticBadgeStyle,
         color: t.color,
         background: t.background,
         border: `1px solid ${t.border}`,
-        fontFamily: 'var(--font-display)',
-        fontSize: 9,
-        fontWeight: 600,
-        letterSpacing: '0.12em',
-        textTransform: 'uppercase',
       }}
     >
       {insight.label}

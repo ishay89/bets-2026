@@ -34,6 +34,27 @@ function fmt(n: number) {
   return n.toFixed(2)
 }
 
+const sectionStyle = {
+  background: 'var(--color-panel)',
+  border: '1px solid var(--border-base)',
+}
+
+const thStyle = {
+  color: 'var(--color-muted)',
+  fontWeight: 600,
+  fontSize: '11px',
+  textAlign: 'left' as const,
+  padding: '8px 12px',
+  borderBottom: '1px solid var(--border-base)',
+}
+
+const tdStyle = {
+  padding: '8px 12px',
+  fontSize: '12px',
+  color: 'var(--color-text)',
+  borderBottom: '1px solid var(--border-subtle)',
+}
+
 function ValidationBadge({ snapshot }: { snapshot: SnapshotRow }) {
   if (snapshot.is_valid) {
     return (
@@ -79,34 +100,13 @@ export default async function ScoresPage() {
   }
 
   // Sort days by date descending
-  const sortedDays = [...dayMap.entries()].sort(([, aRows], [, bRows]) => {
+  const sortedDays = Array.from(dayMap.entries()).toSorted(([, aRows], [, bRows]) => {
     const aDate = aRows[0]?.match_days?.date ?? ''
     const bDate = bRows[0]?.match_days?.date ?? ''
     return bDate.localeCompare(aDate)
   })
 
   const totalInvalid = snapshots.filter(s => !s.is_valid).length
-
-  const sectionStyle = {
-    background: 'var(--color-panel)',
-    border: '1px solid var(--border-base)',
-  }
-
-  const thStyle = {
-    color: 'var(--color-muted)',
-    fontWeight: 600,
-    fontSize: '11px',
-    textAlign: 'left' as const,
-    padding: '8px 12px',
-    borderBottom: '1px solid var(--border-base)',
-  }
-
-  const tdStyle = {
-    padding: '8px 12px',
-    fontSize: '12px',
-    color: 'var(--color-text)',
-    borderBottom: '1px solid var(--border-subtle)',
-  }
 
   return (
     <div className="max-w-4xl mx-auto space-y-6 pb-10">
@@ -140,7 +140,7 @@ export default async function ScoresPage() {
       {snapshots.length === 0 && (
         <div className="rounded-xl p-8 text-center" style={sectionStyle}>
           <div className="text-3xl mb-2">📭</div>
-          <div className="text-muted text-sm">No snapshots yet — enter results to generate them.</div>
+          <div className="text-muted text-sm">No snapshots yet - enter results to generate them.</div>
         </div>
       )}
 
@@ -175,7 +175,7 @@ export default async function ScoresPage() {
             </thead>
             <tbody>
               {preTournament
-                .sort((a, b) => a.users.display_name.localeCompare(b.users.display_name))
+                .toSorted((a, b) => a.users.display_name.localeCompare(b.users.display_name))
                 .map(s => (
                   <tr key={s.id}>
                     <td style={tdStyle}>
@@ -233,7 +233,7 @@ export default async function ScoresPage() {
               </thead>
               <tbody>
                 {rows
-                  .sort((a, b) => b.day_points - a.day_points)
+                  .toSorted((a, b) => b.day_points - a.day_points)
                   .map(s => (
                     <tr key={s.id}>
                       <td style={tdStyle}>

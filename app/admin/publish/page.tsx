@@ -251,7 +251,7 @@ export default async function PublishPage({
     <div className="max-w-2xl mx-auto space-y-6 pb-10">
       <div>
         <div className="font-black text-lg" style={{ color: 'var(--color-amber)' }}>📋 Publish Matches</div>
-        <div className="text-muted text-xs">Publish individual matches and pikanteria — players only see published items</div>
+        <div className="text-muted text-xs">Publish individual matches and pikanteria - players only see published items</div>
       </div>
 
       {/* Date picker — GET form loads the day */}
@@ -262,8 +262,8 @@ export default async function PublishPage({
         </div>
         <div className="flex gap-3 items-end">
           <div className="flex-1 space-y-1">
-            <label className="text-muted text-xs">Date</label>
-            <input type="date" name="date" defaultValue={selectedDate}
+            <label htmlFor="publish-date-picker" className="text-muted text-xs">Date</label>
+            <input id="publish-date-picker" type="date" name="date" defaultValue={selectedDate}
               required style={inputBase} className={cls} />
           </div>
           <button type="submit" className="px-4 py-2 rounded-lg text-sm font-bold"
@@ -313,7 +313,7 @@ export default async function PublishPage({
             style={{ background: 'var(--color-accent-soft)', border: '1px solid var(--border-accent)' }}>
             <div className="text-lg">📅</div>
             <div>
-              <div className="text-sm font-bold text-text">{day.date} — {day.stage}</div>
+              <div className="text-sm font-bold text-text">{day.date} - {day.stage}</div>
               <div className="text-xs text-muted">
                 {matches.filter(m => m.published_at).length}/{matches.length} matches live
                 {pikanteria.length > 0 && ` · ${pikanteria.filter(p => p.published_at).length}/${pikanteria.length} pikanteria live`}
@@ -343,8 +343,10 @@ export default async function PublishPage({
                 <div className="grid grid-cols-3 gap-2">
                   {(['home', 'draw', 'away'] as const).map(k => (
                     <div key={k} className="space-y-1">
-                      <label className="text-muted text-xs capitalize">Odds {k}</label>
+                      <label htmlFor={`publish_odds_${k}_${match.id}`} className="text-muted text-xs capitalize">Odds {k}</label>
                       <input
+                        id={`publish_odds_${k}_${match.id}`}
+                        aria-label={`Odds ${k}`}
                         type="number" step="0.01" name={`odds_${k}`}
                         required
                         defaultValue={(k === 'home' ? match.odds_home : k === 'draw' ? match.odds_draw : match.odds_away).toFixed(2)}
@@ -373,7 +375,7 @@ export default async function PublishPage({
           )}
           {pikanteria.map(pika => {
             const published = pika.published_at != null
-            const options = [...pika.pikanteria_options].sort((a, b) => a.sort_order - b.sort_order)
+            const options = pika.pikanteria_options.toSorted((a, b) => a.sort_order - b.sort_order)
             return (
               <form key={pika.id} action={published ? unpublishPikanteria : publishExistingPikanteria}
                 className="rounded-xl p-4 space-y-3"
@@ -410,8 +412,8 @@ export default async function PublishPage({
             <input type="hidden" name="match_day_id" value={day.id} />
             <input type="hidden" name="date" value={day.date} />
             <div className="space-y-1">
-              <label className="text-muted text-xs">Question</label>
-              <input type="text" name="pik_q_1" placeholder="e.g. Will Mbappé score?"
+              <label htmlFor="publish-new-pik-question" className="text-muted text-xs">Question</label>
+              <input id="publish-new-pik-question" type="text" name="pik_q_1" placeholder="e.g. Will Mbappé score?"
                 style={inputBase} className={cls} />
             </div>
             <PicanteriaBuilder questionIndex={1} />

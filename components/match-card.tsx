@@ -31,7 +31,11 @@ const SEG_COLOR: Record<Pick, string> = {
 }
 
 export function MatchCard({ match, currentPick, isLocked, stageLabel, onSave, crowd, crowdTotal = 0, insight }: Props) {
-  const [selected, setSelected] = useState<Pick | null>(currentPick)
+  // Optimistic overlay instead of copying the prop into state. `optimisticPick`
+  // is null when no in-flight pick exists; the effective selection is the
+  // in-flight value or the authoritative prop.
+  const [optimisticPick, setOptimisticPick] = useState<Pick | null>(null)
+  const selected = optimisticPick ?? currentPick
 
   const hasResult = match.result !== null
   const isCorrect = hasResult && selected !== null && selected === match.result
@@ -43,20 +47,22 @@ export function MatchCard({ match, currentPick, isLocked, stageLabel, onSave, cr
 
   function handleSelect(pick: Pick) {
     if (isLocked || inFlightRef.current || selected === pick) return
-    const previous = selected
+    const previous = optimisticPick
     inFlightRef.current = true
     setSaving(true)
     setError(null)
-    setSelected(pick)
+    setOptimisticPick(pick)
     startTransition(async () => {
       try {
         const result = await onSave(match.id, pick)
         if (!result.ok) {
-          setSelected(previous)
+          setOptimisticPick(previous)
           setError(result.message)
+        } else {
+          setOptimisticPick(null)
         }
       } catch {
-        setSelected(previous)
+        setOptimisticPick(previous)
         setError('Could not save prediction. Please try again.')
       } finally {
         inFlightRef.current = false
@@ -96,259 +102,366 @@ export function MatchCard({ match, currentPick, isLocked, stageLabel, onSave, cr
             : 'var(--shadow-card)',
       }}
     >
-      {/* Header bar */}
-      <div
-        className="flex items-center justify-between px-4 py-2"
-        style={{ borderBottom: '1px solid var(--border-subtle)' }}
+      <CardHeader
+        kickoff={kickoff}
+        stageLabel={stageLabel}
+        isCorrect={isCorrect}
+        isWrong={isWrong}
+        selected={selected}
+        isLocked={isLocked}
+      />
+
+      <TeamsRow
+        homeTeam={match.home_team}
+        awayTeam={match.away_team}
+        result={match.result}
+        selected={selected}
+      />
+
+      <PickButtons
+        options={options}
+        selected={selected}
+        isLocked={isLocked}
+        disabled={isLocked || pending || saving}
+        onSelect={handleSelect}
+      />
+
+      <ErrorMessage error={error} />
+
+      <CrowdSection
+        isLocked={isLocked}
+        crowd={crowd}
+        crowdTotal={crowdTotal}
+        insight={insight}
+        options={options}
+        selected={selected}
+      />
+    </div>
+  )
+}
+
+function CardHeader({
+  kickoff,
+  stageLabel,
+  isCorrect,
+  isWrong,
+  selected,
+  isLocked,
+}: {
+  kickoff: string
+  stageLabel: string
+  isCorrect: boolean
+  isWrong: boolean
+  selected: Pick | null
+  isLocked: boolean
+}) {
+  return (
+    <div
+      className="flex items-center justify-between px-4 py-2"
+      style={{ borderBottom: '1px solid var(--border-subtle)' }}
+    >
+      <span
+        style={{
+          fontFamily: 'var(--font-mono)',
+          fontSize: 12,
+          color: 'var(--color-muted)',
+          letterSpacing: '0.04em',
+        }}
       >
+        {kickoff}
+      </span>
+
+      <span
+        style={{
+          fontFamily: 'var(--font-display)',
+          fontSize: 12,
+          letterSpacing: '0.12em',
+          textTransform: 'uppercase',
+          color: 'var(--color-sub)',
+        }}
+      >
+        {stageLabel}
+      </span>
+
+      {isCorrect ? (
         <span
+          className="text-[12px] px-2 py-0.5 rounded-full font-bold"
           style={{
-            fontFamily: 'var(--font-mono)',
-            fontSize: 11,
-            color: 'var(--color-muted)',
+            color: '#000',
+            background: 'var(--color-accent)',
+            border: '1px solid transparent',
+            fontFamily: 'var(--font-display)',
             letterSpacing: '0.04em',
           }}
         >
-          {kickoff}
+          ✓ Correct
         </span>
-
+      ) : isWrong ? (
         <span
+          className="text-[12px] px-2 py-0.5 rounded-full font-bold"
           style={{
+            color: '#fff',
+            background: 'var(--color-danger)',
+            border: '1px solid var(--border-danger)',
             fontFamily: 'var(--font-display)',
-            fontSize: 10,
-            letterSpacing: '0.12em',
-            textTransform: 'uppercase',
-            color: 'var(--color-sub)',
+            letterSpacing: '0.04em',
           }}
         >
-          {stageLabel}
+          ✗ Wrong
         </span>
+      ) : selected ? (
+        <span
+          className="text-[12px] px-2 py-0.5 rounded-full font-bold"
+          style={{
+            color: 'var(--color-accent)',
+            background: 'var(--color-accent-soft)',
+            border: '1px solid var(--border-accent)',
+            fontFamily: 'var(--font-display)',
+            letterSpacing: '0.04em',
+          }}
+        >
+          ✓ {PICK_LABELS[selected]}
+        </span>
+      ) : (
+        <span
+          className="text-[12px] px-2 py-0.5 rounded-full"
+          style={{
+            color: 'var(--color-muted)',
+            background: 'var(--color-elev)',
+            border: '1px solid var(--border-base)',
+            fontFamily: 'var(--font-display)',
+            letterSpacing: '0.04em',
+          }}
+        >
+          {isLocked ? '🔒 Locked' : 'Pick'}
+        </span>
+      )}
+    </div>
+  )
+}
 
-        {isCorrect ? (
-          <span
-            className="text-[10px] px-2 py-0.5 rounded-full font-bold"
+function TeamsRow({
+  homeTeam,
+  awayTeam,
+  result,
+  selected,
+}: {
+  homeTeam: string
+  awayTeam: string
+  result: Pick | null
+  selected: Pick | null
+}) {
+  return (
+    <div className="flex items-center justify-around px-4 py-5">
+      <TeamBlock name={homeTeam} selected={selected === '1'} />
+
+      <div className="flex flex-col items-center gap-1">
+        <div
+          style={{
+            fontFamily: 'var(--font-display)',
+            fontSize: 22,
+            fontWeight: 700,
+            color: 'var(--color-dim)',
+            letterSpacing: '0.04em',
+          }}
+        >
+          VS
+        </div>
+        {result && (
+          <div
+            className="text-[12px] font-bold px-2 py-0.5 rounded"
             style={{
-              color: '#000',
-              background: 'var(--color-accent)',
-              border: '1px solid transparent',
-              fontFamily: 'var(--font-display)',
-              letterSpacing: '0.06em',
+              fontFamily: 'var(--font-mono)',
+              color: 'var(--color-gold)',
+              background: 'var(--color-amber-soft)',
             }}
           >
-            ✓ Correct
-          </span>
-        ) : isWrong ? (
-          <span
-            className="text-[10px] px-2 py-0.5 rounded-full font-bold"
-            style={{
-              color: '#fff',
-              background: 'var(--color-danger)',
-              border: '1px solid var(--border-danger)',
-              fontFamily: 'var(--font-display)',
-              letterSpacing: '0.06em',
-            }}
-          >
-            ✗ Wrong
-          </span>
-        ) : selected ? (
-          <span
-            className="text-[10px] px-2 py-0.5 rounded-full font-bold"
-            style={{
-              color: 'var(--color-accent)',
-              background: 'var(--color-accent-soft)',
-              border: '1px solid var(--border-accent)',
-              fontFamily: 'var(--font-display)',
-              letterSpacing: '0.06em',
-            }}
-          >
-            ✓ {PICK_LABELS[selected]}
-          </span>
-        ) : (
-          <span
-            className="text-[10px] px-2 py-0.5 rounded-full"
-            style={{
-              color: 'var(--color-muted)',
-              background: 'var(--color-elev)',
-              border: '1px solid var(--border-base)',
-              fontFamily: 'var(--font-display)',
-              letterSpacing: '0.06em',
-            }}
-          >
-            {isLocked ? '🔒 Locked' : 'Pick'}
-          </span>
+            {result}
+          </div>
         )}
       </div>
 
-      {/* Teams */}
-      <div className="flex items-center justify-around px-4 py-5">
-        <TeamBlock name={match.home_team} selected={selected === '1'} />
+      <TeamBlock name={awayTeam} selected={selected === '2'} />
+    </div>
+  )
+}
 
-        <div className="flex flex-col items-center gap-1">
-          <div
+function PickButtons({
+  options,
+  selected,
+  isLocked,
+  disabled,
+  onSelect,
+}: {
+  options: [Pick, number][]
+  selected: Pick | null
+  isLocked: boolean
+  disabled: boolean
+  onSelect: (pick: Pick) => void
+}) {
+  return (
+    <div className="grid grid-cols-3 gap-2 px-4 pb-4">
+      {options.map(([pick, odds]) => {
+        const sel = selected === pick
+        return (
+          <button
+            key={pick}
+            type="button"
+            onClick={() => onSelect(pick)}
+            disabled={disabled}
+            className="flex flex-col items-center rounded-xl py-3 transition-all duration-150"
             style={{
-              fontFamily: 'var(--font-display)',
-              fontSize: 22,
-              fontWeight: 700,
-              color: 'var(--color-dim)',
-              letterSpacing: 3,
+              background: sel ? 'var(--color-accent)' : 'var(--color-elev)',
+              color: sel ? '#000' : 'var(--color-text)',
+              border: sel ? '1px solid transparent' : '1px solid var(--border-base)',
+              opacity: isLocked ? 0.55 : 1,
+              cursor: isLocked || disabled ? 'not-allowed' : 'pointer',
+              transform: sel ? 'scale(1.03)' : 'scale(1)',
+              boxShadow: sel ? '0 4px 16px rgba(0,217,126,0.35)' : 'none',
             }}
           >
-            VS
-          </div>
-          {match.result && (
-            <div
-              className="text-[11px] font-bold px-2 py-0.5 rounded"
-              style={{
-                fontFamily: 'var(--font-mono)',
-                color: 'var(--color-gold)',
-                background: 'var(--color-amber-soft)',
-              }}
-            >
-              {match.result}
-            </div>
-          )}
-        </div>
-
-        <TeamBlock name={match.away_team} selected={selected === '2'} />
-      </div>
-
-      {/* Bet buttons (1X2) */}
-      <div className="grid grid-cols-3 gap-2 px-4 pb-4">
-        {options.map(([pick, odds]) => {
-          const sel = selected === pick
-          return (
-            <button
-              key={pick}
-              onClick={() => handleSelect(pick)}
-              disabled={isLocked || pending || saving}
-              className="flex flex-col items-center rounded-xl py-3 transition-all duration-150"
-              style={{
-                background: sel ? 'var(--color-accent)' : 'var(--color-elev)',
-                color: sel ? '#000' : 'var(--color-text)',
-                border: sel ? '1px solid transparent' : '1px solid var(--border-base)',
-                opacity: isLocked ? 0.55 : 1,
-                cursor: isLocked || saving ? 'not-allowed' : 'pointer',
-                transform: sel ? 'scale(1.03)' : 'scale(1)',
-                boxShadow: sel ? '0 4px 16px rgba(0,217,126,0.35)' : 'none',
-              }}
-            >
-              <span
-                style={{
-                  fontFamily: 'var(--font-display)',
-                  fontSize: 20,
-                  fontWeight: 700,
-                  lineHeight: 1,
-                  letterSpacing: pick === 'X' ? 0 : '0.03em',
-                }}
-              >
-                {pick}
-              </span>
-              <span
-                className="mt-0.5"
-                style={{
-                  fontFamily: 'var(--font-mono)',
-                  fontSize: 11,
-                  opacity: sel ? 0.7 : 0.55,
-                }}
-              >
-                {odds.toFixed(2)}
-              </span>
-            </button>
-          )
-        })}
-      </div>
-
-      {error && (
-        <div
-          role="alert"
-          className="px-4 pb-3 text-[11px] font-semibold"
-          style={{ color: 'var(--color-danger)' }}
-        >
-          {error}
-        </div>
-      )}
-
-      {/* Crowd picks — revealed only after lock */}
-      {isLocked && crowd && crowdTotal > 0 ? (
-        <div className="px-4 pb-4" style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: 12 }}>
-          <div className="flex items-center justify-between mb-2 gap-2">
             <span
               style={{
                 fontFamily: 'var(--font-display)',
-                fontSize: 9,
-                letterSpacing: '0.16em',
-                textTransform: 'uppercase',
-                color: 'var(--color-muted)',
+                fontSize: 20,
+                fontWeight: 700,
+                lineHeight: 1,
+                letterSpacing: pick === 'X' ? 0 : '0.03em',
               }}
             >
-              Crowd · {crowdTotal} {crowdTotal === 1 ? 'pick' : 'picks'}
+              {pick}
             </span>
-            {insight && <CrowdInsight insight={insight} />}
-          </div>
-
-          <div
-            className="flex w-full rounded-full overflow-hidden"
-            style={{ height: 8, background: 'var(--color-elev)' }}
-          >
-            {options.map(([pick]) =>
-              crowd[pick] > 0 ? (
-                <div
-                  key={pick}
-                  style={{
-                    width: `${crowd[pick]}%`,
-                    background: SEG_COLOR[pick],
-                    opacity: selected === pick ? 1 : 0.8,
-                  }}
-                />
-              ) : null
-            )}
-          </div>
-
-          <div className="flex justify-between mt-1.5">
-            {options.map(([pick]) => (
-              <span
-                key={pick}
-                style={{
-                  fontFamily: 'var(--font-mono)',
-                  fontSize: 11,
-                  color: selected === pick ? 'var(--color-accent)' : 'var(--color-muted)',
-                  fontWeight: selected === pick ? 700 : 400,
-                }}
-              >
-                {crowd[pick]}% · {pick}
-              </span>
-            ))}
-          </div>
-        </div>
-      ) : !isLocked ? (
-        <div
-          className="px-4 pb-3"
-          style={{
-            fontFamily: 'var(--font-display)',
-            fontSize: 9,
-            letterSpacing: '0.16em',
-            textTransform: 'uppercase',
-            color: 'var(--color-muted)',
-          }}
-        >
-          Crowd revealed at lock
-        </div>
-      ) : null}
+            <span
+              className="mt-0.5"
+              style={{
+                fontFamily: 'var(--font-mono)',
+                fontSize: 12,
+                opacity: sel ? 0.7 : 0.55,
+              }}
+            >
+              {odds.toFixed(2)}
+            </span>
+          </button>
+        )
+      })}
     </div>
   )
+}
+
+function ErrorMessage({ error }: { error: string | null }) {
+  if (!error) return null
+  return (
+    <div
+      role="alert"
+      className="px-4 pb-3 text-[12px] font-semibold"
+      style={{ color: 'var(--color-danger)' }}
+    >
+      {error}
+    </div>
+  )
+}
+
+function CrowdSection({
+  isLocked,
+  crowd,
+  crowdTotal,
+  insight,
+  options,
+  selected,
+}: {
+  isLocked: boolean
+  crowd?: CrowdPct | null
+  crowdTotal: number
+  insight?: Insight | null
+  options: [Pick, number][]
+  selected: Pick | null
+}) {
+  if (isLocked && crowd && crowdTotal > 0) {
+    return (
+      <div className="px-4 pb-4" style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: 12 }}>
+        <div className="flex items-center justify-between mb-2 gap-2">
+          <span
+            style={{
+              fontFamily: 'var(--font-display)',
+              fontSize: 12,
+              letterSpacing: '0.04em',
+              textTransform: 'uppercase',
+              color: 'var(--color-muted)',
+            }}
+          >
+            Crowd · {crowdTotal} {crowdTotal === 1 ? 'pick' : 'picks'}
+          </span>
+          {insight && <CrowdInsight insight={insight} />}
+        </div>
+
+        <div
+          className="flex w-full rounded-full overflow-hidden"
+          style={{ height: 8, background: 'var(--color-elev)' }}
+        >
+          {options.map(([pick]) =>
+            crowd[pick] > 0 ? (
+              <div
+                key={pick}
+                style={{
+                  width: `${crowd[pick]}%`,
+                  background: SEG_COLOR[pick],
+                  opacity: selected === pick ? 1 : 0.8,
+                }}
+              />
+            ) : null
+          )}
+        </div>
+
+        <div className="flex justify-between mt-1.5">
+          {options.map(([pick]) => (
+            <span
+              key={pick}
+              style={{
+                fontFamily: 'var(--font-mono)',
+                fontSize: 12,
+                color: selected === pick ? 'var(--color-accent)' : 'var(--color-muted)',
+                fontWeight: selected === pick ? 700 : 400,
+              }}
+            >
+              {crowd[pick]}% · {pick}
+            </span>
+          ))}
+        </div>
+      </div>
+    )
+  }
+
+  if (!isLocked) {
+    return (
+      <div
+        className="px-4 pb-3"
+        style={{
+          fontFamily: 'var(--font-display)',
+          fontSize: 12,
+          letterSpacing: '0.04em',
+          textTransform: 'uppercase',
+          color: 'var(--color-muted)',
+        }}
+      >
+        Crowd revealed at lock
+      </div>
+    )
+  }
+
+  return null
 }
 
 function TeamBlock({ name, selected }: { name: string; selected: boolean }) {
   return (
     <div className="flex flex-col items-center gap-2" style={{ width: 80 }}>
       <div
-        className="w-12 h-12 rounded-full flex items-center justify-center text-2xl transition-all"
+        className="size-12 rounded-full flex items-center justify-center text-2xl"
         style={{
           background: selected ? 'var(--color-accent-soft)' : 'var(--color-elev)',
           border: selected ? '2px solid var(--border-accent)' : '2px solid var(--border-base)',
           boxShadow: selected ? '0 0 12px rgba(0,217,126,0.25)' : 'none',
           transform: selected ? 'scale(1.08)' : 'scale(1)',
-          transition: 'all 0.15s',
+          transition: 'background 0.15s, border-color 0.15s, box-shadow 0.15s, transform 0.15s',
         }}
       >
         <span style={{ fontSize: 24, display: 'block' }}>{FLAGS[name] ?? '🏳️'}</span>
@@ -357,7 +470,7 @@ function TeamBlock({ name, selected }: { name: string; selected: boolean }) {
         className="text-center leading-tight"
         style={{
           fontFamily: 'var(--font-display)',
-          fontSize: 11,
+          fontSize: 12,
           letterSpacing: '0.08em',
           textTransform: 'uppercase',
           color: selected ? 'var(--color-accent)' : 'var(--color-sub)',

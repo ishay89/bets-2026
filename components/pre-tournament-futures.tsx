@@ -143,7 +143,7 @@ export function PreTournamentFutures({ pick, isLocked }: { pick: FuturesPick; is
           <div className="bet-card p-4 space-y-2">
             <label htmlFor="winner" className="text-sm font-semibold text-text block">🏆 Tournament Winner</label>
             <select id="winner" name="winner" defaultValue="" required style={inputStyle} className={cls}>
-              <option value="">Select a team...</option>
+              <option value="">Select a team…</option>
               {TEAMS.map(t => (
                 <option key={t.name} value={t.name}>
                   {FLAGS[t.name] ?? ''} {t.name} - {t.odds.toFixed(2)}
@@ -156,7 +156,7 @@ export function PreTournamentFutures({ pick, isLocked }: { pick: FuturesPick; is
           <div className="bet-card p-4 space-y-2">
             <label htmlFor="scorer" className="text-sm font-semibold text-text block">⚽ Top Scorer</label>
             <select id="scorer" name="scorer" defaultValue="" required style={inputStyle} className={cls}>
-              <option value="">Select a player...</option>
+              <option value="">Select a player…</option>
               {SCORERS.map(s => (
                 <option key={s.name} value={s.name}>{s.name} - {s.odds.toFixed(2)}</option>
               ))}

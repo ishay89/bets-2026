@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useReducer } from 'react'
 
 function fmt(ms: number): string {
   if (ms <= 0) return 'LOCKED'
@@ -11,12 +11,20 @@ function fmt(ms: number): string {
   return `${s}s`
 }
 
+function msUntil(lockTime: string): number {
+  return new Date(lockTime).getTime() - Date.now()
+}
+
 export function LockTimer({ lockTime }: { lockTime: string }) {
-  // eslint-disable-next-line react-hooks/purity
-  const [remaining, setRemaining] = useState(new Date(lockTime).getTime() - Date.now())
+  const [remaining, dispatch] = useReducer(
+    (_: number, lt: string) => msUntil(lt),
+    lockTime,
+    msUntil,
+  )
 
   useEffect(() => {
-    const id = setInterval(() => setRemaining(new Date(lockTime).getTime() - Date.now()), 1000)
+    dispatch(lockTime)
+    const id = setInterval(() => dispatch(lockTime), 1000)
     return () => clearInterval(id)
   }, [lockTime])
 
