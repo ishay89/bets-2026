@@ -26,6 +26,7 @@ type PikaAnswerRow = { option_id: string; points: number | null; user_id: string
 type HistoryPika = {
   id: string
   question: string
+  locked: boolean
   pikanteria_options: PikaOptionRow[]
   pikanteria_answers: PikaAnswerRow[]
 }
@@ -34,8 +35,6 @@ export type HistoryMatchDay = {
   id: string
   date: string
   stage: string
-  lock_time: string
-  locked: boolean
   matches: HistoryMatch[]
   pikanteria: HistoryPika[]
 }
@@ -53,17 +52,17 @@ export async function getPublishedMatchDaysWithAll(supabase: Db): Promise<FullMa
 }
 
 // Returns match days with nested predictions and pikanteria_answers — used by
-// both history and h2h pages. Includes lock_time/locked/kickoff_time for h2h
-// lock detection; history pages simply ignore those extra fields.
+// both history and h2h pages. Includes kickoff_time and item-level lock state
+// for H2H visibility; history pages simply ignore those extra fields.
 export async function getMatchDaysWithUserData(supabase: Db): Promise<HistoryMatchDay[]> {
   const { data, error } = await supabase
     .from('match_days')
     .select(`
-      id, date, stage, lock_time, locked,
+      id, date, stage,
       matches(id, home_team, away_team, kickoff_time, result, locked,
         predictions(pick, points, user_id)
       ),
-      pikanteria(id, question,
+      pikanteria(id, question, locked,
         pikanteria_options(id, label, is_correct),
         pikanteria_answers(option_id, points, user_id)
       )
@@ -99,33 +98,15 @@ export async function getUserPikanteriaAnswers(
 }
 
 /**
- * Returns true if futures picks (winner / top scorer) are locked.
- * Locked when: admin manually locked via tournament_settings, OR any published
- * match day is manually locked, OR any published match is manually locked, OR
- * the first published day's lock_time has passed.
+ * Returns true if futures picks (winner / top scorer) are manually locked.
  */
 export async function isFuturesLocked(supabase: Db): Promise<boolean> {
-  const [{ data: settings }, { data: days }] = await Promise.all([
-    supabase.from('tournament_settings').select('futures_locked').eq('id', true).single(),
-    supabase
-      .from('match_days')
-      .select('locked, lock_time, matches(locked, kickoff_time)')
-      .not('published_at', 'is', null)
-      .order('date', { ascending: true }),
-  ])
-
-  if (settings?.futures_locked) return true
-
-  const now = Date.now()
-  for (const day of (days ?? []) as { locked: boolean; lock_time: string; matches: { locked: boolean; kickoff_time: string }[] }[]) {
-    if (day.locked) return true
-    if (now >= new Date(day.lock_time).getTime()) return true
-    for (const m of day.matches ?? []) {
-      if (m.locked) return true
-    }
-  }
-
-  return false
+  const { data: settings } = await supabase
+    .from('tournament_settings')
+    .select('futures_locked')
+    .eq('id', true)
+    .single()
+  return settings?.futures_locked ?? false
 }
 
 export async function getLeaderboardEntries(supabase: Db): Promise<LeaderboardEntry[]> {

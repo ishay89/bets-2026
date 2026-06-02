@@ -53,6 +53,7 @@ export interface Pikanteria {
   id: string
   match_day_id: string
   question: string
+  locked: boolean
   created_at: string
   published_at: string | null
   options?: PicanteriaOption[]

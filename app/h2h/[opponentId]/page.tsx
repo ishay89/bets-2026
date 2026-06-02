@@ -55,7 +55,7 @@ function buildRoundsVM(
     )
 
     for (const m of matches) {
-      const locked = isMatchLocked(m, day.locked, now)
+      const locked = isMatchLocked(m, now)
       const predByUser = new Map(m.predictions.map(p => [p.user_id, p]))
       const myPred = predByUser.get(myId)
       const theirPred = predByUser.get(opponentId)
@@ -90,8 +90,6 @@ function buildRoundsVM(
       })
     }
 
-    // Pikanteria locks with the whole day (migration 009 gates on md.lock_time).
-    const pikaLocked = day.locked || now >= new Date(day.lock_time).getTime()
     for (const pk of day.pikanteria ?? []) {
       const optById = new Map<string, { id: string; label: string; is_correct: boolean }>()
       let correctOpt: { id: string; label: string; is_correct: boolean } | null = null
@@ -102,7 +100,7 @@ function buildRoundsVM(
       const ansByUser = new Map(pk.pikanteria_answers.map(a => [a.user_id, a]))
       const myAns = ansByUser.get(myId)
       const theirAns = ansByUser.get(opponentId)
-      const theirHidden = !pikaLocked && !theirAns
+      const theirHidden = !pk.locked && !theirAns
       const resolved = correctOpt !== null
 
       const labelFor = (optId: string | undefined) =>

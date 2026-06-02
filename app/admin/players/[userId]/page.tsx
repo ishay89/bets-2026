@@ -2,7 +2,7 @@ import { createAdminClient, assertAdmin } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { isMatchLocked } from '@/lib/lock'
-import type { MatchDay, Pick, User } from '@/lib/types'
+import type { Pick, User } from '@/lib/types'
 import {
   getPublishedMatchDaysWithAll,
   getUserPredictions,
@@ -17,19 +17,13 @@ const STAGE_LABELS: Record<string, string> = {
 
 const PICK_LABELS: Record<Pick, string> = { '1': 'Home', X: 'Draw', '2': 'Away' }
 
-// Module-level helpers avoid calling Date.now() directly in the component body,
-// which would trigger the react-compiler purity lint rule.
-function isPikLocked(day: MatchDay): boolean {
-  return day.locked || Date.now() >= new Date(day.lock_time).getTime()
-}
-
 function filterOpenDays(matchDays: FullMatchDay[]) {
   const result = []
   for (const day of matchDays) {
     const openMatches = (day.matches ?? [])
-      .filter(m => !isMatchLocked(m, day.locked))
+      .filter(m => !isMatchLocked(m))
       .toSorted((a, b) => new Date(a.kickoff_time).getTime() - new Date(b.kickoff_time).getTime())
-    const openPikanteria = isPikLocked(day) ? [] : (day.pikanteria ?? [])
+    const openPikanteria = (day.pikanteria ?? []).filter(item => !item.locked)
     if (openMatches.length > 0 || openPikanteria.length > 0) {
       result.push({ day, openMatches, openPikanteria })
     }

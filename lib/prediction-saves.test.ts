@@ -111,3 +111,26 @@ describe('atomic prediction save migration', () => {
     expect(sql).toMatch(/now\(\) < md\.lock_time/)
   })
 })
+
+describe('independent bet locks migration', () => {
+  const sql = readFileSync(
+    join(process.cwd(), 'supabase/migrations/20260602000000_independent_bet_locks.sql'),
+    'utf8',
+  )
+
+  test('adds an independent pikanteria lock flag', () => {
+    expect(sql).toMatch(/alter table public\.pikanteria[\s\S]+add column if not exists locked boolean not null default false/)
+  })
+
+  test('removes legacy match-day lock checks from active guards', () => {
+    expect(sql).not.toMatch(/md\.locked|day_locked/)
+    expect(sql).toMatch(/m\.locked|match_locked/)
+  })
+
+  test('uses question-level pikanteria locks for saves, policies, and crowd reveal', () => {
+    expect(sql).toMatch(/pk\.locked as pikanteria_locked/)
+    expect(sql).toMatch(/if v_item\.pikanteria_locked then/)
+    expect(sql).toMatch(/and not pk\.locked/)
+    expect(sql).toMatch(/where pk\.published_at is not null\s+and pk\.locked/)
+  })
+})
