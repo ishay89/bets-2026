@@ -150,6 +150,9 @@ export default async function PredictPage() {
     e.total += r.cnt
   }
 
+  // Server-rendered "now" for lock comparisons below. Computed once so the
+  // pikanteria-only lock check stays consistent across the render.
+  // eslint-disable-next-line react-hooks/purity
   const nowMs = Date.now()
 
   return (
