@@ -4,12 +4,6 @@ import { usePathname } from 'next/navigation'
 
 const tabs = [
   {
-    href: '/',
-    label: 'Home',
-    // House
-    d: 'M3 12L5 10.2V5H8V7.5L12 3.5L21 12H18.5V21H14.5V15H9.5V21H5.5V12H3Z',
-  },
-  {
     href: '/predict',
     // Soccer ball (simplified)
     label: 'Predict',
