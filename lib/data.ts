@@ -1,8 +1,8 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { MatchDay, Match, Pikanteria, PicanteriaOption, LeaderboardEntry, Pick } from './types'
+import type { Database } from './supabase/types'
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type Db = SupabaseClient<any>
+type Db = SupabaseClient<Database>
 
 // ── Shared nested types ──────────────────────────────────────────────────────
 

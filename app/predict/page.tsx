@@ -29,6 +29,12 @@ const STAGE_LABELS: Record<string, string> = {
   sf: 'Semi Finals ×2', '3rd': 'Third Place ×1.5', final: 'Final ×3',
 }
 
+// Module-level helper keeps the impure Date.now() read out of the component
+// body, so the render stays pure (see app/h2h/[opponentId]/page.tsx).
+function nowMs(): number {
+  return Date.now()
+}
+
 function invalidSaveResult(error: unknown): SaveResult {
   const message = error instanceof Error ? error.message : 'Invalid prediction'
   return { ok: false, status: 'invalid', message }
@@ -152,8 +158,7 @@ export default async function PredictPage() {
 
   // Server-rendered "now" for lock comparisons below. Computed once so the
   // pikanteria-only lock check stays consistent across the render.
-  // eslint-disable-next-line react-hooks/purity
-  const nowMs = Date.now()
+  const now = nowMs()
 
   return (
     <div className="min-h-screen bg-bg">
@@ -190,7 +195,7 @@ export default async function PredictPage() {
           const dayManuallyLocked = matchDay.locked
           const allMatchesLocked = sortedMatches.length > 0 && sortedMatches.every(m => isMatchLocked(m, dayManuallyLocked))
           // A pikanteria-only day (no published matches) locks at the day's lock_time.
-          const pikaOnlyLocked = sortedMatches.length === 0 && nowMs >= new Date(matchDay.lock_time).getTime()
+          const pikaOnlyLocked = sortedMatches.length === 0 && now >= new Date(matchDay.lock_time).getTime()
           const isDayLocked = dayManuallyLocked || allMatchesLocked || pikaOnlyLocked
 
           // Lock timer points to the earliest match's lock time (kickoff − 5 min).

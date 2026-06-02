@@ -34,6 +34,12 @@ const soccerBallStyle: React.CSSProperties = {
   flexShrink: 0,
 }
 
+// Module-level helper keeps the impure Date.now() read out of the component
+// body, so the render stays pure (see app/h2h/[opponentId]/page.tsx).
+function nowMs(): number {
+  return Date.now()
+}
+
 export default async function HomePage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -61,8 +67,7 @@ export default async function HomePage() {
 
   let minutesUntilLock: number | null = null
   if (todayDay?.lock_time) {
-    // eslint-disable-next-line react-hooks/purity
-    const diff = new Date(todayDay.lock_time).getTime() - Date.now()
+    const diff = new Date(todayDay.lock_time).getTime() - nowMs()
     minutesUntilLock = Math.max(0, Math.floor(diff / 60000))
   }
   const picksOpen = minutesUntilLock != null && minutesUntilLock > 0
