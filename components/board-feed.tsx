@@ -36,6 +36,7 @@ interface Props {
   initialPosts: BoardPost[]
   initialAiPosts: AiSocialPost[]
   currentUserId: string
+  currentUserIsAdmin: boolean
 }
 
 function formatPostTime(createdAt: string): string {
@@ -53,7 +54,7 @@ function getImageUrl(path: string): string {
   return `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/${IMAGE_BUCKET}/${path}`
 }
 
-export function BoardFeed({ initialPosts, initialAiPosts, currentUserId }: Props) {
+export function BoardFeed({ initialPosts, initialAiPosts, currentUserId, currentUserIsAdmin }: Props) {
   const [posts, setPosts] = useState(initialPosts)
   const [aiPosts, setAiPosts] = useState(initialAiPosts)
   const [body, setBody] = useState('')
@@ -187,7 +188,6 @@ export function BoardFeed({ initialPosts, initialAiPosts, currentUserId }: Props
         .from('message_board_posts')
         .delete()
         .eq('id', post.id)
-        .eq('user_id', currentUserId)
       if (deleteError) throw deleteError
 
       if (post.image_path) {
@@ -273,7 +273,7 @@ export function BoardFeed({ initialPosts, initialAiPosts, currentUserId }: Props
                 <div className="truncate text-[13px] font-extrabold text-text">{post.users.display_name}</div>
                 <div className="text-[10px] font-semibold text-muted">{formatPostTime(post.created_at)}</div>
               </div>
-              {post.user_id === currentUserId && (
+              {(post.user_id === currentUserId || currentUserIsAdmin) && (
                 <button type="button" onClick={() => handleDelete(post)}
                   disabled={deletingPostId === post.id}
                   className="shrink-0 rounded-lg px-2 py-1 text-[11px] font-bold disabled:opacity-50"
