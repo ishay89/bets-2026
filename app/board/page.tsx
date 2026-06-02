@@ -13,7 +13,7 @@ export default async function BoardPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const [{ data: posts, error }, { data: aiPosts, error: aiPostsError }] = await Promise.all([
+  const [{ data: posts, error }, { data: aiPosts, error: aiPostsError }, { data: profile, error: profileError }] = await Promise.all([
     supabase
       .from('message_board_posts')
       .select('id, user_id, body, image_path, created_at, users(display_name, is_monkey, automation_strategy)')
@@ -26,10 +26,16 @@ export default async function BoardPage() {
       .order('created_at', { ascending: false })
       .limit(50)
       .returns<AiSocialPost[]>(),
+    supabase
+      .from('users')
+      .select('is_admin')
+      .eq('id', user.id)
+      .single(),
   ])
 
   if (error) throw error
   if (aiPostsError) throw aiPostsError
+  if (profileError) throw profileError
 
   return (
     <div className="min-h-screen bg-bg">
@@ -41,7 +47,8 @@ export default async function BoardPage() {
       </header>
 
       <main className="px-4 pb-28">
-        <BoardFeed initialPosts={posts ?? []} initialAiPosts={aiPosts ?? []} currentUserId={user.id} />
+        <BoardFeed initialPosts={posts ?? []} initialAiPosts={aiPosts ?? []}
+          currentUserId={user.id} currentUserIsAdmin={profile.is_admin} />
       </main>
 
       <BottomNav />
