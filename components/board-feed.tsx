@@ -204,7 +204,7 @@ export function BoardFeed({ initialPosts, initialAiPosts, currentUserId }: Props
         {previewUrl && (
           <div className="relative overflow-hidden rounded-[10px]" style={{ border: '1px solid var(--border-base)' }}>
             <Image src={previewUrl} alt="Selected upload preview" width={900} height={600}
-              unoptimized className="max-h-56 w-full object-cover" />
+              unoptimized className="max-h-56 w-full object-contain" style={{ background: 'var(--color-elev)' }} />
             <button type="button" onClick={clearImage}
               className="absolute right-2 top-2 rounded-full px-2 py-1 text-[11px] font-bold text-white"
               style={{ background: 'rgba(0, 0, 0, 0.65)' }}>
@@ -259,7 +259,8 @@ export function BoardFeed({ initialPosts, initialAiPosts, currentUserId }: Props
             {post.body && <p className="whitespace-pre-wrap break-words px-3 py-3 text-[14px] leading-5 text-sub">{post.body}</p>}
             {post.image_path && (
               <Image src={getImageUrl(post.image_path)} alt={`Post by ${post.users.display_name}`}
-                width={900} height={700} unoptimized className="max-h-[32rem] w-full object-cover" />
+                width={900} height={700} unoptimized className="max-h-[32rem] w-full object-contain"
+                style={{ background: 'var(--color-elev)' }} />
             )}
           </article>
         ))}
