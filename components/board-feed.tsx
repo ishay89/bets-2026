@@ -291,16 +291,6 @@ function SectionButton({ active, children, onClick }: {
 function AiRecapFeed({ posts }: { posts: AiSocialPost[] }) {
   return (
     <>
-      <div className="rounded-[14px] px-4 py-3"
-        style={{ background: 'var(--color-accent-soft)', border: '1px solid var(--border-accent)' }}>
-        <div className="text-[10px] font-extrabold uppercase tracking-[1.2px]" style={{ color: 'var(--color-accent)' }}>
-          AI Press Box
-        </div>
-        <div className="mt-1 text-[12px] leading-4 text-sub">
-          Generated recaps of the daily drama, glorious wins, and פחי הזהב.
-        </div>
-      </div>
-
       {posts.length === 0 && (
         <div className="rounded-[14px] py-10 text-center text-[13px] text-sub"
           style={{ background: 'var(--color-panel)', border: '1px solid var(--border-base)' }}>
