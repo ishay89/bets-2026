@@ -114,7 +114,7 @@ describe('atomic prediction save migration', () => {
 
 describe('independent bet locks migration', () => {
   const sql = readFileSync(
-    join(process.cwd(), 'supabase/migrations/20260602000000_independent_bet_locks.sql'),
+    join(process.cwd(), 'supabase/migrations/20260602174444_independent_bet_locks.sql'),
     'utf8',
   )
 
