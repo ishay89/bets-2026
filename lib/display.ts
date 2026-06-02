@@ -6,7 +6,7 @@
 
 import type { AutomationStrategy } from './types'
 
-export const STAGE_LABELS: Record<string, string> = {
+const STAGE_LABELS: Record<string, string> = {
   group: 'Group Stage',
   r32: 'Round of 32',
   r16: 'Round of 16',
@@ -20,7 +20,7 @@ export function stageLabel(stage: string): string {
   return STAGE_LABELS[stage] ?? stage
 }
 
-export const FLAGS: Record<string, string> = {
+const FLAGS: Record<string, string> = {
   France: '🇫🇷', Spain: '🇪🇸', Brazil: '🇧🇷', England: '🏴󠁧󠁢󠁥󠁮󠁧󠁿',
   Argentina: '🇦🇷', Netherlands: '🇳🇱', Portugal: '🇵🇹', Germany: '🇩🇪',
   Italy: '🇮🇹', Belgium: '🇧🇪', Croatia: '🇭🇷', Uruguay: '🇺🇾',
@@ -32,7 +32,7 @@ export function getFlag(name: string): string {
   return FLAGS[name] ?? '🏳️'
 }
 
-export const AVATARS = ['🦁','🐯','🦊','🐺','🦅','🐻','🐼','🦝','🦄','🐉','🦋','🌟','🔥','⚡','🎯']
+const AVATARS = ['🦁','🐯','🦊','🐺','🦅','🐻','🐼','🦝','🦄','🐉','🦋','🌟','🔥','⚡','🎯']
 
 /** Marker / monkey aware avatar. Falls back to a name-derived animal. */
 export function getAvatar(player: {

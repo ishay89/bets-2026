@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useTransition } from 'react'
+import React, { useReducer, useTransition } from 'react'
 import { fetchAuditEvents } from './actions'
 import { PAGE_SIZE, type AuditRow, type AuditValue } from './types'
 
@@ -57,12 +57,47 @@ const inputStyle: React.CSSProperties = {
   fontSize: 12,
 }
 
+type AuditState = {
+  events: AuditRow[]
+  from: string
+  to: string
+  activeFrom: string
+  activeTo: string
+}
+
+type AuditAction =
+  | { type: 'SET_FROM'; value: string }
+  | { type: 'SET_TO'; value: string }
+  | { type: 'SET_EVENTS'; events: AuditRow[]; from: string; to: string }
+  | { type: 'APPEND_EVENTS'; events: AuditRow[] }
+  | { type: 'RESET'; events: AuditRow[] }
+
+function auditReducer(state: AuditState, action: AuditAction): AuditState {
+  switch (action.type) {
+    case 'SET_FROM':
+      return { ...state, from: action.value }
+    case 'SET_TO':
+      return { ...state, to: action.value }
+    case 'SET_EVENTS':
+      return { ...state, events: action.events, activeFrom: action.from, activeTo: action.to }
+    case 'APPEND_EVENTS':
+      return { ...state, events: [...state.events, ...action.events] }
+    case 'RESET':
+      return { ...state, from: '', to: '', activeFrom: '', activeTo: '', events: action.events }
+    default:
+      return state
+  }
+}
+
 export default function AuditClient({ initialEvents }: { initialEvents: AuditRow[] }) {
-  const [events, setEvents] = useState<AuditRow[]>(initialEvents)
-  const [from, setFrom] = useState('')
-  const [to, setTo] = useState('')
-  const [activeFrom, setActiveFrom] = useState('')
-  const [activeTo, setActiveTo] = useState('')
+  const [state, dispatch] = useReducer(auditReducer, {
+    events: initialEvents,
+    from: '',
+    to: '',
+    activeFrom: '',
+    activeTo: '',
+  })
+  const { events, from, to, activeFrom, activeTo } = state
   const [isPending, startTransition] = useTransition()
   const [isLoadingMore, startLoadMore] = useTransition()
 
@@ -71,20 +106,14 @@ export default function AuditClient({ initialEvents }: { initialEvents: AuditRow
   function handleSearch() {
     startTransition(async () => {
       const results = await fetchAuditEvents({ from: from || undefined, to: to || undefined, offset: 0 })
-      setEvents(results)
-      setActiveFrom(from)
-      setActiveTo(to)
+      dispatch({ type: 'SET_EVENTS', events: results, from, to })
     })
   }
 
   function handleReset() {
-    setFrom('')
-    setTo('')
     startTransition(async () => {
       const results = await fetchAuditEvents({ offset: 0 })
-      setEvents(results)
-      setActiveFrom('')
-      setActiveTo('')
+      dispatch({ type: 'RESET', events: results })
     })
   }
 
@@ -95,7 +124,7 @@ export default function AuditClient({ initialEvents }: { initialEvents: AuditRow
         to: activeTo || undefined,
         offset: events.length,
       })
-      setEvents((prev: AuditRow[]) => [...prev, ...results])
+      dispatch({ type: 'APPEND_EVENTS', events: results })
     })
   }
 
@@ -119,24 +148,27 @@ export default function AuditClient({ initialEvents }: { initialEvents: AuditRow
       {/* Date/time filter */}
       <div className="rounded-xl p-4 flex flex-wrap items-end gap-3" style={panelStyle}>
         <div className="flex flex-col gap-1">
-          <label className="text-[10px] font-semibold" style={{ color: 'var(--color-muted)' }}>From</label>
+          <label htmlFor="audit-from" className="text-[10px] font-semibold" style={{ color: 'var(--color-muted)' }}>From</label>
           <input
+            id="audit-from"
             type="datetime-local"
             value={from}
-            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFrom(e.target.value)}
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => dispatch({ type: 'SET_FROM', value: e.target.value })}
             style={inputStyle}
           />
         </div>
         <div className="flex flex-col gap-1">
-          <label className="text-[10px] font-semibold" style={{ color: 'var(--color-muted)' }}>To</label>
+          <label htmlFor="audit-to" className="text-[10px] font-semibold" style={{ color: 'var(--color-muted)' }}>To</label>
           <input
+            id="audit-to"
             type="datetime-local"
             value={to}
-            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setTo(e.target.value)}
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => dispatch({ type: 'SET_TO', value: e.target.value })}
             style={inputStyle}
           />
         </div>
         <button
+          type="button"
           onClick={handleSearch}
           disabled={isPending}
           className="px-4 py-1.5 rounded-lg text-[12px] font-bold"
@@ -146,6 +178,7 @@ export default function AuditClient({ initialEvents }: { initialEvents: AuditRow
         </button>
         {(activeFrom || activeTo) && (
           <button
+            type="button"
             onClick={handleReset}
             disabled={isPending}
             className="px-3 py-1.5 rounded-lg text-[12px]"
@@ -220,8 +253,9 @@ export default function AuditClient({ initialEvents }: { initialEvents: AuditRow
           </table>
 
           {hasMore && (
-            <div className="px-3 py-3 flex justify-center" style={{ borderTop: '1px solid var(--border-base)' }}>
+            <div className="p-3 flex justify-center" style={{ borderTop: '1px solid var(--border-base)' }}>
               <button
+                type="button"
                 onClick={handleLoadMore}
                 disabled={isLoadingMore}
                 className="px-6 py-2 rounded-lg text-[12px] font-bold"

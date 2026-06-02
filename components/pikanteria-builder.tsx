@@ -2,8 +2,13 @@
 import { useState } from 'react'
 
 interface Option {
+  id: string
   label: string
   odds: string
+}
+
+function newOption(): Option {
+  return { id: crypto.randomUUID(), label: '', odds: '' }
 }
 
 interface Props {
@@ -18,13 +23,10 @@ const inputBase = {
 }
 
 export function PicanteriaBuilder({ questionIndex: qi }: Props) {
-  const [options, setOptions] = useState<Option[]>([
-    { label: '', odds: '' },
-    { label: '', odds: '' },
-  ])
+  const [options, setOptions] = useState<Option[]>(() => [newOption(), newOption()])
 
   function addOption() {
-    setOptions(o => [...o, { label: '', odds: '' }])
+    setOptions(o => [...o, newOption()])
   }
 
   function removeOption(idx: number) {
@@ -46,8 +48,13 @@ export function PicanteriaBuilder({ questionIndex: qi }: Props) {
         const j = idx + 1
         const placeholder = idx === 0 ? 'Yes' : idx === 1 ? 'No' : `Option ${j}`
         return (
-          <div key={idx} className="flex gap-2 items-center">
+          <div key={opt.id} className="flex gap-2 items-center">
+            <label htmlFor={`pik_opt_label_${qi}_${j}`} className="sr-only">
+              Option {j} label
+            </label>
             <input
+              id={`pik_opt_label_${qi}_${j}`}
+              aria-label={`Option ${j} label`}
               type="text"
               name={`pik_opt_label_${qi}_${j}`}
               placeholder={placeholder}
@@ -56,7 +63,12 @@ export function PicanteriaBuilder({ questionIndex: qi }: Props) {
               style={inputBase}
               className="rounded-lg px-3 py-2 text-sm outline-none focus:ring-1 flex-1"
             />
+            <label htmlFor={`pik_opt_odds_${qi}_${j}`} className="sr-only">
+              Option {j} odds
+            </label>
             <input
+              id={`pik_opt_odds_${qi}_${j}`}
+              aria-label={`Option ${j} odds`}
               type="number"
               step="0.01"
               name={`pik_opt_odds_${qi}_${j}`}

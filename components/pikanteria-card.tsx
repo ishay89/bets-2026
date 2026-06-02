@@ -18,7 +18,11 @@ interface Props {
 const SEG_COLORS = ['var(--color-amber)', 'var(--color-accent)', 'var(--color-dim)', 'var(--color-silver)', 'var(--color-sub)']
 
 export function PicanteriaCard({ item, currentAnswer, isLocked, onSave, crowd, crowdTotal = 0 }: Props) {
-  const [selected, setSelected] = useState<string | null>(currentAnswer)
+  // Optimistic overlay instead of copying the prop into state. `optimisticAnswer`
+  // is null when no in-flight pick exists; the effective selection is the
+  // in-flight value or the authoritative prop.
+  const [optimisticAnswer, setOptimisticAnswer] = useState<string | null>(null)
+  const selected = optimisticAnswer ?? currentAnswer
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [pending, startTransition] = useTransition()
@@ -26,20 +30,22 @@ export function PicanteriaCard({ item, currentAnswer, isLocked, onSave, crowd, c
 
   function handleSelect(optionId: string) {
     if (isLocked || inFlightRef.current || selected === optionId) return
-    const previous = selected
+    const previous = optimisticAnswer
     inFlightRef.current = true
     setSaving(true)
     setError(null)
-    setSelected(optionId)
+    setOptimisticAnswer(optionId)
     startTransition(async () => {
       try {
         const result = await onSave(item.id, optionId)
         if (!result.ok) {
-          setSelected(previous)
+          setOptimisticAnswer(previous)
           setError(result.message)
+        } else {
+          setOptimisticAnswer(null)
         }
       } catch {
-        setSelected(previous)
+        setOptimisticAnswer(previous)
         setError('Could not save pikanteria answer. Please try again.')
       } finally {
         inFlightRef.current = false
@@ -72,7 +78,7 @@ export function PicanteriaCard({ item, currentAnswer, isLocked, onSave, crowd, c
         <span
           style={{
             fontFamily: 'var(--font-display)',
-            fontSize: 10,
+            fontSize: 12,
             letterSpacing: '0.14em',
             textTransform: 'uppercase',
             color: 'var(--color-amber)',
@@ -103,16 +109,16 @@ export function PicanteriaCard({ item, currentAnswer, isLocked, onSave, crowd, c
             return (
               <button
                 key={opt.id}
+                type="button"
                 onClick={() => handleSelect(opt.id)}
                 disabled={isLocked || pending || saving}
-                className="flex-1 flex items-center justify-center gap-1.5 rounded-xl py-3 transition-all duration-150"
+                className="flex-1 flex items-center justify-center gap-1.5 rounded-xl py-3 transition-all duration-150 min-w-[72px]"
                 style={{
                   background: sel ? 'var(--color-amber)' : 'var(--color-elev)',
                   color: sel ? '#000' : 'var(--color-text)',
                   border: sel ? '1px solid transparent' : '1px solid var(--border-base)',
                   opacity: isLocked ? 0.55 : 1,
                   cursor: isLocked || saving ? 'not-allowed' : 'pointer',
-                  minWidth: 72,
                   transform: sel ? 'scale(1.03)' : 'scale(1)',
                   boxShadow: sel ? '0 4px 14px rgba(245,166,35,0.35)' : 'none',
                 }}
@@ -130,7 +136,7 @@ export function PicanteriaCard({ item, currentAnswer, isLocked, onSave, crowd, c
                 <span
                   style={{
                     fontFamily: 'var(--font-mono)',
-                    fontSize: 11,
+                    fontSize: 12,
                     opacity: 0.65,
                   }}
                 >
@@ -144,7 +150,7 @@ export function PicanteriaCard({ item, currentAnswer, isLocked, onSave, crowd, c
         {error && (
           <div
             role="alert"
-            className="mt-3 text-[11px] font-semibold"
+            className="mt-3 text-[12px] font-semibold"
             style={{ color: 'var(--color-danger)' }}
           >
             {error}
@@ -158,8 +164,8 @@ export function PicanteriaCard({ item, currentAnswer, isLocked, onSave, crowd, c
               className="mb-2"
               style={{
                 fontFamily: 'var(--font-display)',
-                fontSize: 9,
-                letterSpacing: '0.16em',
+                fontSize: 12,
+                letterSpacing: '0.04em',
                 textTransform: 'uppercase',
                 color: 'var(--color-muted)',
               }}
@@ -191,7 +197,7 @@ export function PicanteriaCard({ item, currentAnswer, isLocked, onSave, crowd, c
                   key={opt.id}
                   style={{
                     fontFamily: 'var(--font-mono)',
-                    fontSize: 11,
+                    fontSize: 12,
                     color: selected === opt.id ? 'var(--color-amber)' : 'var(--color-muted)',
                     fontWeight: selected === opt.id ? 700 : 400,
                   }}

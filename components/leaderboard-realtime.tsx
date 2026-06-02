@@ -30,7 +30,7 @@ export function LeaderboardRealtime({ initialEntries, currentUserId }: Props) {
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'pre_tournament_picks' }, refresh)
       .subscribe()
 
-    return () => { supabase.removeChannel(channel) }
+    return () => { channel.unsubscribe() }
   }, [])
 
   return <Leaderboard entries={entries} currentUserId={currentUserId} />

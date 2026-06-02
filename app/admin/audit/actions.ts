@@ -1,6 +1,7 @@
 'use server'
 
-import { createAdminClient, assertAdmin } from '@/lib/supabase/server'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
+import { redirect } from 'next/navigation'
 import { PAGE_SIZE, type AuditRow } from './types'
 
 export async function fetchAuditEvents({
@@ -12,10 +13,15 @@ export async function fetchAuditEvents({
   to?: string
   offset?: number
 }): Promise<AuditRow[]> {
-  await assertAdmin()
-  const supabase = createAdminClient()
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
+  const { data: profile } = await supabase.from('users').select('is_admin').eq('id', user.id).single()
+  if (!profile?.is_admin) redirect('/')
 
-  let query = supabase
+  const admin = createAdminClient()
+
+  let query = admin
     .from('user_prediction_audit_events')
     .select('*, users(display_name, email, is_monkey)')
     .order('committed_at', { ascending: false })

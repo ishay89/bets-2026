@@ -3,6 +3,8 @@ import { redirect } from 'next/navigation'
 import { BottomNav } from '@/components/bottom-nav'
 import { getMatchDaysWithUserData } from '@/lib/data'
 
+export const metadata = { title: 'History | Mondial Bets 2026', description: 'Your prediction history' }
+
 const STAGE_LABELS: Record<string, string> = {
   group: 'Group Stage', r16: 'Round of 16', qf: 'Quarter Finals',
   sf: 'Semi Finals', '3rd': 'Third Place', final: 'Final',
@@ -15,17 +17,18 @@ export default async function HistoryPage() {
 
   const matchDays = await getMatchDaysWithUserData(supabase)
 
-  const allPicks: ('W' | 'L' | null)[] = []
+  const allPicks: { outcome: 'W' | 'L'; matchId: string }[] = []
   for (const day of matchDays.slice(0, 10)) {
     for (const m of day.matches) {
-      const pred = m.predictions.find(p => p.user_id === user.id)
+      const predMap = new Map(m.predictions.map(p => [p.user_id, p]))
+      const pred = predMap.get(user.id)
       if (pred && m.result !== null) {
-        allPicks.push(pred.pick === m.result ? 'W' : 'L')
+        allPicks.push({ outcome: pred.pick === m.result ? 'W' : 'L', matchId: m.id })
       }
     }
   }
   const streak = allPicks.slice(-15)
-  const wins = streak.filter(s => s === 'W').length
+  const wins = streak.filter(s => s.outcome === 'W').length
 
   return (
     <div className="min-h-screen bg-bg">
@@ -50,15 +53,15 @@ export default async function HistoryPage() {
               </span>
             </div>
             <div className="flex gap-1">
-              {streak.map((s, i) => (
-                <div key={i}
+              {streak.map((s) => (
+                <div key={s.matchId}
                   className="flex-1 h-7 rounded flex items-center justify-center text-[10px] font-extrabold"
                   style={{
-                    background: s === 'W' ? 'var(--color-accent-soft)' : 'var(--color-danger-soft)',
-                    border: `1px solid ${s === 'W' ? 'var(--border-accent)' : 'var(--border-danger)'}`,
-                    color: s === 'W' ? 'var(--color-accent)' : 'var(--color-danger)',
+                    background: s.outcome === 'W' ? 'var(--color-accent-soft)' : 'var(--color-danger-soft)',
+                    border: `1px solid ${s.outcome === 'W' ? 'var(--border-accent)' : 'var(--border-danger)'}`,
+                    color: s.outcome === 'W' ? 'var(--color-accent)' : 'var(--color-danger)',
                   }}
-                >{s}</div>
+                >{s.outcome}</div>
               ))}
             </div>
           </div>

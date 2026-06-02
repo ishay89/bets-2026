@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { Oswald, Barlow, IBM_Plex_Mono } from 'next/font/google'
 import { cookies } from 'next/headers'
+import Script from 'next/script'
 import './globals.css'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { createClient } from '@/lib/supabase/server'
@@ -44,6 +45,21 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       .eq('user_id', user.id)
       .maybeSingle()
     winningTeam = pick?.winner_team ?? null
+
+    const { data: existingProfile } = await supabase
+      .from('users')
+      .select('id')
+      .eq('id', user.id)
+      .maybeSingle()
+    if (!existingProfile) {
+      const adminEmails = (process.env.ADMIN_EMAILS ?? '').split(',').map(e => e.trim())
+      await supabase.from('users').insert({
+        id: user.id,
+        email: user.email!,
+        display_name: (user.user_metadata?.full_name as string | undefined) ?? user.email!.split('@')[0],
+        is_admin: adminEmails.includes(user.email!),
+      })
+    }
   }
 
   const cookieStore = await cookies()
@@ -63,11 +79,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     >
       <head>
         {/* Prevent flash of wrong theme on load */}
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `(function(){try{var t=localStorage.getItem('theme')||'light';document.documentElement.setAttribute('data-theme',t);}catch(e){}})();`,
-          }}
-        />
+        <Script strategy="beforeInteractive" id="theme-init">
+          {`(function(){try{var t=localStorage.getItem('theme')||'light';document.documentElement.setAttribute('data-theme',t);}catch(e){}})();`}
+        </Script>
       </head>
       <body className="bg-bg text-text min-h-screen font-sans">
         {children}

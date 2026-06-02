@@ -1,8 +1,8 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { MatchDay, Match, Pikanteria, PicanteriaOption, LeaderboardEntry, Pick } from './types'
+import type { Database } from './supabase/types'
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type Db = SupabaseClient<any>
+type Db = SupabaseClient<Database>
 
 // ── Shared nested types ──────────────────────────────────────────────────────
 
@@ -96,20 +96,6 @@ export async function getUserPikanteriaAnswers(
     .eq('user_id', userId)
   if (error) throw error
   return (data ?? []) as { pikanteria_id: string; option_id: string }[]
-}
-
-export async function getFirstPublishedLockTime(
-  supabase: Db,
-): Promise<{ lock_time: string } | null> {
-  const { data, error } = await supabase
-    .from('match_days')
-    .select('lock_time')
-    .not('published_at', 'is', null)
-    .order('date', { ascending: true })
-    .limit(1)
-    .maybeSingle()
-  if (error) throw error
-  return data as { lock_time: string } | null
 }
 
 /**

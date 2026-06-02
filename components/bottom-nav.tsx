@@ -42,8 +42,8 @@ export function BottomNav() {
       className="fixed bottom-0 left-0 right-0 flex border-t z-10"
       style={{
         background: 'var(--nav-bg)',
-        backdropFilter: 'blur(20px)',
-        WebkitBackdropFilter: 'blur(20px)',
+        backdropFilter: 'blur(8px)',
+        WebkitBackdropFilter: 'blur(8px)',
         borderColor: 'var(--border-subtle)',
         paddingBottom: 'env(safe-area-inset-bottom, 8px)',
       }}
@@ -62,11 +62,11 @@ export function BottomNav() {
               <path d={d} />
             </svg>
             <span
-              className="text-[9px] tracking-widest uppercase"
+              className="text-[12px] uppercase"
               style={{
                 fontFamily: 'var(--font-display)',
                 fontWeight: active ? 700 : 500,
-                letterSpacing: '0.08em',
+                letterSpacing: '0.04em',
               }}
             >
               {label}

@@ -22,9 +22,17 @@ import {
   type SaveResult,
 } from '@/lib/prediction-saves'
 
+export const metadata = { title: 'Predict | Mondial Bets 2026' }
+
 const STAGE_LABELS: Record<string, string> = {
   group: 'Group Stage ×1', r16: 'Round of 16 ×1.5', qf: 'Quarter Finals ×1.5',
   sf: 'Semi Finals ×2', '3rd': 'Third Place ×1.5', final: 'Final ×3',
+}
+
+// Module-level helper keeps the impure Date.now() read out of the component
+// body, so the render stays pure (see app/h2h/[opponentId]/page.tsx).
+function nowMs(): number {
+  return Date.now()
 }
 
 function invalidSaveResult(error: unknown): SaveResult {
@@ -38,6 +46,52 @@ function revalidatePredictPath() {
   } catch (error) {
     console.error('Failed to revalidate /predict after saving prediction', error)
   }
+}
+
+async function savePick(matchId: string, pick: Pick): Promise<SaveResult> {
+  'use server'
+  try {
+    parseUUID(matchId, 'match_id')
+    parsePick(pick, 'match')
+  } catch (error) {
+    return invalidSaveResult(error)
+  }
+
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) {
+    return { ok: false, status: 'error', message: 'Unauthorized' }
+  }
+
+  const result = await saveMatchPrediction(supabase, matchId, pick)
+  if (result.ok) {
+    revalidatePredictPath()
+  }
+
+  return result
+}
+
+async function saveAnswer(picanteriaId: string, optionId: string): Promise<SaveResult> {
+  'use server'
+  try {
+    parseUUID(picanteriaId, 'pikanteria_id')
+    parseUUID(optionId, 'option_id')
+  } catch (error) {
+    return invalidSaveResult(error)
+  }
+
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) {
+    return { ok: false, status: 'error', message: 'Unauthorized' }
+  }
+
+  const result = await savePikanteriaAnswer(supabase, picanteriaId, optionId)
+  if (result.ok) {
+    revalidatePredictPath()
+  }
+
+  return result
 }
 
 export default async function PredictPage() {
@@ -77,7 +131,7 @@ export default async function PredictPage() {
 
   // Surface the most recently published match days first, so a returning player
   // lands on the matches they still need to bet without scrolling.
-  const sortedDays = [...matchDays].sort(
+  const sortedDays = matchDays.toSorted(
     (a, b) => new Date(b.published_at!).getTime() - new Date(a.published_at!).getTime()
   )
 
@@ -102,51 +156,9 @@ export default async function PredictPage() {
     e.total += r.cnt
   }
 
-  async function savePick(matchId: string, pick: Pick): Promise<SaveResult> {
-    'use server'
-    try {
-      parseUUID(matchId, 'match_id')
-      parsePick(pick, 'match')
-    } catch (error) {
-      return invalidSaveResult(error)
-    }
-
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
-      return { ok: false, status: 'error', message: 'Unauthorized' }
-    }
-
-    const result = await saveMatchPrediction(supabase, matchId, pick)
-    if (result.ok) {
-      revalidatePredictPath()
-    }
-
-    return result
-  }
-
-  async function saveAnswer(picanteriaId: string, optionId: string): Promise<SaveResult> {
-    'use server'
-    try {
-      parseUUID(picanteriaId, 'pikanteria_id')
-      parseUUID(optionId, 'option_id')
-    } catch (error) {
-      return invalidSaveResult(error)
-    }
-
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
-      return { ok: false, status: 'error', message: 'Unauthorized' }
-    }
-
-    const result = await savePikanteriaAnswer(supabase, picanteriaId, optionId)
-    if (result.ok) {
-      revalidatePredictPath()
-    }
-
-    return result
-  }
+  // Server-rendered "now" for lock comparisons below. Computed once so the
+  // pikanteria-only lock check stays consistent across the render.
+  const now = nowMs()
 
   return (
     <div className="min-h-screen bg-bg">
@@ -172,7 +184,7 @@ export default async function PredictPage() {
           const stageLabel = STAGE_LABELS[matchDay.stage] ?? matchDay.stage
           const multiplier = stageLabel.includes('×') ? `×${stageLabel.split('×')[1]}` : ''
           const pikaItems = matchDay.pikanteria
-          const sortedMatches = [...matchDay.matches].sort(
+          const sortedMatches = matchDay.matches.toSorted(
             (a, b) => new Date(a.kickoff_time).getTime() - new Date(b.kickoff_time).getTime()
           )
           const dateLabel = new Date(matchDay.date + 'T12:00:00Z').toLocaleDateString('en-US', {
@@ -183,7 +195,7 @@ export default async function PredictPage() {
           const dayManuallyLocked = matchDay.locked
           const allMatchesLocked = sortedMatches.length > 0 && sortedMatches.every(m => isMatchLocked(m, dayManuallyLocked))
           // A pikanteria-only day (no published matches) locks at the day's lock_time.
-          const pikaOnlyLocked = sortedMatches.length === 0 && new Date().getTime() >= new Date(matchDay.lock_time).getTime()
+          const pikaOnlyLocked = sortedMatches.length === 0 && now >= new Date(matchDay.lock_time).getTime()
           const isDayLocked = dayManuallyLocked || allMatchesLocked || pikaOnlyLocked
 
           // Lock timer points to the earliest match's lock time (kickoff − 5 min).
@@ -267,7 +279,7 @@ export default async function PredictPage() {
                   {pikaItems.map(item => (
                     <PicanteriaCard
                       key={`${item.id}:${answerMap[item.id] ?? 'none'}`}
-                      item={{ ...item, options: [...(item.pikanteria_options ?? [])].sort((a, b) => a.sort_order - b.sort_order) }}
+                      item={{ ...item, options: (item.pikanteria_options ?? []).toSorted((a, b) => a.sort_order - b.sort_order) }}
                       currentAnswer={answerMap[item.id] ?? null}
                       isLocked={isDayLocked}
                       onSave={saveAnswer}

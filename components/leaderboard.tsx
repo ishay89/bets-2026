@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import React, { useState } from 'react'
 import Link from 'next/link'
 import type { LeaderboardEntry } from '@/lib/types'
 
@@ -29,6 +29,17 @@ function isAutomated(entry: LeaderboardEntry): boolean {
   return Boolean(entry.automation_strategy || entry.is_monkey)
 }
 
+const vsLinkStyle: React.CSSProperties = {
+  fontFamily: 'var(--font-display)',
+  fontSize: 12,
+  fontWeight: 700,
+  letterSpacing: '0.04em',
+  color: 'var(--color-sub)',
+  background: 'var(--color-elev)',
+  border: '1px solid var(--border-base)',
+  textDecoration: 'none',
+}
+
 const podiumColors = { gold: '#f5c441', silver: '#aab4cd', bronze: '#d18a4d' }
 const podiumOrder = [
   { idx: 1, color: podiumColors.silver, height: 92 },
@@ -40,7 +51,7 @@ export function Leaderboard({ entries, currentUserId }: Props) {
   const [mode, setMode] = useState<'total' | 'today'>('total')
 
   const sorted = mode === 'today'
-    ? [...entries].sort((a, b) => b.today_points - a.today_points)
+    ? entries.toSorted((a, b) => b.today_points - a.today_points)
     : entries
 
   const score = (e: LeaderboardEntry) =>
@@ -72,6 +83,7 @@ export function Leaderboard({ entries, currentUserId }: Props) {
           {(['total', 'today'] as const).map(m => (
             <button
               key={m}
+              type="button"
               onClick={() => setMode(m)}
               className="relative z-10 px-5 py-1.5 rounded-full text-[11px] font-bold tracking-wide transition-colors duration-150"
               style={{ color: mode === m ? '#000' : 'var(--color-muted)', minWidth: 72 }}
@@ -135,8 +147,8 @@ export function Leaderboard({ entries, currentUserId }: Props) {
                 >
                   <span className="text-[11px]">⚠️</span>
                   <span
-                    className="text-[9px] font-bold uppercase tracking-widest"
-                    style={{ color: 'var(--color-danger)' }}
+                    className="text-[12px] font-bold uppercase"
+                    style={{ color: 'var(--color-danger)', letterSpacing: '0.04em' }}
                   >Danger zone · pays extra</span>
                 </div>
               )}
@@ -167,7 +179,7 @@ export function Leaderboard({ entries, currentUserId }: Props) {
                 >
                   {entry.display_name}
                   {automationLabel && (
-                    <span className="ml-1 text-[9px] not-italic" style={{ color: 'var(--color-muted)' }}>
+                    <span className="ml-1 text-[12px] not-italic" style={{ color: 'var(--color-muted)' }}>
                       · {automationLabel}
                     </span>
                   )}
@@ -176,16 +188,7 @@ export function Leaderboard({ entries, currentUserId }: Props) {
                   <Link
                     href={`/h2h/${entry.id}`}
                     className="px-2 py-0.5 rounded-full not-italic shrink-0"
-                    style={{
-                      fontFamily: 'var(--font-display)',
-                      fontSize: 9,
-                      fontWeight: 700,
-                      letterSpacing: '0.08em',
-                      color: 'var(--color-sub)',
-                      background: 'var(--color-elev)',
-                      border: '1px solid var(--border-base)',
-                      textDecoration: 'none',
-                    }}
+                    style={vsLinkStyle}
                   >
                     VS
                   </Link>
