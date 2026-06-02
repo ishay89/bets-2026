@@ -22,6 +22,12 @@ const tabs = [
     d: 'M7 3h10v7a5 5 0 01-10 0V3zM4 5H7v3H4V5zM17 5h3v3h-3V5zM12 15v3M9 21h6M12 18h0',
   },
   {
+    href: '/board',
+    label: 'Social',
+    // Message bubble
+    d: 'M4 4h16v12H8l-4 4V4zm4 5h8M8 12h5',
+  },
+  {
     href: '/history',
     label: 'History',
     // Clock
