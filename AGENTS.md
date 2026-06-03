@@ -6,7 +6,7 @@ This file provides guidance to coding agents when working with code in this repo
 
 **Every code change must follow this workflow. No exceptions.**
 
-1. **Create a new branch** from main before making any changes. Name it descriptively (e.g. `feature/add-login`, `fix/scoring-bug`).
+1. **Create a new branch** from main before making any changes. Name it descriptively (for example `feature/add-login`, `fix/scoring-bug`, `docs/update-agents-codebase-flow`).
 2. **Make changes and commit** on that branch.
 3. **Open a Pull Request** targeting main.
 4. **Never push directly to main** — all changes go through a PR.
@@ -22,261 +22,267 @@ npm run start        # Run production server
 npm run lint         # Run ESLint on all files
 npm test             # Run all tests once (Vitest)
 npm run test:watch   # Run tests in watch mode
+npm run seed         # Seed 2026 group-stage fixtures into Supabase
+npm run gen:types    # Regenerate lib/supabase/types.ts from local Supabase
 ```
 
-## Architecture Overview
+Run a single test file:
 
-**Mondial Bets 2026** is a real-time FIFA World Cup 2026 betting game built with Next.js 16, React 19, and Supabase. Players make predictions on match outcomes and bonus questions (Pikanteria), earn points based on odds and tournament stage, and compete on a live leaderboard.
-
-### Tech Stack
-
-- **Framework**: Next.js 16 (App Router with SSR)
-- **UI**: React 19, Tailwind CSS 4
-- **Database**: Supabase (PostgreSQL) with Row Level Security
-- **Auth**: Supabase Auth (magic link / OAuth)
-- **Testing**: Vitest (scoring logic tests)
-- **Linting**: ESLint 9 with Next.js config
-- **TypeScript**: Strict mode enabled
-
-### Key Architecture Decisions
-
-#### Page Routes (App Router)
-
-The app uses Next.js App Router with this structure:
-- `/` — Home page with leaderboard mini-view, today's matches, countdown to lock time
-- `/login` — Auth entry point (redirects authenticated users home)
-- `/auth/callback` — Supabase OAuth callback handler
-- `/predict` — Make/view predictions for today's matches
-- `/pre-tournament` — One-time picks for tournament winner and top scorer
-- `/history` — View past predictions and results
-- `/leaderboard` — Full leaderboard with all players
-- `/profile` — User profile/settings
-- `/h2h` — Head-to-head player comparison selector
-- `/h2h/[opponentId]` — Detailed H2H comparison against a specific opponent
-- `/admin/*` — Admin-only pages (guarded by `assertAdmin()` in layout + each Server Action)
-  - `/admin/players` — Manage users
-  - `/admin/players/[userId]` — Per-user prediction status
-  - `/admin/tournament` — Create match days and matches
-  - `/admin/edit` — Edit existing match days and matches
-  - `/admin/publish` — Publish drafts to make them playable
-  - `/admin/results` — Enter match results and calculate points
-  - `/admin/scores` — Score validation and recalculation
-  - `/admin/audit` — View prediction audit log
-
-#### Middleware Authentication (proxy.ts)
-
-`proxy.ts` implements edge middleware that:
-- Redirects unauthenticated users to `/login` (except `/auth/*`)
-- Guards `/admin/*` routes (checks `is_admin` flag in users table)
-- Uses Supabase SSR client to validate session via cookies
-
-All routes except auth/login require authentication.
-
-> **IMPORTANT — Next.js 16 naming**: In Next.js 16, the middleware file is `proxy.ts` (not `middleware.ts`). Do **not** create a `middleware.ts` file — having both files simultaneously causes a hard build error: `Both middleware file and proxy file are detected. Please use proxy.ts only.`
-
-For programmatic admin checks inside Server Components and Server Actions, use the `assertAdmin()` helper from `lib/supabase/server.ts` — it calls `getUser()` and redirects to `/login` or `/` on failure.
-
-#### Data Model & Scoring
-
-**Core Tables**:
-- `users` — Player profiles (id, email, display_name, is_admin, is_monkey, created_at)
-- `match_days` — Tournament days (date, stage, lock_time, published_at status)
-- `matches` — Individual matches (home/away teams, odds, result)
-- `predictions` — Player picks per match (1=home win, X=draw, 2=away win)
-- `pikanteria` — Daily bonus questions (yes/no format with odds)
-- `pikanteria_answers` — Player answers to bonus questions
-- `pre_tournament_picks` — One-time bets on tournament winner and top scorer
-
-**Leaderboard View**: SQL view aggregates all points (predictions + pikanteria + pre-tournament) per player, ordered descending.
-
-**Scoring Logic** (`lib/scoring.ts`):
-- Match predictions: `odds × stage_multiplier` (group=1x, r16/qf/3rd=1.5x, sf=2x, final=3x)
-- Pikanteria: `odds × 1` (no multiplier)
-- Tournament winner: `odds × 1.5` (if correct), `odds × 0.75` (if runner-up), 0 (otherwise)
-- Top scorer: `odds × 1` (if correct)
-- Points calculated only after admin enters result
-
-#### Authentication & Authorization
-
-- Supabase handles user signup/login with magic links or OAuth
-- "Monkey" player (id: 00000000-0000-0000-0000-000000000001) is AI baseline for scoring comparison
-- Row Level Security (RLS) enforces:
-  - Predictions/pikanteria answers are user-scoped (read all, write own)
-  - Match days only visible if `published_at IS NOT NULL`
-  - Admins have unrestricted access (not enforced by RLS, but by middleware)
-- **`assertAdmin()`** in `lib/supabase/server.ts` — call at the top of every admin Server Action and admin layout to verify the user is authenticated and has `is_admin = true`; redirects to `/login` or `/` on failure
-- **Server Components**: after `supabase.auth.getUser()`, always check `if (!user) redirect('/login')` before using `user.id` — never use `user!.id`
-
-**Environment Variables Required**:
-```
-NEXT_PUBLIC_SUPABASE_URL=https://...supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=...
-SUPABASE_SERVICE_ROLE_KEY=...  # For server-side admin operations
-```
-
-#### Real-Time Components
-
-`components/leaderboard-realtime.tsx` uses Supabase's real-time subscription API to listen for prediction/answer changes and update leaderboard live during a match day.
-
-### Directory Structure
-
-```
-app/                    # Next.js app router pages
-├── admin/              # Admin pages (all guarded by assertAdmin())
-│   ├── layout.tsx      # Shared admin layout with nav; calls assertAdmin()
-│   ├── page.tsx        # Admin dashboard
-│   ├── audit/          # Prediction audit log
-│   ├── edit/           # Edit match days and matches
-│   ├── players/        # Manage users
-│   │   └── [userId]/   # Per-user prediction status
-│   ├── publish/        # Publish draft match days
-│   ├── results/        # Enter match results
-│   ├── scores/         # Score validation and recalculation
-│   └── tournament/     # Create match days and matches
-├── auth/callback/      # Supabase OAuth callback handler
-├── h2h/                # Head-to-head comparison selector
-│   └── [opponentId]/   # Detailed H2H stats page
-├── history/            # Past predictions and results
-├── leaderboard/        # Full live leaderboard
-├── login/              # Auth entry point
-├── predict/            # Make/view daily predictions
-├── pre-tournament/     # One-time tournament picks
-├── profile/            # User profile and stats
-├── layout.tsx          # Root layout with metadata
-└── page.tsx            # Home page (mini leaderboard + today's matches)
-
-components/             # Reusable React components
-├── admin-nav.tsx       # Admin section navigation bar
-├── bottom-nav.tsx      # Mobile bottom navigation
-├── crowd-insight.tsx   # Crowd pick distribution display
-├── leaderboard.tsx     # Leaderboard table component
-├── leaderboard-realtime.tsx  # Live leaderboard with Supabase subscription
-├── lock-timer.tsx      # Countdown to pick lock time
-├── match-card.tsx      # Match display with odds and pick UI
-├── pikanteria-builder.tsx    # Admin: pikanteria question builder
-├── pikanteria-card.tsx # Pikanteria side-bet card
-└── theme-toggle.tsx    # Light/dark theme switcher
-
-lib/
-├── audit.ts            # Audit event writing helpers
-├── crowd.ts            # Crowd pick aggregation and insight logic
-├── display.ts          # Shared display/formatting utilities
-├── h2h.ts              # Head-to-head comparison calculations
-├── lock.ts             # Match lock-time helpers (5 min before kickoff)
-├── monkey.ts           # Monkey AI pick logic
-├── pre-tournament.ts   # Pre-tournament pick helpers and guards
-├── score-validation.ts # Score integrity validation
-├── scoring.ts          # Point calculation functions
-├── team-theme.ts       # Winner team dynamic theme tokens
-├── types.ts            # TypeScript interfaces (User, Match, Prediction, etc.)
-└── supabase/
-    ├── server.ts       # Server-side Supabase client; exports createClient(),
-    │                   # createAdminClient(), createServiceClient(), assertAdmin()
-    └── client.ts       # Browser-side Supabase client
-
-supabase/
-├── config.toml                 # Supabase CLI project config (fill in project_id)
-└── migrations/
-    ├── 001_schema.sql              # Create all tables and leaderboard view
-    ├── 002_rls.sql                 # Enable RLS policies
-    ├── 003_add_r32_stage.sql       # Add r32 stage
-    ├── 004_score_snapshots.sql     # Score snapshot table
-    ├── 005_leaderboard_today_points.sql
-    ├── 006_pikanteria_options.sql  # N-option pikanteria support
-    ├── 007_user_prediction_audit_events.sql
-    ├── 008_automated_marker_users.sql
-    ├── 009_match_locking.sql       # Per-match lock flag
-    ├── 010_crowd_picks.sql         # Crowd pick RPCs
-    └── 011_atomic_scoring.sql      # Atomic scoring write path
-
-public/                 # Static assets
-
-proxy.ts                # Next.js 16 middleware (auth guard + session refresh)
-tsconfig.json           # TypeScript config with @ path alias
-next.config.ts          # Next.js config
-eslint.config.mjs       # ESLint rules
-postcss.config.mjs      # Tailwind CSS PostCSS config
-vitest.config.ts        # Vitest config
-package.json            # Dependencies and scripts
-```
-
-### Testing
-
-Tests are in `lib/*.test.ts` files. Vitest is configured with React support via `@vitejs/plugin-react`.
-
-Test files:
-- `lib/scoring.test.ts` — point calculations for all stages, rounding
-- `lib/crowd.test.ts` — crowd pick aggregation and percentage logic
-- `lib/h2h.test.ts` — head-to-head comparison calculations
-- `lib/lock.test.ts` — match lock-time logic
-- `lib/monkey.test.ts` — monkey AI pick strategy
-- `lib/pre-tournament.test.ts` — pre-tournament pick helpers
-- `lib/team-theme.test.ts` — team theme token mapping
-- `lib/audit.test.ts` — audit event deduplication
-
-Run single test file:
 ```bash
 npm test -- lib/scoring.test.ts
 ```
 
-### Configuration Files
+## Architecture Overview
 
-- **tsconfig.json**: Strict mode, @ alias to root, incremental builds
-- **next.config.ts**: Empty (can add image optimization, API routes, etc.)
-- **postcss.config.mjs**: Tailwind CSS 4 plugin
-- **eslint.config.mjs**: ESLint 9 flat config with Next.js/TypeScript rules
-- **vitest.config.ts**: Node environment, React plugin
+**Mondial Bets 2026** is a private FIFA World Cup 2026 betting game built with Next.js 16, React 19, Tailwind CSS 4, and Supabase. Players make pre-tournament futures picks, daily match predictions, and pikanteria side bets, then compete against friends and automated benchmark players on a live leaderboard.
 
-### CSS & Styling
+### Tech Stack
 
-- **Tailwind CSS 4** with custom CSS variables for theming
-- Global styles in `app/globals.css`
-- Custom color tokens: `--color-accent` (green), `--color-bg`, `--color-panel`, `--color-text`, `--color-muted`, etc.
-- Fonts: Inter (body), IBM Plex Mono (monospace), Geist (via next/font)
+- **Framework**: Next.js 16 App Router with Server Components and Server Actions
+- **UI**: React 19, Tailwind CSS 4, CSS custom-property theming
+- **Database**: Supabase PostgreSQL with RLS, SQL views, triggers, RPCs, and Storage
+- **Auth**: Supabase Auth, plus app-level player approval/blocking
+- **Testing**: Vitest for pure scoring, lock, audit, snapshot, and save helpers
+- **Linting**: ESLint 9 with Next.js config
+- **TypeScript**: Strict mode enabled, `@/*` path alias to repo root
 
-## Database Setup
+### Page Routes
 
-1. Create Supabase project (free tier works)
-2. Fill in `project_id` in `supabase/config.toml` (Supabase Dashboard → Settings → General)
-3. Apply all migrations via the Supabase CLI:
-   ```bash
-   npm install -g supabase   # install CLI once
-   supabase login
-   supabase db push          # applies 001 → 011 in order
-   ```
-   Migrations include automated benchmark users (Monkey, Always Max, Always Mid, Always Min) — no manual seed needed.
-4. Set environment variables in `.env.local` (see Supabase dashboard)
+- `/` — redirects to `/predict`
+- `/login` — auth entry point with Google sign-in
+- `/auth/callback` — Supabase OAuth callback handler
+- `/pending` — waiting/blocked account screen with sign-out
+- `/predict` — primary player surface: futures picks, published match predictions, pikanteria, crowd insights, and lock timers
+- `/history` — past picks and results
+- `/leaderboard` — full leaderboard
+- `/profile` — user profile and stats
+- `/board` — message board with user posts, image uploads, and AI recap feed
+- `/h2h` — head-to-head player comparison selector
+- `/h2h/[opponentId]` — detailed H2H comparison against one opponent
+- `/admin/*` — admin-only pages, guarded by `assertAdmin()` in layout and in every Server Action
+  - `/admin` — admin dashboard
+  - `/admin/publish` — publish or unpublish individual matches/pikanteria for a date; can create and immediately publish pikanteria
+  - `/admin/edit` — edit odds, pikanteria, futures lock, match locks, and pikanteria locks for unscored published content
+  - `/admin/results` — score/reset individual matches and resolve pikanteria
+  - `/admin/tournament` — score tournament winner/top scorer futures
+  - `/admin/players` — approve, block, unblock, promote, and demote users
+  - `/admin/players/[userId]` — per-user prediction status
+  - `/admin/scores` — score snapshot validation and recalculation
+  - `/admin/audit` — admin view of prediction audit events
 
-> **Manual fallback**: if the CLI is unavailable, run each file in `supabase/migrations/` in numeric order (001 → 011) via Supabase Dashboard → SQL Editor.
+### Authentication, Approval, and Middleware
 
-## Development Workflow
+`proxy.ts` is the Next.js 16 middleware file. Do **not** create `middleware.ts`; having both `proxy.ts` and `middleware.ts` causes a hard build error.
 
-### Making Predictions Feature Changes
+`proxy.ts`:
+- Redirects unauthenticated users to `/login`, except `/login` and `/auth/*`
+- Reads `users.is_admin` and `users.status`
+- Allows admins into `/admin/*`
+- Sends pending/blocked non-admin users to `/pending`
+- Keeps approved users/admins away from `/pending`
+- Refreshes Supabase session cookies via `@supabase/ssr`
 
-1. Pages fetch data server-side with `createClient()` from `lib/supabase/server.ts`
-2. Add real-time listeners in component `useEffect` using browser client from `lib/supabase/client.ts`
-3. Updates insert/update predictions via Supabase client (RLS enforces user_id = auth.uid())
-4. Lock time is checked in the component (server calculates, UI shows countdown)
+`app/layout.tsx` creates a `users` row on first authenticated render if one does not exist. Emails listed in `ADMIN_EMAILS` become approved admins automatically; all other new players start as `pending`.
 
-### Adding Tournament Stages & Matches
+For Server Components, always check:
 
-1. Create match_day record with stage, date, lock_time, published_at (null = draft)
-2. Insert match records under that match_day
-3. Set odds for each match
-4. Admin publishes match_day (sets published_at), making it visible to players
-5. After kickoff, admin enters results (1/X/2) and system auto-calculates points
+```ts
+const { data: { user } } = await supabase.auth.getUser()
+if (!user) redirect('/login')
+```
 
-### Updating Scoring Rules
+Never use `user!.id` in Server Components.
 
-1. Modify `STAGE_MULTIPLIERS` or calculation functions in `lib/scoring.ts`
-2. Update tests in `lib/scoring.test.ts`
-3. Admin runs "recalculate" endpoint (if implemented) or manually updates predictions.points in DB
+For admin Server Components and Server Actions, call `assertAdmin()` from `lib/supabase/server.ts` before privileged reads/writes. Use:
+- `createClient()` for user-session scoped reads/writes
+- `createAdminClient()` for service-role operations that bypass RLS without cookies
+- `createServiceClient()` for service-role operations that still need cookie plumbing in Server Actions
+
+## Data Model
+
+Core tables and views:
+
+- `users` — player profiles, admin flag, automated marker flag/strategy, and `status` (`pending`, `approved`, `blocked`)
+- `match_days` — tournament dates, stage, aggregate publish/lock metadata
+- `matches` — fixtures, odds, result, per-match lock, per-item `published_at`
+- `pikanteria` — side-bet questions, per-question lock, per-item `published_at`
+- `pikanteria_options` — N-option pikanteria answers with odds, correctness, and sort order
+- `predictions` — player match picks and scored points
+- `pikanteria_answers` — player pikanteria option picks and scored points
+- `pre_tournament_picks` — futures picks for winner and top scorer
+- `tournament_settings` — global futures lock
+- `score_snapshots` — per-day and pre-tournament score validation snapshots
+- `user_prediction_audit_events` — audit log for committed prediction/futures changes
+- `message_board_posts` — user board posts with optional image paths
+- `ai_social_posts` — generated recap/commentary posts shown on the board
+- `leaderboard` — SQL view aggregating all scored points and today points
+- Supabase Storage bucket `message-board-images` — public board image uploads with RLS policies
+
+Automated benchmark users:
+- Monkey (`00000000-0000-0000-0000-000000000001`) uses deterministic random picks
+- Always Max (`...0002`) chooses highest odds
+- Always Mid (`...0003`) chooses median odds
+- Always Min (`...0004`) chooses lowest odds
+
+Automated match and pikanteria rows are generated when items are published in `/admin/publish`.
+
+## Scoring and Write Paths
+
+Point math lives in `lib/scoring.ts`:
+- Match predictions: `odds × stage_multiplier`
+- Stage multipliers: group `1`, r32 `1.25`, r16/qf/3rd `1.5`, sf `2`, final `3`
+- Pikanteria: odds only
+- Tournament winner: odds `× 1.5` if winner, odds `× 0.75` if runner-up
+- Top scorer: odds only
+- All point values are rounded to 4 decimals
+
+Pure builders in `lib/scoring-writes.ts` assemble payloads for atomic scoring RPCs. Keep point math in pure functions and add/update tests when scoring changes.
+
+Prediction save flow:
+- `/predict` Server Actions validate IDs/picks with `lib/validation.ts`
+- `lib/prediction-saves.ts` calls `save_match_prediction` and `save_pikanteria_answer`
+- The SQL RPCs enforce item existence, publication, lock state, and user ownership
+- RPC responses normalize to `created`, `updated`, `unchanged`, `locked`, `not_found`, `invalid`, or `error`
+
+Scoring flow:
+- `/admin/results` builds match/pikanteria point payloads and calls `enter_match_day_results`
+- `/admin/results` reset calls `reset_match_result`
+- `/admin/tournament` builds futures point payloads and calls `score_tournament_end`
+- Score snapshots are derived after scoring through `lib/score-validation.ts`; they are recoverable and intentionally outside the scoring transaction
+
+Crowd insight flow:
+- `/predict` calls `crowd_match_picks` and `crowd_pikanteria_picks`
+- RLS/RPC logic reveals aggregate crowd data only after the relevant item is locked
+
+Futures flow:
+- The futures UI is part of `/predict` via `components/pre-tournament-futures.tsx`
+- Server Actions live in `app/predict/pre-tournament-actions.ts`
+- `tournament_settings.futures_locked` blocks edits when set
+- The root layout reads the current user's winner pick and applies dynamic team theme variables
+
+Message board flow:
+- `/board` loads initial `message_board_posts` and `ai_social_posts`
+- `components/board-feed.tsx` handles realtime refresh, client-side image uploads, post creation, and deletion
+- Users can delete their own posts; admins can delete any post
+
+## Supabase Migrations
+
+Migrations live in `supabase/migrations/` and must be applied in filename order. The database has evolved beyond the original `001`-`011` files; include `012_atomic_prediction_saves.sql` and all later timestamped migrations.
+
+Important later migrations:
+- `012_atomic_prediction_saves.sql` — atomic prediction/pikanteria save RPCs and stricter write policies
+- `20260530182900_per_item_publishing.sql` — `matches.published_at`, `pikanteria.published_at`, sync triggers for `match_days`
+- `20260530182901_per_item_publish_write_guards.sql` — save guards for per-item publication
+- `20260530182902_update_pikanteria.sql` — `update_pikanteria_with_options`
+- `20260531000000_tournament_settings_futures_lock.sql` — futures lock table
+- `20260601000000_widen_numeric_precision.sql` — widened numeric precision for odds/points
+- `20260601000001_reset_match_result_rpc.sql` — atomic result reset
+- `20260602000000_player_approval_blocking.sql` — user approval/blocking status and leaderboard filtering
+- `20260602174444_independent_bet_locks.sql` — independent match and pikanteria locks
+- `20260602193151_message_board.sql` — message board table, Storage bucket, and policies
+- `20260602200200_ai_social_posts.sql` — AI recap table
+- `20260602204722_admin_delete_message_board_posts.sql` — admin delete policies for posts/images
+
+Apply migrations:
+
+```bash
+supabase db push
+```
+
+Manual fallback: run every SQL file in `supabase/migrations/` in filename order in the Supabase Dashboard SQL Editor. Do not stop at `011`.
+
+After schema changes, regenerate types when a local Supabase instance is available:
+
+```bash
+npm run gen:types
+```
+
+## Seeding
+
+`scripts/seed-wc2026.ts` inserts the 2026 group-stage `match_days` and `matches` as drafts. It requires:
+
+```env
+NEXT_PUBLIC_SUPABASE_URL=...
+SUPABASE_SERVICE_ROLE_KEY=...
+```
+
+Run:
+
+```bash
+npm run seed
+```
+
+The seed script does not publish matches. Use `/admin/publish` to publish individual matches or pikanteria when ready.
+
+## Testing
+
+Vitest tests are in `lib/*.test.ts`.
+
+Current test focus:
+- `lib/scoring.test.ts` — point calculations and rounding
+- `lib/scoring-writes.test.ts` — payload builders for atomic scoring RPCs
+- `lib/score-validation.test.ts` — score snapshot validity and payloads
+- `lib/prediction-saves.test.ts` — save RPC result normalization
+- `lib/crowd.test.ts` — crowd pick aggregation and insight logic
+- `lib/h2h.test.ts` — head-to-head comparison calculations
+- `lib/lock.test.ts` — match lock-time logic
+- `lib/monkey.test.ts` — automated benchmark pick strategy
+- `lib/pre-tournament.test.ts` — futures pick completion helper
+- `lib/team-theme.test.ts` — dynamic team theme token mapping
+- `lib/audit.test.ts` — audit event deduplication
+
+Before finishing code changes, run the narrow relevant tests and then `npm run lint` when practical. For docs-only updates, at minimum inspect the diff.
+
+## Styling and UI
+
+Global styles live in `app/globals.css`; additional guidance is in `STYLE_GUIDE.md` and `docs/style-guide.md`.
+
+Key rules:
+- Use design tokens (`--color-*`, `--border-*`, `--team-*`) instead of hard-coded colors when possible
+- The active champion pick can alter `--color-accent` and related team variables via `lib/team-theme.ts`
+- Keep mobile betting screens dense, scannable, and operational
+- Main page content usually needs `pb-28` so the bottom nav does not cover controls
+- The floating `ThemeToggle` is in the root layout; bottom navigation is page-specific
+- Existing UI uses compact betting cards, odds chips, all-caps display labels, and CSS variable inline styles
+
+## Environment Variables
+
+Required for app runtime:
+
+```env
+NEXT_PUBLIC_SUPABASE_URL=https://...supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=...
+SUPABASE_SERVICE_ROLE_KEY=...
+```
+
+Optional:
+
+```env
+ADMIN_EMAILS=admin1@example.com,admin2@example.com
+```
+
+`ADMIN_EMAILS` only affects first-time profile creation in `app/layout.tsx`.
+
+## Development Notes
+
+- Use `proxy.ts` only for middleware.
+- Keep admin Server Actions guarded with `assertAdmin()`.
+- Prefer existing helpers in `lib/data.ts`, `lib/validation.ts`, `lib/prediction-saves.ts`, `lib/scoring-writes.ts`, and `lib/score-validation.ts`.
+- Do not bypass the prediction save/scoring RPCs with direct table writes unless you are deliberately changing the write path and migrations/tests together.
+- Preserve RLS expectations: normal users write their own predictions/answers/posts; service-role clients are for admin-only flows.
+- When adding pikanteria, use the N-option model (`pikanteria_options`), not the old yes/no shape.
+- Publication is per item (`matches.published_at`, `pikanteria.published_at`); `match_days.published_at` is synchronized by database triggers.
+- Locks are also per item (`matches.locked`, `pikanteria.locked`) plus a separate futures lock.
+- If changing leaderboard semantics, update the SQL view migrations and any snapshot validation assumptions together.
 
 ## Common Issues
 
-- **Build error "Both middleware file and proxy file are detected"**: Do NOT create `middleware.ts` — Next.js 16 uses `proxy.ts` as its middleware file. Delete `middleware.ts` if it exists.
-- **401 Unauthorized on admin routes**: Ensure user has `is_admin = true` in users table; check `assertAdmin()` is called in the layout and each Server Action
-- **Predictions not appearing**: Check match_day has `published_at IS NOT NULL`
-- **Lock time shows negative**: Verify match_day.lock_time is in future; UI clamps to 0
-- **Points not calculated**: Admin must enter result (1/X/2) in matches table; points trigger on result entry
-- **Server crash / forced reload**: Never use `user!.id` in Server Components — always guard with `if (!user) redirect('/login')` after `getUser()`
+- **Build error "Both middleware file and proxy file are detected"**: Do not create `middleware.ts`; Next.js 16 uses `proxy.ts`.
+- **New user stuck on `/pending`**: Approve them in `/admin/players`, or include their email in `ADMIN_EMAILS` before their first profile row is created.
+- **Admin cannot access `/admin`**: Ensure `users.is_admin = true` and `users.status = 'approved'`.
+- **Predictions not visible/savable**: Check item-level `published_at`, item lock state, and the save RPC response.
+- **Crowd picks not visible**: Crowd RPCs reveal data only after locks.
+- **Pikanteria answers missing**: Ensure options exist in `pikanteria_options`; the old yes/no columns are not the active model.
+- **Points not updated**: Results must be entered through `/admin/results` or the atomic scoring RPC path.
+- **Score snapshot mismatch**: Use `/admin/scores` → Revalidate All, then inspect raw prediction/answer/futures point rows.
+- **Message board image failures**: Check the `message-board-images` Storage bucket, file size/type, and Storage policies.
