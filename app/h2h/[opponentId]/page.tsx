@@ -91,33 +91,30 @@ function buildRoundsVM(
     }
 
     for (const pk of day.pikanteria ?? []) {
-      const optById = new Map<string, { id: string; label: string; is_correct: boolean }>()
-      let correctOpt: { id: string; label: string; is_correct: boolean } | null = null
-      for (const o of pk.pikanteria_options) {
-        optById.set(o.id, o)
-        if (o.is_correct) correctOpt = o
+      const labelFor = (pick: string | null | undefined): string | null => {
+        if (pick === '1') return pk.label_1
+        if (pick === '2') return pk.label_2
+        if (pick === 'X') return pk.label_x
+        return null
       }
       const ansByUser = new Map(pk.pikanteria_answers.map(a => [a.user_id, a]))
       const myAns = ansByUser.get(myId)
       const theirAns = ansByUser.get(opponentId)
       const theirHidden = !pk.locked && !theirAns
-      const resolved = correctOpt !== null
-
-      const labelFor = (optId: string | undefined) =>
-        optId ? (optById.get(optId)?.label ?? '?') : null
+      const resolved = pk.result !== null
 
       const h2h: H2HMatch = {
         id: pk.id,
         resolved,
         mine: {
-          pick: myAns?.option_id ?? null,
+          pick: myAns?.pick ?? null,
           points: myAns?.points ?? 0,
-          correct: resolved && myAns ? myAns.option_id === correctOpt!.id : null,
+          correct: resolved && myAns ? myAns.pick === pk.result : null,
         },
         theirs: {
-          pick: theirHidden ? null : (theirAns?.option_id ?? null),
+          pick: theirHidden ? null : (theirAns?.pick ?? null),
           points: theirAns?.points ?? 0,
-          correct: resolved && theirAns ? theirAns.option_id === correctOpt!.id : null,
+          correct: resolved && theirAns ? theirAns.pick === pk.result : null,
           hidden: theirHidden,
         },
       }
@@ -125,9 +122,9 @@ function buildRoundsVM(
         h2h,
         kind: 'pika',
         label: pk.question,
-        resultLabel: correctOpt?.label ?? null,
-        myLabel: labelFor(myAns?.option_id),
-        theirLabel: theirHidden ? null : labelFor(theirAns?.option_id),
+        resultLabel: labelFor(pk.result),
+        myLabel: labelFor(myAns?.pick),
+        theirLabel: theirHidden ? null : labelFor(theirAns?.pick),
       })
     }
 

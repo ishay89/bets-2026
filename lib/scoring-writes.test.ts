@@ -4,7 +4,7 @@ import {
   buildPikanteriaScoringPayload,
   buildTournamentScoringPayload,
   type ScoredMatchInput,
-  type PikanteriaInput,
+  type ScoredPikanteriaInput,
   type PreTournamentPickInput,
 } from './scoring-writes'
 
@@ -22,55 +22,62 @@ describe('buildMatchScoringPayload', () => {
   }
 
   it('emits one match-result write per match', () => {
-    const { matchResults } = buildMatchScoringPayload([match], 'group')
+    const { matchResults } = buildMatchScoringPayload([match])
     expect(matchResults).toEqual([{ match_id: 'm1', result: '1' }])
   })
 
   it('scores correct picks with the result odds and wrong picks zero', () => {
-    const { predictionPoints } = buildMatchScoringPayload([match], 'group')
+    const { predictionPoints } = buildMatchScoringPayload([match])
     expect(predictionPoints).toEqual([
       { id: 'p-correct', points: 2.0 },
       { id: 'p-wrong', points: 0 },
     ])
   })
 
-  it('uses the odds matching the actual result and applies the stage multiplier', () => {
+  it('uses the odds matching the actual result (plain odds, no multiplier)', () => {
     const awayWin: ScoredMatchInput = { ...match, result: '2', predictions: [{ id: 'p', pick: '2' }] }
-    // away odds 4.0 × qf multiplier 1.5 = 6.0
-    const { predictionPoints } = buildMatchScoringPayload([awayWin], 'qf')
-    expect(predictionPoints).toEqual([{ id: 'p', points: 6.0 }])
+    const { predictionPoints } = buildMatchScoringPayload([awayWin])
+    expect(predictionPoints).toEqual([{ id: 'p', points: 4.0 }])
   })
 
   it('handles a match with no predictions', () => {
     const empty: ScoredMatchInput = { ...match, predictions: [] }
-    const { matchResults, predictionPoints } = buildMatchScoringPayload([empty], 'group')
+    const { matchResults, predictionPoints } = buildMatchScoringPayload([empty])
     expect(matchResults).toHaveLength(1)
     expect(predictionPoints).toEqual([])
   })
 })
 
 describe('buildPikanteriaScoringPayload', () => {
-  const item: PikanteriaInput = {
+  const item: ScoredPikanteriaInput = {
     id: 'pk1',
-    winningOptionId: 'opt-win',
-    winningOdds: 1.65,
+    odds_1: 1.65,
+    odds_2: 2.2,
+    odds_x: 3.4,
+    result: '1',
     answers: [
-      { id: 'a-correct', option_id: 'opt-win' },
-      { id: 'a-wrong', option_id: 'opt-lose' },
+      { id: 'a-correct', pick: '1' },
+      { id: 'a-wrong', pick: '2' },
     ],
   }
 
-  it('emits the winner flip per question', () => {
-    const { winners } = buildPikanteriaScoringPayload([item])
-    expect(winners).toEqual([{ pikanteria_id: 'pk1', option_id: 'opt-win' }])
+  it('emits the result write per question', () => {
+    const { pikanteriaResults } = buildPikanteriaScoringPayload([item])
+    expect(pikanteriaResults).toEqual([{ pikanteria_id: 'pk1', result: '1' }])
   })
 
-  it('scores answers matching the winning option with its odds, others zero', () => {
+  it('scores answers matching the winning outcome with its odds, others zero', () => {
     const { answerPoints } = buildPikanteriaScoringPayload([item])
     expect(answerPoints).toEqual([
       { id: 'a-correct', points: 1.65 },
       { id: 'a-wrong', points: 0 },
     ])
+  })
+
+  it('reads the X odds when the draw outcome wins', () => {
+    const drawWin: ScoredPikanteriaInput = { ...item, result: 'X', answers: [{ id: 'a', pick: 'X' }] }
+    const { answerPoints } = buildPikanteriaScoringPayload([drawWin])
+    expect(answerPoints).toEqual([{ id: 'a', points: 3.4 }])
   })
 })
 
@@ -83,18 +90,18 @@ describe('per-item scoring payloads', () => {
       id: 'm1', odds_home: 2, odds_draw: 3, odds_away: 4, result: '1',
       predictions: [{ id: 'p1', pick: '1' }],
     }
-    const { matchResults, predictionPoints } = buildMatchScoringPayload([one], 'group')
+    const { matchResults, predictionPoints } = buildMatchScoringPayload([one])
     expect(matchResults).toEqual([{ match_id: 'm1', result: '1' }])
     expect(predictionPoints).toEqual([{ id: 'p1', points: 2 }])
   })
 
   it('scores a single pikanteria without touching others', () => {
-    const one: PikanteriaInput = {
-      id: 'pk1', winningOptionId: 'opt', winningOdds: 2.0,
-      answers: [{ id: 'a1', option_id: 'opt' }],
+    const one: ScoredPikanteriaInput = {
+      id: 'pk1', odds_1: 2.0, odds_2: 1.5, odds_x: null, result: '1',
+      answers: [{ id: 'a1', pick: '1' }],
     }
-    const { winners, answerPoints } = buildPikanteriaScoringPayload([one])
-    expect(winners).toEqual([{ pikanteria_id: 'pk1', option_id: 'opt' }])
+    const { pikanteriaResults, answerPoints } = buildPikanteriaScoringPayload([one])
+    expect(pikanteriaResults).toEqual([{ pikanteria_id: 'pk1', result: '1' }])
     expect(answerPoints).toEqual([{ id: 'a1', points: 2.0 }])
   })
 })

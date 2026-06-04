@@ -54,8 +54,8 @@ export default async function PlayerDetailPage({
   const predictionMap: Record<string, Pick> = Object.fromEntries(
     predictions.map(p => [p.match_id, p.pick as Pick])
   )
-  const answerMap: Record<string, string> = Object.fromEntries(
-    answers.map(a => [a.pikanteria_id, a.option_id as string])
+  const answerMap: Record<string, Pick> = Object.fromEntries(
+    answers.map(a => [a.pikanteria_id, a.pick as Pick])
   )
 
   const matchDays = matchDaysRaw as FullMatchDay[]
@@ -126,8 +126,8 @@ export default async function PlayerDetailPage({
             })}
 
             {openPikanteria.map(item => {
-              const optionId = answerMap[item.id]
-              const option = (item.pikanteria_options ?? []).find(o => o.id === optionId)
+              const pick = answerMap[item.id]
+              const label = pick === '1' ? item.label_1 : pick === '2' ? item.label_2 : pick === 'X' ? item.label_x : null
               return (
                 <div key={item.id}
                   className="flex items-center justify-between rounded-xl px-4 py-3"
@@ -138,7 +138,7 @@ export default async function PlayerDetailPage({
                       <span className="font-semibold text-[13px] text-text truncate">{item.question}</span>
                     </div>
                   </div>
-                  <StatusBadge submitted={!!optionId} label={option?.label} />
+                  <StatusBadge submitted={!!pick} label={pick ? `${pick} · ${label ?? ''}` : undefined} />
                 </div>
               )
             })}

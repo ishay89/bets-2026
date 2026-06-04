@@ -63,17 +63,17 @@ describe('prediction save RPC wrappers', () => {
     await expect(saveMatchPrediction(client, 'match-1', '2')).resolves.toEqual(expected)
   })
 
-  test('saves a pikanteria option through the atomic RPC', async () => {
+  test('saves a pikanteria answer through the atomic RPC', async () => {
     const client = rpcClient({
       data: { ok: true, status: 'created', record_id: 'answer-1', message: null },
       error: null,
     })
 
-    const result = await savePikanteriaAnswer(client, 'pika-1', 'option-1')
+    const result = await savePikanteriaAnswer(client, 'pika-1', '1')
 
     expect(client.rpc).toHaveBeenCalledWith('save_pikanteria_answer', {
       p_pikanteria_id: 'pika-1',
-      p_option_id: 'option-1',
+      p_pick: '1',
     })
     expect(result).toEqual<SaveResult>({
       ok: true,

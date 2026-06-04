@@ -1,5 +1,5 @@
 import { createAdminClient, assertAdmin } from '@/lib/supabase/server'
-import { parseUUID, parseOdds } from '@/lib/validation'
+import { parseUUID, parseOdds, parsePikanteriaOutcomes } from '@/lib/validation'
 import {
   buildAutomatedMatchRows,
   buildAutomatedPikaRows,
@@ -90,13 +90,18 @@ async function publishExistingPikanteria(formData: FormData) {
 
   const users = await getAutomatedUsers(supabase)
   if (users.length) {
-    const { data: opts } = await supabase
-      .from('pikanteria_options')
-      .select('id, odds, sort_order')
-      .eq('pikanteria_id', pikanteriaId)
-    if (opts?.length) {
-      const options = opts.map(o => ({ id: o.id as string, odds: Number(o.odds), sort_order: o.sort_order as number }))
-      const rows = buildAutomatedPikaRows(users, [{ id: pikanteriaId, options }], date)
+    const { data: pika } = await supabase
+      .from('pikanteria')
+      .select('odds_1, odds_2, odds_x')
+      .eq('id', pikanteriaId)
+      .single()
+    if (pika) {
+      const rows = buildAutomatedPikaRows(users, [{
+        id: pikanteriaId,
+        odds_1: Number(pika.odds_1),
+        odds_2: Number(pika.odds_2),
+        odds_x: pika.odds_x == null ? null : Number(pika.odds_x),
+      }], date)
       await supabase.from('pikanteria_answers').upsert(rows, { onConflict: 'user_id,pikanteria_id' })
     }
   }
@@ -113,14 +118,13 @@ async function unpublishPikanteria(formData: FormData) {
   const pikanteriaId = parseUUID(formData.get('pikanteria_id'), 'pikanteria_id')
   const date = formData.get('date') as string
 
-  // Refuse to hide an already-resolved question (one with a correct option).
-  const { data: correct } = await supabase
-    .from('pikanteria_options')
-    .select('id')
-    .eq('pikanteria_id', pikanteriaId)
-    .eq('is_correct', true)
-    .limit(1)
-  if (correct?.length) {
+  // Refuse to hide an already-resolved question (one with a result entered).
+  const { data: pika } = await supabase
+    .from('pikanteria')
+    .select('result')
+    .eq('id', pikanteriaId)
+    .single()
+  if (pika?.result != null) {
     redirect(`/admin/publish?date=${date}&notice=scored`)
   }
 
@@ -141,36 +145,36 @@ async function publishNewPikanteria(formData: FormData) {
   const q = (formData.get('pik_q_1') as string | null)?.trim()
   if (!q) redirect(`/admin/publish?date=${date}`)
 
-  const count = parseInt((formData.get('pik_opt_count_1') as string) || '0')
-  const optionRows: { label: string; odds: number; sort_order: number }[] = []
-  for (let j = 1; j <= count; j++) {
-    const label = (formData.get(`pik_opt_label_1_${j}`) as string | null)?.trim()
-    if (!label) continue
-    let odds: number
-    try {
-      odds = parseOdds(formData.get(`pik_opt_odds_1_${j}`), `pik_opt_odds_1_${j}`)
-    } catch {
-      continue
-    }
-    optionRows.push({ label, odds, sort_order: j - 1 })
+  let outcomes
+  try {
+    outcomes = parsePikanteriaOutcomes(formData)
+  } catch {
+    redirect(`/admin/publish?date=${date}&notice=options`)
   }
-  if (optionRows.length < 2) redirect(`/admin/publish?date=${date}&notice=options`)
 
-  const { data: pikaResult, error } = await supabase.rpc('insert_pikanteria_with_options', {
+  const { data: newId, error } = await supabase.rpc('insert_pikanteria', {
     p_match_day_id: matchDayId,
     p_question: q,
-    p_options: optionRows,
+    p_label_1: outcomes.label_1,
+    p_odds_1: outcomes.odds_1,
+    p_label_2: outcomes.label_2,
+    p_odds_2: outcomes.odds_2,
+    p_label_x: outcomes.label_x,
+    p_odds_x: outcomes.odds_x,
   })
-  if (error || !pikaResult) redirect(`/admin/publish?date=${date}&notice=options`)
+  if (error || !newId) redirect(`/admin/publish?date=${date}&notice=options`)
 
-  const inserted = pikaResult as { id: string; options: { id: string; odds: number; sort_order: number }[] }
-
-  await supabase.from('pikanteria').update({ published_at: new Date().toISOString() }).eq('id', inserted.id)
+  const pikanteriaId = newId as string
+  await supabase.from('pikanteria').update({ published_at: new Date().toISOString() }).eq('id', pikanteriaId)
 
   const users = await getAutomatedUsers(supabase)
   if (users.length) {
-    const options = inserted.options.map(o => ({ id: o.id, odds: Number(o.odds), sort_order: o.sort_order }))
-    const rows = buildAutomatedPikaRows(users, [{ id: inserted.id, options }], date)
+    const rows = buildAutomatedPikaRows(users, [{
+      id: pikanteriaId,
+      odds_1: outcomes.odds_1,
+      odds_2: outcomes.odds_2,
+      odds_x: outcomes.odds_x,
+    }], date)
     await supabase.from('pikanteria_answers').upsert(rows, { onConflict: 'user_id,pikanteria_id' })
   }
 
@@ -212,7 +216,9 @@ export default async function PublishPage({
   }
   type DayPika = {
     id: string; question: string; published_at: string | null
-    pikanteria_options: { id: string; label: string; odds: number; sort_order: number; is_correct: boolean }[]
+    label_1: string; label_2: string; label_x: string | null
+    odds_1: number; odds_2: number; odds_x: number | null
+    result: string | null
   }
   type Day = { id: string; stage: string; date: string }
 
@@ -238,7 +244,7 @@ export default async function PublishPage({
           .order('kickoff_time'),
         supabase
           .from('pikanteria')
-          .select('id, question, published_at, pikanteria_options(id, label, odds, sort_order, is_correct)')
+          .select('id, question, published_at, label_1, label_2, label_x, odds_1, odds_2, odds_x, result')
           .eq('match_day_id', matchDay.id)
           .order('created_at'),
       ])
@@ -375,7 +381,11 @@ export default async function PublishPage({
           )}
           {pikanteria.map(pika => {
             const published = pika.published_at != null
-            const options = pika.pikanteria_options.toSorted((a, b) => a.sort_order - b.sort_order)
+            const outcomes = [
+              { key: '1', label: pika.label_1, odds: pika.odds_1 },
+              ...(pika.label_x != null && pika.odds_x != null ? [{ key: 'X', label: pika.label_x, odds: pika.odds_x }] : []),
+              { key: '2', label: pika.label_2, odds: pika.odds_2 },
+            ]
             return (
               <form key={pika.id} action={published ? unpublishPikanteria : publishExistingPikanteria}
                 className="rounded-xl p-4 space-y-3"
@@ -387,9 +397,9 @@ export default async function PublishPage({
                   <StatusBadge published={published} />
                 </div>
                 <div className="flex gap-2 flex-wrap">
-                  {options.map(o => (
-                    <span key={o.id} className="text-xs rounded-lg px-2 py-1" style={inputBase}>
-                      {o.label} <span className="text-muted" style={{ fontFamily: 'var(--font-mono)' }}>{o.odds.toFixed(2)}</span>
+                  {outcomes.map(o => (
+                    <span key={o.key} className="text-xs rounded-lg px-2 py-1" style={inputBase}>
+                      <span className="text-muted">{o.key}</span> {o.label} <span className="text-muted" style={{ fontFamily: 'var(--font-mono)' }}>{Number(o.odds).toFixed(2)}</span>
                     </span>
                   ))}
                 </div>
@@ -416,7 +426,7 @@ export default async function PublishPage({
               <input id="publish-new-pik-question" type="text" name="pik_q_1" placeholder="e.g. Will Mbappé score?"
                 style={inputBase} className={cls} />
             </div>
-            <PicanteriaBuilder questionIndex={1} />
+            <PicanteriaBuilder />
             <button type="submit" className="w-full py-2 rounded-lg font-bold text-sm"
               style={{ background: 'var(--color-amber)', color: 'var(--color-bg)' }}>
               🚀 Add &amp; publish question

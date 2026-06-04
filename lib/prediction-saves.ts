@@ -45,11 +45,11 @@ export async function saveMatchPrediction(
 export async function savePikanteriaAnswer(
   supabase: RpcClient,
   pikanteriaId: string,
-  optionId: string,
+  pick: Pick,
 ): Promise<SaveResult> {
   const { data, error } = await supabase.rpc('save_pikanteria_answer', {
     p_pikanteria_id: pikanteriaId,
-    p_option_id: optionId,
+    p_pick: pick,
   })
 
   return normalizeRpcSaveResult(data, error, GENERIC_PIKA_ERROR)

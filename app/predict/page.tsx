@@ -1,11 +1,10 @@
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
-import { MatchCard } from '@/components/match-card'
-import { PicanteriaCard } from '@/components/pikanteria-card'
+import { BetCard, type BetOption } from '@/components/bet-card'
 import { LockTimer } from '@/components/lock-timer'
 import { BottomNav } from '@/components/bottom-nav'
-import type { Pick } from '@/lib/types'
+import type { Pick, Match, Pikanteria } from '@/lib/types'
 import { isMatchLocked, matchLockMs } from '@/lib/lock'
 import { toPct, matchInsight, type CrowdTally } from '@/lib/crowd'
 import { parseUUID, parsePick } from '@/lib/validation'
@@ -25,8 +24,27 @@ import {
 export const metadata = { title: 'Predict | Mondial Bets 2026' }
 
 const STAGE_LABELS: Record<string, string> = {
-  group: 'Group Stage ×1', r16: 'Round of 16 ×1.5', qf: 'Quarter Finals ×1.5',
-  sf: 'Semi Finals ×2', '3rd': 'Third Place ×1.5', final: 'Final ×3',
+  group: 'Group Stage', r32: 'Round of 32', r16: 'Round of 16', qf: 'Quarter Finals',
+  sf: 'Semi Finals', '3rd': 'Third Place', final: 'Final',
+}
+
+// Match → the three fixed outcomes, in display order.
+function matchOptions(match: Match): BetOption[] {
+  return [
+    { pick: '1', label: match.home_team, odds: match.odds_home },
+    { pick: 'X', label: 'Draw', odds: match.odds_draw },
+    { pick: '2', label: match.away_team, odds: match.odds_away },
+  ]
+}
+
+// Pikanteria → its outcomes, hiding X when the question is two-way (odds_x null).
+function pikaOptions(item: Pikanteria): BetOption[] {
+  const opts: BetOption[] = [{ pick: '1', label: item.label_1, odds: item.odds_1 }]
+  if (item.odds_x != null && item.label_x != null) {
+    opts.push({ pick: 'X', label: item.label_x, odds: item.odds_x })
+  }
+  opts.push({ pick: '2', label: item.label_2, odds: item.odds_2 })
+  return opts
 }
 
 function invalidSaveResult(error: unknown): SaveResult {
@@ -65,11 +83,11 @@ async function savePick(matchId: string, pick: Pick): Promise<SaveResult> {
   return result
 }
 
-async function saveAnswer(picanteriaId: string, optionId: string): Promise<SaveResult> {
+async function saveAnswer(picanteriaId: string, pick: Pick): Promise<SaveResult> {
   'use server'
   try {
     parseUUID(picanteriaId, 'pikanteria_id')
-    parseUUID(optionId, 'option_id')
+    parsePick(pick, 'pikanteria')
   } catch (error) {
     return invalidSaveResult(error)
   }
@@ -80,7 +98,7 @@ async function saveAnswer(picanteriaId: string, optionId: string): Promise<SaveR
     return { ok: false, status: 'error', message: 'Unauthorized' }
   }
 
-  const result = await savePikanteriaAnswer(supabase, picanteriaId, optionId)
+  const result = await savePikanteriaAnswer(supabase, picanteriaId, pick)
   if (result.ok) {
     revalidatePredictPath()
   }
@@ -129,21 +147,22 @@ export default async function PredictPage() {
     existingPredictions.map(p => [p.match_id, p.pick as Pick])
   )
   const answerMap = Object.fromEntries(
-    existingAnswers.map(a => [a.pikanteria_id, a.option_id as string])
+    existingAnswers.map(a => [a.pikanteria_id, a.pick as Pick])
   )
 
   // Aggregate crowd picks (counts only; revealed by the RPCs only after lock).
+  // Both matches and pikanteria are tallied by the 1/X/2 pick now.
   const crowdTally: Record<string, CrowdTally> = {}
   for (const r of (crowdMatchRows ?? []) as { match_id: string; pick: Pick; cnt: number }[]) {
     const t = (crowdTally[r.match_id] ??= { '1': 0, X: 0, '2': 0, total: 0 })
     t[r.pick] = r.cnt
     t.total += r.cnt
   }
-  const crowdPik: Record<string, { counts: Record<string, number>; total: number }> = {}
-  for (const r of (crowdPikRows ?? []) as { pikanteria_id: string; option_id: string; cnt: number }[]) {
-    const e = (crowdPik[r.pikanteria_id] ??= { counts: {}, total: 0 })
-    e.counts[r.option_id] = r.cnt
-    e.total += r.cnt
+  const crowdPikTally: Record<string, CrowdTally> = {}
+  for (const r of (crowdPikRows ?? []) as { pikanteria_id: string; pick: Pick; cnt: number }[]) {
+    const t = (crowdPikTally[r.pikanteria_id] ??= { '1': 0, X: 0, '2': 0, total: 0 })
+    t[r.pick] = r.cnt
+    t.total += r.cnt
   }
 
   return (
@@ -168,7 +187,6 @@ export default async function PredictPage() {
         {sortedDays.map((matchDay, idx) => {
           const isToday = matchDay.date === today
           const stageLabel = STAGE_LABELS[matchDay.stage] ?? matchDay.stage
-          const multiplier = stageLabel.includes('×') ? `×${stageLabel.split('×')[1]}` : ''
           const pikaItems = matchDay.pikanteria
           const sortedMatches = matchDay.matches.toSorted(
             (a, b) => new Date(a.kickoff_time).getTime() - new Date(b.kickoff_time).getTime()
@@ -223,18 +241,24 @@ export default async function PredictPage() {
               {sortedMatches.length > 0 && (
                 <div className="text-[10px] font-bold uppercase tracking-[1.2px]"
                   style={{ color: 'var(--color-muted)' }}>
-                  Matches{multiplier ? ` · Multiplier ${multiplier}` : ''}
+                  Matches
                 </div>
               )}
               {sortedMatches.map(match => {
                 const tally = crowdTally[match.id] ?? { '1': 0, X: 0, '2': 0, total: 0 }
                 return (
-                  <MatchCard
+                  <BetCard
                     key={`${match.id}:${predictionMap[match.id] ?? 'none'}`}
-                    match={match}
+                    id={match.id}
+                    variant="match"
+                    options={matchOptions(match)}
+                    result={match.result}
+                    homeTeam={match.home_team}
+                    awayTeam={match.away_team}
+                    kickoffTime={match.kickoff_time}
+                    stageLabel={stageLabel}
                     currentPick={predictionMap[match.id] ?? null}
                     isLocked={isMatchLocked(match)}
-                    stageLabel={stageLabel}
                     onSave={savePick}
                     crowd={toPct(tally)}
                     crowdTotal={tally.total}
@@ -257,17 +281,24 @@ export default async function PredictPage() {
                       Pikanteria · {pikaItems.length} side bets
                     </span>
                   </div>
-                  {pikaItems.map(item => (
-                    <PicanteriaCard
-                      key={`${item.id}:${answerMap[item.id] ?? 'none'}`}
-                      item={{ ...item, options: (item.pikanteria_options ?? []).toSorted((a, b) => a.sort_order - b.sort_order) }}
-                      currentAnswer={answerMap[item.id] ?? null}
-                      isLocked={item.locked}
-                      onSave={saveAnswer}
-                      crowd={crowdPik[item.id]?.counts ?? null}
-                      crowdTotal={crowdPik[item.id]?.total ?? 0}
-                    />
-                  ))}
+                  {pikaItems.map(item => {
+                    const tally = crowdPikTally[item.id] ?? { '1': 0, X: 0, '2': 0, total: 0 }
+                    return (
+                      <BetCard
+                        key={`${item.id}:${answerMap[item.id] ?? 'none'}`}
+                        id={item.id}
+                        variant="pika"
+                        question={item.question}
+                        options={pikaOptions(item)}
+                        result={item.result}
+                        currentPick={answerMap[item.id] ?? null}
+                        isLocked={item.locked}
+                        onSave={saveAnswer}
+                        crowd={toPct(tally)}
+                        crowdTotal={tally.total}
+                      />
+                    )
+                  })}
                 </>
               )}
 
