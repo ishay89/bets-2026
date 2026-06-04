@@ -2,6 +2,7 @@
 import React, { useState } from 'react'
 import Link from 'next/link'
 import type { LeaderboardEntry } from '@/lib/types'
+import { formatRankDelta, formatTodayMovementPoints } from '@/lib/leaderboard-movement'
 
 interface Props {
   entries: LeaderboardEntry[]
@@ -46,6 +47,10 @@ const podiumOrder = [
   { idx: 0, color: podiumColors.gold, height: 118 },
   { idx: 2, color: podiumColors.bronze, height: 72 },
 ]
+
+function deltaColor(delta: number | null | undefined): string {
+  return delta && delta < 0 ? 'var(--color-danger)' : 'var(--color-accent)'
+}
 
 export function Leaderboard({ entries, currentUserId }: Props) {
   const [mode, setMode] = useState<'total' | 'today'>('total')
@@ -108,6 +113,9 @@ export function Leaderboard({ entries, currentUserId }: Props) {
             const entry = top3[idx]
             if (!entry) return null
             const rank = idx + 1
+            const displayRank = mode === 'total' && entry.current_rank ? entry.current_rank : rank
+            const rankDelta = mode === 'total' ? formatRankDelta(entry.rank_delta) : null
+            const todayMovement = mode === 'total' ? formatTodayMovementPoints(entry.today_points) : null
             const av = getAvatar(entry)
             return (
               <div key={entry.id} style={{ width: idx === 0 ? '36%' : '32%', textAlign: 'center' }}>
@@ -119,10 +127,32 @@ export function Leaderboard({ entries, currentUserId }: Props) {
                 <div className="font-mono text-[11px] text-sub mb-1" style={{ fontFamily: 'var(--font-mono)' }}>
                   {score(entry).toFixed(2)}
                 </div>
+                {(rankDelta || todayMovement) && (
+                  <div className="mb-1 flex min-h-[16px] items-center justify-center gap-1.5 text-[10px] font-bold">
+                    {rankDelta && (
+                      <span
+                        className="rounded-full px-1.5 py-0.5"
+                        style={{
+                          color: deltaColor(entry.rank_delta),
+                          background: 'var(--color-elev)',
+                          border: '1px solid var(--border-base)',
+                          fontFamily: 'var(--font-mono)',
+                        }}
+                      >
+                        {rankDelta}
+                      </span>
+                    )}
+                    {todayMovement && (
+                      <span className="text-sub" style={{ fontFamily: 'var(--font-mono)' }}>
+                        {todayMovement}
+                      </span>
+                    )}
+                  </div>
+                )}
                 <div
                   className="flex items-start justify-center pt-2 rounded-t-lg font-black text-[18px]"
                   style={{ height, background: `linear-gradient(180deg, ${color}, ${color}40)`, color: '#000' }}
-                >{rank}</div>
+                >{displayRank}</div>
               </div>
             )
           })}
@@ -133,6 +163,9 @@ export function Leaderboard({ entries, currentUserId }: Props) {
       <div className="rounded-b-xl overflow-hidden">
         {rest.map((entry, i) => {
           const rank = i + 4
+          const displayRank = mode === 'total' && entry.current_rank ? entry.current_rank : rank
+          const rankDelta = mode === 'total' ? formatRankDelta(entry.rank_delta) : null
+          const todayMovement = mode === 'total' ? formatTodayMovementPoints(entry.today_points) : null
           const isMe = entry.id === currentUserId
           const av = getAvatar(entry)
           const automationLabel = getAutomationLabel(entry)
@@ -168,7 +201,20 @@ export function Leaderboard({ entries, currentUserId }: Props) {
                 <div
                   className="font-bold text-[12px] w-[22px]"
                   style={{ fontFamily: 'var(--font-mono)', color: isDanger ? 'var(--color-danger)' : isMe ? 'var(--color-accent)' : 'var(--color-muted)' }}
-                >{rank}.</div>
+                >{displayRank}.</div>
+                {rankDelta && (
+                  <div
+                    className="rounded-full px-1.5 py-0.5 text-[10px] font-bold shrink-0"
+                    style={{
+                      color: deltaColor(entry.rank_delta),
+                      background: 'var(--color-elev)',
+                      border: '1px solid var(--border-base)',
+                      fontFamily: 'var(--font-mono)',
+                    }}
+                  >
+                    {rankDelta}
+                  </div>
+                )}
                 <div
                   className="flex items-center justify-center rounded-full text-base shrink-0"
                   style={{ width: 28, height: 28, background: 'var(--color-elev)', fontSize: 14 }}
@@ -194,10 +240,13 @@ export function Leaderboard({ entries, currentUserId }: Props) {
                   </Link>
                 )}
                 <div
-                  className="font-bold text-[13px]"
+                  className="min-w-[72px] text-right font-bold text-[13px]"
                   style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-text)' }}
                 >
-                  {score(entry).toFixed(2)}
+                  <div>{score(entry).toFixed(2)}</div>
+                  {todayMovement && (
+                    <div className="text-[10px] font-semibold text-sub">{todayMovement}</div>
+                  )}
                 </div>
                 {fine && (
                   <div

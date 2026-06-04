@@ -93,6 +93,10 @@ export interface LeaderboardEntry {
   automation_strategy: AutomationStrategy | null
   total_points: number
   today_points: number
+  previous_total_points: number | null
+  current_rank: number | null
+  previous_rank: number | null
+  rank_delta: number | null
 }
 
 export interface ScoreSnapshot {
