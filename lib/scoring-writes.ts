@@ -98,10 +98,7 @@ export function buildPikanteriaScoringPayload(
   for (const item of items) {
     pikanteriaResults.push({ pikanteria_id: item.id, result: item.result })
 
-    const oddsForResult =
-      item.result === '1' ? item.odds_1
-      : item.result === 'X' ? (item.odds_x ?? 0)
-      : item.odds_2
+    const oddsForResult = pikanteriaOddsForResult(item)
 
     for (const ans of item.answers) {
       answerPoints.push({
@@ -112,6 +109,15 @@ export function buildPikanteriaScoringPayload(
   }
 
   return { pikanteriaResults, answerPoints }
+}
+
+function pikanteriaOddsForResult(item: ScoredPikanteriaInput): number {
+  if (item.result === '1') return item.odds_1
+  if (item.result === '2') return item.odds_2
+  if (item.odds_x == null) {
+    throw new Error(`Pikanteria ${item.id} cannot be resolved as X because it has no X odds`)
+  }
+  return item.odds_x
 }
 
 /** Build the per-pick bonus-point writes from the final tournament results. */

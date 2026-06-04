@@ -79,6 +79,18 @@ describe('buildPikanteriaScoringPayload', () => {
     const { answerPoints } = buildPikanteriaScoringPayload([drawWin])
     expect(answerPoints).toEqual([{ id: 'a', points: 3.4 }])
   })
+
+  it('rejects an X result on a two-way question', () => {
+    const invalidDrawWin: ScoredPikanteriaInput = {
+      ...item,
+      odds_x: null,
+      result: 'X',
+      answers: [{ id: 'a', pick: 'X' }],
+    }
+
+    expect(() => buildPikanteriaScoringPayload([invalidDrawWin]))
+      .toThrow('Pikanteria pk1 cannot be resolved as X because it has no X odds')
+  })
 })
 
 // Per-item scoring (one "Score this" button) passes a single-element payload to

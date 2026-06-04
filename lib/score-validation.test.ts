@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest'
-import { computeSnapshotValidity, SNAPSHOT_EPSILON, buildMatchDaySnapshotPayloads } from './score-validation'
+import {
+  computeSnapshotValidity,
+  SNAPSHOT_EPSILON,
+  buildMatchDaySnapshotPayloads,
+  selectScoredSnapshotDays,
+} from './score-validation'
 
 describe('SNAPSHOT_EPSILON', () => {
   it('is 0.005', () => {
@@ -262,5 +267,35 @@ describe('buildMatchDaySnapshotPayloads', () => {
     const u2 = toInsert.find(r => r.user_id === 'u2')!
     expect(u1.match_points).toBe(3)
     expect(u2.match_points).toBe(7)
+  })
+})
+
+describe('selectScoredSnapshotDays', () => {
+  it('includes days with resolved pikanteria even when no match has a result', () => {
+    const days = [
+      {
+        id: 'match-only',
+        stage: 'group',
+        matches: [{ result: '1' }],
+        pikanteria: [{ result: null }],
+      },
+      {
+        id: 'pikanteria-only',
+        stage: 'group',
+        matches: [{ result: null }],
+        pikanteria: [{ result: '2' }],
+      },
+      {
+        id: 'unscored',
+        stage: 'group',
+        matches: [{ result: null }],
+        pikanteria: [{ result: null }],
+      },
+    ]
+
+    expect(selectScoredSnapshotDays(days).map(day => day.id)).toEqual([
+      'match-only',
+      'pikanteria-only',
+    ])
   })
 })

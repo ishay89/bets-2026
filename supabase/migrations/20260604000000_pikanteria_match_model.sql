@@ -18,6 +18,12 @@
 -- Old option-aware RPCs must go before the table they reference is dropped.
 drop function if exists public.insert_pikanteria_with_options(uuid, text, jsonb);
 drop function if exists public.update_pikanteria_with_options(uuid, text, jsonb);
+drop function if exists public.crowd_pikanteria_picks();
+
+-- Active write policies reference pikanteria_answers.option_id and
+-- pikanteria_options, so remove them before reshaping those objects.
+drop policy if exists "pik_answers_write_own_unlocked" on public.pikanteria_answers;
+drop policy if exists "pik_answers_update_own_unlocked" on public.pikanteria_answers;
 
 -- Answers: option_id → pick. Truncate first so the NOT NULL pick column applies.
 truncate table public.pikanteria_answers;
@@ -35,7 +41,13 @@ alter table public.pikanteria
   add column odds_2  numeric(8,4) not null,
   add column label_x text,
   add column odds_x  numeric(8,4),
-  add column result  text check (result in ('1', 'X', '2'));
+  add column result  text,
+  add constraint pikanteria_x_outcome_pair
+    check ((label_x is null) = (odds_x is null)),
+  add constraint pikanteria_result_valid
+    check (result in ('1', 'X', '2')),
+  add constraint pikanteria_result_x_requires_odds
+    check (result <> 'X' or odds_x is not null);
 
 -- ────────────────────────────────────────────────────────────────────────────
 -- 2. save_pikanteria_answer — now takes a 1/X/2 pick (mirrors save_match_prediction).
@@ -372,7 +384,6 @@ grant execute on function public.update_pikanteria(uuid, text, text, numeric, te
 -- ────────────────────────────────────────────────────────────────────────────
 -- 6. crowd_pikanteria_picks — aggregate by pick (revealed only once locked).
 -- ────────────────────────────────────────────────────────────────────────────
-drop function if exists public.crowd_pikanteria_picks();
 create function public.crowd_pikanteria_picks()
 returns table (pikanteria_id uuid, pick text, cnt integer)
 language sql
@@ -394,9 +405,6 @@ grant execute on function public.crowd_pikanteria_picks() to authenticated;
 -- 7. Defense in depth: pikanteria_answers write policies validate the pick
 --    against the question's outcomes instead of an options row.
 -- ────────────────────────────────────────────────────────────────────────────
-drop policy if exists "pik_answers_write_own_unlocked" on public.pikanteria_answers;
-drop policy if exists "pik_answers_update_own_unlocked" on public.pikanteria_answers;
-
 create policy "pik_answers_write_own_unlocked"
   on public.pikanteria_answers
   for insert
