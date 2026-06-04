@@ -4,6 +4,8 @@ import type { Match, Pick } from '@/lib/types'
 import type { CrowdPct, Insight } from '@/lib/crowd'
 import type { SaveResult } from '@/lib/prediction-saves'
 import { CrowdInsight } from './crowd-insight'
+import type { PlayerRevealRow } from '@/lib/prediction-reveals'
+import { PredictionRevealSheet } from './prediction-reveal-sheet'
 
 const FLAGS: Record<string, string> = {
   France: '🇫🇷', Spain: '🇪🇸', Brazil: '🇧🇷', England: '🏴󠁧󠁢󠁥󠁮󠁧󠁿',
@@ -19,10 +21,11 @@ interface Props {
   isLocked: boolean
   stageLabel: string
   onSave: (matchId: string, pick: Pick) => Promise<SaveResult>
-  /** Crowd-pick percentages, revealed only once the match is locked. */
   crowd?: CrowdPct | null
   crowdTotal?: number
   insight?: Insight | null
+  myUserId?: string
+  onReveal?: (matchId: string) => Promise<PlayerRevealRow[]>
 }
 
 const PICK_LABELS: Record<Pick, string> = { '1': 'Home', X: 'Draw', '2': 'Away' }
@@ -30,7 +33,7 @@ const SEG_COLOR: Record<Pick, string> = {
   '1': 'var(--color-accent)', X: 'var(--color-dim)', '2': 'var(--color-amber)',
 }
 
-export function MatchCard({ match, currentPick, isLocked, stageLabel, onSave, crowd, crowdTotal = 0, insight }: Props) {
+export function MatchCard({ match, currentPick, isLocked, stageLabel, onSave, crowd, crowdTotal = 0, insight, myUserId, onReveal }: Props) {
   // Optimistic overlay instead of copying the prop into state. `optimisticPick`
   // is null when no in-flight pick exists; the effective selection is the
   // in-flight value or the authoritative prop.
@@ -44,6 +47,26 @@ export function MatchCard({ match, currentPick, isLocked, stageLabel, onSave, cr
   const [saving, setSaving] = useState(false)
   const [pending, startTransition] = useTransition()
   const inFlightRef = useRef(false)
+
+  const [revealRows, setRevealRows] = useState<PlayerRevealRow[] | null>(null)
+  const [revealLoading, setRevealLoading] = useState(false)
+  const [revealError, setRevealError] = useState(false)
+  const [sheetOpen, setSheetOpen] = useState(false)
+
+  async function handleReveal() {
+    if (!onReveal) return
+    setRevealLoading(true)
+    setRevealError(false)
+    try {
+      const rows = await onReveal(match.id)
+      setRevealRows(rows)
+      setSheetOpen(true)
+    } catch {
+      setRevealError(true)
+    } finally {
+      setRevealLoading(false)
+    }
+  }
 
   function handleSelect(pick: Pick) {
     if (isLocked || inFlightRef.current || selected === pick) return
@@ -135,7 +158,19 @@ export function MatchCard({ match, currentPick, isLocked, stageLabel, onSave, cr
         insight={insight}
         options={options}
         selected={selected}
+        onReveal={onReveal ? handleReveal : undefined}
+        revealLoading={revealLoading}
+        revealError={revealError}
       />
+
+      {sheetOpen && revealRows !== null && myUserId && (
+        <PredictionRevealSheet
+          title={`${match.home_team} vs ${match.away_team} · Picks`}
+          rows={revealRows}
+          myUserId={myUserId}
+          onClose={() => setSheetOpen(false)}
+        />
+      )}
     </div>
   )
 }
@@ -368,6 +403,9 @@ function CrowdSection({
   insight,
   options,
   selected,
+  onReveal,
+  revealLoading,
+  revealError,
 }: {
   isLocked: boolean
   crowd?: CrowdPct | null
@@ -375,62 +413,10 @@ function CrowdSection({
   insight?: Insight | null
   options: [Pick, number][]
   selected: Pick | null
+  onReveal?: () => void
+  revealLoading?: boolean
+  revealError?: boolean
 }) {
-  if (isLocked && crowd && crowdTotal > 0) {
-    return (
-      <div className="px-4 pb-4" style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: 12 }}>
-        <div className="flex items-center justify-between mb-2 gap-2">
-          <span
-            style={{
-              fontFamily: 'var(--font-display)',
-              fontSize: 12,
-              letterSpacing: '0.04em',
-              textTransform: 'uppercase',
-              color: 'var(--color-muted)',
-            }}
-          >
-            Crowd · {crowdTotal} {crowdTotal === 1 ? 'pick' : 'picks'}
-          </span>
-          {insight && <CrowdInsight insight={insight} />}
-        </div>
-
-        <div
-          className="flex w-full rounded-full overflow-hidden"
-          style={{ height: 8, background: 'var(--color-elev)' }}
-        >
-          {options.map(([pick]) =>
-            crowd[pick] > 0 ? (
-              <div
-                key={pick}
-                style={{
-                  width: `${crowd[pick]}%`,
-                  background: SEG_COLOR[pick],
-                  opacity: selected === pick ? 1 : 0.8,
-                }}
-              />
-            ) : null
-          )}
-        </div>
-
-        <div className="flex justify-between mt-1.5">
-          {options.map(([pick]) => (
-            <span
-              key={pick}
-              style={{
-                fontFamily: 'var(--font-mono)',
-                fontSize: 12,
-                color: selected === pick ? 'var(--color-accent)' : 'var(--color-muted)',
-                fontWeight: selected === pick ? 700 : 400,
-              }}
-            >
-              {crowd[pick]}% · {pick}
-            </span>
-          ))}
-        </div>
-      </div>
-    )
-  }
-
   if (!isLocked) {
     return (
       <div
@@ -448,7 +434,87 @@ function CrowdSection({
     )
   }
 
-  return null
+  return (
+    <div className="px-4 pb-4" style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: 12 }}>
+      {crowd && crowdTotal > 0 && (
+        <>
+          <div className="flex items-center justify-between mb-2 gap-2">
+            <span
+              style={{
+                fontFamily: 'var(--font-display)',
+                fontSize: 12,
+                letterSpacing: '0.04em',
+                textTransform: 'uppercase',
+                color: 'var(--color-muted)',
+              }}
+            >
+              Crowd · {crowdTotal} {crowdTotal === 1 ? 'pick' : 'picks'}
+            </span>
+            {insight && <CrowdInsight insight={insight} />}
+          </div>
+
+          <div
+            className="flex w-full rounded-full overflow-hidden"
+            style={{ height: 8, background: 'var(--color-elev)' }}
+          >
+            {options.map(([pick]) =>
+              crowd[pick] > 0 ? (
+                <div
+                  key={pick}
+                  style={{
+                    width: `${crowd[pick]}%`,
+                    background: SEG_COLOR[pick],
+                    opacity: selected === pick ? 1 : 0.8,
+                  }}
+                />
+              ) : null
+            )}
+          </div>
+
+          <div className="flex justify-between mt-1.5 mb-2">
+            {options.map(([pick]) => (
+              <span
+                key={pick}
+                style={{
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: 12,
+                  color: selected === pick ? 'var(--color-accent)' : 'var(--color-muted)',
+                  fontWeight: selected === pick ? 700 : 400,
+                }}
+              >
+                {crowd[pick]}% · {pick}
+              </span>
+            ))}
+          </div>
+        </>
+      )}
+
+      {onReveal && (
+        <button
+          type="button"
+          onClick={onReveal}
+          disabled={revealLoading}
+          style={{
+            width: '100%',
+            padding: '6px 12px',
+            borderRadius: 10,
+            fontFamily: 'var(--font-display)',
+            fontSize: 12,
+            fontWeight: 700,
+            letterSpacing: '0.06em',
+            textTransform: 'uppercase',
+            color: revealError ? 'var(--color-danger)' : 'var(--color-accent)',
+            background: revealError ? 'var(--color-danger-soft)' : 'var(--color-accent-soft)',
+            border: revealError ? '1px solid var(--border-danger)' : '1px solid var(--border-accent)',
+            cursor: revealLoading ? 'not-allowed' : 'pointer',
+            opacity: revealLoading ? 0.6 : 1,
+          }}
+        >
+          {revealLoading ? '…' : revealError ? 'Could not load picks' : '👁 Picks'}
+        </button>
+      )}
+    </div>
+  )
 }
 
 function TeamBlock({ name, selected }: { name: string; selected: boolean }) {
