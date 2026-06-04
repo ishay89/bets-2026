@@ -92,12 +92,16 @@ async function saveAnswer(picanteriaId: string, optionId: string): Promise<SaveR
 async function revealMatchPicks(matchId: string) {
   'use server'
   const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return []
   return getMatchPredictionsReveal(supabase, matchId)
 }
 
 async function revealPikanteriaAnswers(picanteriaId: string) {
   'use server'
   const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return []
   return getPikanteriaAnswersReveal(supabase, picanteriaId)
 }
 
