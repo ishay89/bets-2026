@@ -40,23 +40,24 @@ export interface Match {
   published_at: string | null
 }
 
-export interface PicanteriaOption {
-  id: string
-  pikanteria_id: string
-  label: string
-  odds: number
-  is_correct: boolean
-  sort_order: number
-}
-
+// Pikanteria now mirrors the match shape: a question with up to three fixed
+// outcomes (1 / X / 2). label_x / odds_x are null for two-way questions, in
+// which case the X (draw) slot is hidden. `result` is the admin-entered
+// winning outcome, exactly like matches.result.
 export interface Pikanteria {
   id: string
   match_day_id: string
   question: string
+  label_1: string
+  label_2: string
+  label_x: string | null
+  odds_1: number
+  odds_2: number
+  odds_x: number | null
+  result: Pick | null
   locked: boolean
   created_at: string
   published_at: string | null
-  options?: PicanteriaOption[]
 }
 
 export interface Prediction {
@@ -71,7 +72,7 @@ export interface PicanteriaAnswer {
   id: string
   user_id: string
   pikanteria_id: string
-  option_id: string
+  pick: Pick
   points: number | null
 }
 

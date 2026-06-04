@@ -105,10 +105,9 @@ Core tables and views:
 - `users` — player profiles, admin flag, automated marker flag/strategy, and `status` (`pending`, `approved`, `blocked`)
 - `match_days` — tournament dates, stage, aggregate publish/lock metadata
 - `matches` — fixtures, odds, result, per-match lock, per-item `published_at`
-- `pikanteria` — side-bet questions, per-question lock, per-item `published_at`
-- `pikanteria_options` — N-option pikanteria answers with odds, correctness, and sort order
+- `pikanteria` — side-bet questions in the match 1/X/2 shape: `label_1`/`odds_1`, `label_2`/`odds_2`, optional `label_x`/`odds_x` (null ⇒ two-way, X hidden), admin-entered `result`, per-question lock, per-item `published_at`
 - `predictions` — player match picks and scored points
-- `pikanteria_answers` — player pikanteria option picks and scored points
+- `pikanteria_answers` — player pikanteria `pick` (`1`/`X`/`2`) and scored points
 - `pre_tournament_picks` — futures picks for winner and top scorer
 - `tournament_settings` — global futures lock
 - `score_snapshots` — per-day and pre-tournament score validation snapshots
@@ -129,12 +128,13 @@ Automated match and pikanteria rows are generated when items are published in `/
 ## Scoring and Write Paths
 
 Point math lives in `lib/scoring.ts`:
-- Match predictions: `odds × stage_multiplier`
-- Stage multipliers: group `1`, r32 `1.25`, r16/qf/3rd `1.5`, sf `2`, final `3`
-- Pikanteria: odds only
-- Tournament winner: odds `× 1.5` if winner, odds `× 0.75` if runner-up
+- Match predictions: plain result odds (no stage multiplier — any weighting is baked into the odds when set)
+- Pikanteria: plain result odds (scored exactly like a match, by the winning 1/X/2 outcome)
+- Tournament winner: odds `× 1.5` if winner, odds `× 0.75` if runner-up — applied once at tournament close
 - Top scorer: odds only
 - All point values are rounded to 4 decimals
+
+The ongoing match/pikanteria leaderboard is a straight sum of odds; only the futures bonuses carry multipliers.
 
 Pure builders in `lib/scoring-writes.ts` assemble payloads for atomic scoring RPCs. Keep point math in pure functions and add/update tests when scoring changes.
 
@@ -182,6 +182,7 @@ Important later migrations:
 - `20260602193151_message_board.sql` — message board table, Storage bucket, and policies
 - `20260602200200_ai_social_posts.sql` — AI recap table
 - `20260602204722_admin_delete_message_board_posts.sql` — admin delete policies for posts/images
+- `20260604000000_pikanteria_match_model.sql` — **collapses pikanteria into the match 1/X/2 model**: drops `pikanteria_options`, switches `pikanteria_answers.option_id` → `pick`, adds `pikanteria.label_*/odds_*/result`, and rewrites `save_pikanteria_answer`, `enter_match_day_results`, `crowd_pikanteria_picks`, `insert_pikanteria`, `update_pikanteria`, `reset_pikanteria_result`. Destructive (discards existing pikanteria data); safe pre-tournament.
 
 Apply migrations:
 
@@ -270,7 +271,7 @@ ADMIN_EMAILS=admin1@example.com,admin2@example.com
 - Prefer existing helpers in `lib/data.ts`, `lib/validation.ts`, `lib/prediction-saves.ts`, `lib/scoring-writes.ts`, and `lib/score-validation.ts`.
 - Do not bypass the prediction save/scoring RPCs with direct table writes unless you are deliberately changing the write path and migrations/tests together.
 - Preserve RLS expectations: normal users write their own predictions/answers/posts; service-role clients are for admin-only flows.
-- When adding pikanteria, use the N-option model (`pikanteria_options`), not the old yes/no shape.
+- Pikanteria uses the same 1/X/2 model as matches (`label_1`/`odds_1`, `label_2`/`odds_2`, optional `label_x`/`odds_x`, `result`). Author via `insert_pikanteria`/`update_pikanteria`; render with the shared `components/bet-card.tsx`.
 - Publication is per item (`matches.published_at`, `pikanteria.published_at`); `match_days.published_at` is synchronized by database triggers.
 - Locks are also per item (`matches.locked`, `pikanteria.locked`) plus a separate futures lock.
 - If changing leaderboard semantics, update the SQL view migrations and any snapshot validation assumptions together.
@@ -282,7 +283,7 @@ ADMIN_EMAILS=admin1@example.com,admin2@example.com
 - **Admin cannot access `/admin`**: Ensure `users.is_admin = true` and `users.status = 'approved'`.
 - **Predictions not visible/savable**: Check item-level `published_at`, item lock state, and the save RPC response.
 - **Crowd picks not visible**: Crowd RPCs reveal data only after locks.
-- **Pikanteria answers missing**: Ensure options exist in `pikanteria_options`; the old yes/no columns are not the active model.
+- **Pikanteria answers missing**: A `pick` of `X` is only valid when the question is three-way (`odds_x`/`label_x` set); two-way questions accept only `1`/`2`.
 - **Points not updated**: Results must be entered through `/admin/results` or the atomic scoring RPC path.
 - **Score snapshot mismatch**: Use `/admin/scores` → Revalidate All, then inspect raw prediction/answer/futures point rows.
 - **Message board image failures**: Check the `message-board-images` Storage bucket, file size/type, and Storage policies.

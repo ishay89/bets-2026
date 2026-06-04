@@ -37,7 +37,7 @@ type PredRaw = {
 }
 
 type AnswerRaw = {
-  option_id: string
+  pick: string
   user_id: string
   users: UserRaw
 }
@@ -89,7 +89,7 @@ export async function getPikanteriaAnswersReveal(
   const [{ data: answerData }, pointsMap] = await Promise.all([
     supabase
       .from('pikanteria_answers')
-      .select('option_id, user_id, users(display_name, is_monkey, automation_strategy, status)')
+      .select('pick, user_id, users(display_name, is_monkey, automation_strategy, status)')
       .eq('pikanteria_id', pikanteriaId),
     buildPointsMap(supabase),
   ])
@@ -101,7 +101,7 @@ export async function getPikanteriaAnswersReveal(
     displayName: a.users.display_name,
     isMonkey: a.users.is_monkey,
     automationStrategy: a.users.automation_strategy,
-    pick: a.option_id,
+    pick: a.pick,
     totalPoints: pointsMap[a.user_id] ?? 0,
   }))
   return sortAndRankRevealRows(unranked)

@@ -8,22 +8,13 @@ import {
 
 describe('calcMatchPoints', () => {
   it('returns 0 for wrong pick', () => {
-    expect(calcMatchPoints(2.4, 'group', false)).toBe(0)
+    expect(calcMatchPoints(2.4, false)).toBe(0)
   })
-  it('group stage: odds × 1', () => {
-    expect(calcMatchPoints(2.4, 'group', true)).toBe(2.40)
-  })
-  it('quarter-final: odds × 1.5', () => {
-    expect(calcMatchPoints(2.4, 'qf', true)).toBe(3.60)
-  })
-  it('semi-final: odds × 2', () => {
-    expect(calcMatchPoints(2.4, 'sf', true)).toBe(4.80)
-  })
-  it('final: odds × 3', () => {
-    expect(calcMatchPoints(2.4, 'final', true)).toBe(7.20)
+  it('returns the plain result odds for a correct pick (no stage multiplier)', () => {
+    expect(calcMatchPoints(2.4, true)).toBe(2.40)
   })
   it('rounds to 4 decimal places', () => {
-    expect(calcMatchPoints(1.0001, 'r16', true)).toBe(1.5002)
+    expect(calcMatchPoints(1.00015, true)).toBe(1.0002)
   })
 })
 

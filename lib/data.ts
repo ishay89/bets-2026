@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
-import type { MatchDay, Match, Pikanteria, PicanteriaOption, LeaderboardEntry, Pick } from './types'
+import type { MatchDay, Match, Pikanteria, LeaderboardEntry, Pick } from './types'
 import type { Database } from './supabase/types'
 
 type Db = SupabaseClient<Database>
@@ -8,7 +8,7 @@ type Db = SupabaseClient<Database>
 
 export type FullMatchDay = MatchDay & {
   matches: Match[]
-  pikanteria: (Pikanteria & { pikanteria_options: PicanteriaOption[] })[]
+  pikanteria: Pikanteria[]
 }
 
 type PredRow = { pick: Pick; points: number | null; user_id: string }
@@ -21,13 +21,15 @@ type HistoryMatch = {
   locked: boolean | null
   predictions: PredRow[]
 }
-type PikaOptionRow = { id: string; label: string; is_correct: boolean }
-type PikaAnswerRow = { option_id: string; points: number | null; user_id: string }
+type PikaAnswerRow = { pick: Pick; points: number | null; user_id: string }
 type HistoryPika = {
   id: string
   question: string
   locked: boolean
-  pikanteria_options: PikaOptionRow[]
+  label_1: string
+  label_2: string
+  label_x: string | null
+  result: Pick | null
   pikanteria_answers: PikaAnswerRow[]
 }
 
@@ -44,7 +46,7 @@ export type HistoryMatchDay = {
 export async function getPublishedMatchDaysWithAll(supabase: Db): Promise<FullMatchDay[]> {
   const { data, error } = await supabase
     .from('match_days')
-    .select('*, matches(*), pikanteria(*, pikanteria_options(*))')
+    .select('*, matches(*), pikanteria(*)')
     .not('published_at', 'is', null)
     .order('date', { ascending: true })
   if (error) throw error
@@ -62,9 +64,8 @@ export async function getMatchDaysWithUserData(supabase: Db): Promise<HistoryMat
       matches(id, home_team, away_team, kickoff_time, result, locked,
         predictions(pick, points, user_id)
       ),
-      pikanteria(id, question, locked,
-        pikanteria_options(id, label, is_correct),
-        pikanteria_answers(option_id, points, user_id)
+      pikanteria(id, question, locked, label_1, label_2, label_x, result,
+        pikanteria_answers(pick, points, user_id)
       )
     `)
     .not('published_at', 'is', null)
@@ -88,13 +89,13 @@ export async function getUserPredictions(
 export async function getUserPikanteriaAnswers(
   supabase: Db,
   userId: string,
-): Promise<{ pikanteria_id: string; option_id: string }[]> {
+): Promise<{ pikanteria_id: string; pick: Pick }[]> {
   const { data, error } = await supabase
     .from('pikanteria_answers')
-    .select('pikanteria_id, option_id')
+    .select('pikanteria_id, pick')
     .eq('user_id', userId)
   if (error) throw error
-  return (data ?? []) as { pikanteria_id: string; option_id: string }[]
+  return (data ?? []) as { pikanteria_id: string; pick: Pick }[]
 }
 
 /**

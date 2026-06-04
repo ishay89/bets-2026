@@ -29,16 +29,23 @@ describe('automated marker users', () => {
     expect(automatedMatchPick(match, 'min')).toBe('2')
   })
 
-  it('picks highest, median, and lowest pikanteria option odds', () => {
-    const options = [
-      { id: 'a', odds: 4.5, sort_order: 2 },
-      { id: 'b', odds: 1.6, sort_order: 0 },
-      { id: 'c', odds: 2.2, sort_order: 1 },
-    ]
+  it('picks highest, median, and lowest pikanteria outcome odds (three-way)', () => {
+    // odds_1 = 1.6, odds_x = 2.2, odds_2 = 4.5 → sorted desc: 2 (4.5), X (2.2), 1 (1.6)
+    const pika = { odds_1: 1.6, odds_2: 4.5, odds_x: 2.2 }
 
-    expect(automatedPikanteriaPick(options, 'max')).toBe('a')
-    expect(automatedPikanteriaPick(options, 'mid')).toBe('c')
-    expect(automatedPikanteriaPick(options, 'min')).toBe('b')
+    expect(automatedPikanteriaPick(pika, 'max')).toBe('2')
+    expect(automatedPikanteriaPick(pika, 'mid')).toBe('X')
+    expect(automatedPikanteriaPick(pika, 'min')).toBe('1')
+  })
+
+  it('only picks from available outcomes on a two-way question', () => {
+    // No X outcome: only 1 and 2 are pickable.
+    const pika = { odds_1: 1.8, odds_2: 2.4, odds_x: null }
+
+    // Sorted desc by odds: [2 (2.4), 1 (1.8)].
+    expect(automatedPikanteriaPick(pika, 'max')).toBe('2')
+    expect(automatedPikanteriaPick(pika, 'mid')).toBe('1') // floor(2/2) = index 1
+    expect(automatedPikanteriaPick(pika, 'min')).toBe('1')
   })
 })
 
@@ -68,17 +75,12 @@ describe('buildAutomatedPikaRows', () => {
       { id: 'u-max', automation_strategy: 'max' },
       { id: 'u-min', automation_strategy: 'min' },
     ]
-    const pikas = [{
-      id: 'p1',
-      options: [
-        { id: 'a', odds: 4.5, sort_order: 2 },
-        { id: 'b', odds: 1.6, sort_order: 0 },
-      ],
-    }]
+    // Two-way question: odds_2 (4.5) is the long shot, odds_1 (1.6) the favourite.
+    const pikas = [{ id: 'p1', odds_1: 1.6, odds_2: 4.5, odds_x: null }]
     const rows = buildAutomatedPikaRows(users, pikas, '2026-06-11')
     expect(rows).toEqual([
-      { user_id: 'u-max', pikanteria_id: 'p1', option_id: 'a' },
-      { user_id: 'u-min', pikanteria_id: 'p1', option_id: 'b' },
+      { user_id: 'u-max', pikanteria_id: 'p1', pick: '2' },
+      { user_id: 'u-min', pikanteria_id: 'p1', pick: '1' },
     ])
   })
 })
