@@ -160,4 +160,13 @@ describe('pikanteria match-model migration', () => {
   test('prevents two-way pikanteria questions from being resolved as X in the database', () => {
     expect(sql).toMatch(/check\s*\(\s*result\s*<>\s*'X'\s+or\s+odds_x\s+is\s+not\s+null\s*\)/i)
   })
+
+  test('drops the old scoring RPC before recreating it with renamed parameters', () => {
+    const dropScoringRpc = sql.indexOf('drop function if exists public.enter_match_day_results(uuid, jsonb, jsonb, jsonb, jsonb)')
+    const createScoringRpc = sql.indexOf('create or replace function public.enter_match_day_results')
+
+    expect(dropScoringRpc).toBeGreaterThanOrEqual(0)
+    expect(createScoringRpc).toBeGreaterThanOrEqual(0)
+    expect(dropScoringRpc).toBeLessThan(createScoringRpc)
+  })
 })
