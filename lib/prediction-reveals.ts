@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from './supabase/types'
 import type { AutomationStrategy } from './types'
+import { parseUUID } from './validation'
 
 export type PlayerRevealRow = {
   userId: string
@@ -51,6 +52,11 @@ export async function getMatchPredictionsReveal(
   supabase: Db,
   matchId: string,
 ): Promise<PlayerRevealRow[]> {
+  try {
+    parseUUID(matchId, 'match_id')
+  } catch {
+    return []
+  }
   const [{ data: predData }, pointsMap] = await Promise.all([
     supabase
       .from('predictions')
@@ -72,13 +78,18 @@ export async function getMatchPredictionsReveal(
 
 export async function getPikanteriaAnswersReveal(
   supabase: Db,
-  picanteriaId: string,
+  pikanteriaId: string,
 ): Promise<PlayerRevealRow[]> {
+  try {
+    parseUUID(pikanteriaId, 'pikanteria_id')
+  } catch {
+    return []
+  }
   const [{ data: answerData }, pointsMap] = await Promise.all([
     supabase
       .from('pikanteria_answers')
       .select('option_id, user_id, users(display_name, is_monkey, automation_strategy)')
-      .eq('pikanteria_id', picanteriaId),
+      .eq('pikanteria_id', pikanteriaId),
     buildPointsMap(supabase),
   ])
   if (!answerData) return []
