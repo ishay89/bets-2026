@@ -35,4 +35,14 @@ describe('sortAndRankRevealRows', () => {
     sortAndRankRevealRows(rows)
     expect(rows[0].userId).toBe('b')
   })
+
+  it('assigns sequential ranks to tied totalPoints', () => {
+    const rows = [
+      { ...base, userId: 'a', displayName: 'Alice', totalPoints: 10 },
+      { ...base, userId: 'b', displayName: 'Bob', totalPoints: 10 },
+    ]
+    const result = sortAndRankRevealRows(rows)
+    expect(result[0].rank).toBe(1)
+    expect(result[1].rank).toBe(2)
+  })
 })

@@ -1,6 +1,4 @@
-import type { SupabaseClient } from '@supabase/supabase-js'
 import type { AutomationStrategy } from './types'
-import type { Database } from './supabase/types'
 
 export type PlayerRevealRow = {
   userId: string
