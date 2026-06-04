@@ -205,6 +205,8 @@ grant execute on function public.save_pikanteria_answer(uuid, text) to authentic
 -- 3. enter_match_day_results — pikanteria now resolves by setting result, the
 --    same shape as matches. No stage multiplier; the caller passes plain odds.
 -- ────────────────────────────────────────────────────────────────────────────
+drop function if exists public.enter_match_day_results(uuid, jsonb, jsonb, jsonb, jsonb);
+
 create or replace function public.enter_match_day_results(
   p_match_day_id       uuid,
   p_match_results      jsonb,  -- [{"match_id": uuid, "result": "1"|"X"|"2"}]
