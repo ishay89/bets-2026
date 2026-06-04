@@ -28,7 +28,7 @@ interface Props {
 
 export function PredictionRevealSheet({ title, rows, myUserId, optionLabels, onClose }: Props) {
   const [visible, setVisible] = useState(false)
-  useEffect(() => { setVisible(true) }, [])
+  useEffect(() => { const t = setTimeout(() => setVisible(true), 0); return () => clearTimeout(t) }, [])
 
   const optionKeys = optionLabels ? Object.keys(optionLabels) : []
 
@@ -141,7 +141,10 @@ export function PredictionRevealSheet({ title, rows, myUserId, optionLabels, onC
               const pickColor = optionLabels
                 ? SEG_COLORS[optionKeys.indexOf(row.pick) % SEG_COLORS.length]
                 : (MATCH_PICK_COLORS[row.pick] ?? 'var(--color-muted)')
-              const automationLabel = getAutomationLabel(row)
+              const automationLabel = getAutomationLabel({
+                is_monkey: row.isMonkey,
+                automation_strategy: row.automationStrategy,
+              })
 
               return (
                 <div
@@ -153,6 +156,7 @@ export function PredictionRevealSheet({ title, rows, myUserId, optionLabels, onC
                     padding: '10px 16px',
                     borderBottom: i < rows.length - 1 ? '1px solid var(--border-subtle)' : 'none',
                     background: isMe ? 'var(--color-accent-soft)' : 'transparent',
+                    borderLeft: isMe ? '3px solid var(--color-accent)' : '3px solid transparent',
                   }}
                 >
                   {/* Avatar */}
@@ -169,7 +173,11 @@ export function PredictionRevealSheet({ title, rows, myUserId, optionLabels, onC
                       flexShrink: 0,
                     }}
                   >
-                    {getAvatar(row)}
+                    {getAvatar({
+                      display_name: row.displayName,
+                      is_monkey: row.isMonkey,
+                      automation_strategy: row.automationStrategy,
+                    })}
                   </div>
 
                   {/* Name + rank */}
@@ -207,7 +215,7 @@ export function PredictionRevealSheet({ title, rows, myUserId, optionLabels, onC
                         marginTop: 1,
                       }}
                     >
-                      #{row.rank}
+                      {row.rank != null ? `#${row.rank}` : '—'}
                     </div>
                   </div>
 
