@@ -54,7 +54,7 @@ export function MatchCard({ match, currentPick, isLocked, stageLabel, onSave, cr
   const [sheetOpen, setSheetOpen] = useState(false)
 
   async function handleReveal() {
-    if (!onReveal) return
+    if (!onReveal || sheetOpen) return
     setRevealLoading(true)
     setRevealError(false)
     try {

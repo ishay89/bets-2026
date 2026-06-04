@@ -38,7 +38,7 @@ export function PicanteriaCard({ item, currentAnswer, isLocked, onSave, crowd, c
   const [sheetOpen, setSheetOpen] = useState(false)
 
   async function handleReveal() {
-    if (!onReveal) return
+    if (!onReveal || sheetOpen) return
     setRevealLoading(true)
     setRevealError(false)
     try {
