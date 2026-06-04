@@ -15,6 +15,13 @@
 --    pikanteria the match-style outcome columns + result.
 -- ────────────────────────────────────────────────────────────────────────────
 
+-- Old RLS policies and functions that reference option_id / pikanteria_options
+-- must be dropped BEFORE any ALTER TABLE removes those columns/tables, or
+-- PostgreSQL will refuse with a dependency error.
+drop policy if exists "pik_answers_write_own_unlocked" on public.pikanteria_answers;
+drop policy if exists "pik_answers_update_own_unlocked" on public.pikanteria_answers;
+drop function if exists public.crowd_pikanteria_picks();
+
 -- Old option-aware RPCs must go before the table they reference is dropped.
 drop function if exists public.insert_pikanteria_with_options(uuid, text, jsonb);
 drop function if exists public.update_pikanteria_with_options(uuid, text, jsonb);
@@ -372,7 +379,6 @@ grant execute on function public.update_pikanteria(uuid, text, text, numeric, te
 -- ────────────────────────────────────────────────────────────────────────────
 -- 6. crowd_pikanteria_picks — aggregate by pick (revealed only once locked).
 -- ────────────────────────────────────────────────────────────────────────────
-drop function if exists public.crowd_pikanteria_picks();
 create function public.crowd_pikanteria_picks()
 returns table (pikanteria_id uuid, pick text, cnt integer)
 language sql
@@ -394,9 +400,6 @@ grant execute on function public.crowd_pikanteria_picks() to authenticated;
 -- 7. Defense in depth: pikanteria_answers write policies validate the pick
 --    against the question's outcomes instead of an options row.
 -- ────────────────────────────────────────────────────────────────────────────
-drop policy if exists "pik_answers_write_own_unlocked" on public.pikanteria_answers;
-drop policy if exists "pik_answers_update_own_unlocked" on public.pikanteria_answers;
-
 create policy "pik_answers_write_own_unlocked"
   on public.pikanteria_answers
   for insert

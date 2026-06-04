@@ -98,9 +98,13 @@ export function buildPikanteriaScoringPayload(
   for (const item of items) {
     pikanteriaResults.push({ pikanteria_id: item.id, result: item.result })
 
+    if (item.result === 'X' && item.odds_x == null) {
+      throw new Error(`Pikanteria ${item.id}: result is 'X' but this is a two-way question (odds_x is null)`)
+    }
+
     const oddsForResult =
       item.result === '1' ? item.odds_1
-      : item.result === 'X' ? (item.odds_x ?? 0)
+      : item.result === 'X' ? item.odds_x!
       : item.odds_2
 
     for (const ans of item.answers) {

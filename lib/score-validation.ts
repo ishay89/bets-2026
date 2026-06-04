@@ -363,16 +363,16 @@ export async function recalculateAllSnapshots(
   const [{ data: matchDays }, { data: users }, { data: picks }] = await Promise.all([
     supabase
       .from('match_days')
-      .select('id, stage, matches(result)')
+      .select('id, stage, matches(result), pikanteria(result)')
       .not('published_at', 'is', null)
       .order('date', { ascending: true }),
     supabase.from('users').select('id'),
     supabase.from('pre_tournament_picks').select('user_id'),
   ])
 
-  type RecalcDay = { id: string; stage: string; matches: { result: string | null }[] }
+  type RecalcDay = { id: string; stage: string; matches: { result: string | null }[]; pikanteria: { result: string | null }[] }
   const scoredDays = ((matchDays ?? []) as RecalcDay[]).filter(d =>
-    d.matches.some(m => m.result !== null)
+    d.matches.some(m => m.result !== null) || d.pikanteria.some(p => p.result !== null)
   )
   const allUsers = users ?? []
   const allPicks = picks ?? []
