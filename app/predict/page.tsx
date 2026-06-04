@@ -20,6 +20,7 @@ import {
   savePikanteriaAnswer,
   type SaveResult,
 } from '@/lib/prediction-saves'
+import { getMatchPredictionsReveal, getPikanteriaAnswersReveal } from '@/lib/prediction-reveals'
 
 export const metadata = { title: 'Predict | Mondial Bets 2026' }
 
@@ -104,6 +105,22 @@ async function saveAnswer(picanteriaId: string, pick: Pick): Promise<SaveResult>
   }
 
   return result
+}
+
+async function revealMatchPicks(matchId: string) {
+  'use server'
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return []
+  return getMatchPredictionsReveal(supabase, matchId)
+}
+
+async function revealPikanteriaAnswers(picanteriaId: string) {
+  'use server'
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return []
+  return getPikanteriaAnswersReveal(supabase, picanteriaId)
 }
 
 export default async function PredictPage() {
@@ -267,6 +284,8 @@ export default async function PredictPage() {
                       odds: { '1': match.odds_home, X: match.odds_draw, '2': match.odds_away },
                       myPick: predictionMap[match.id] ?? null,
                     })}
+                    myUserId={user.id}
+                    onReveal={revealMatchPicks}
                   />
                 )
               })}
@@ -296,6 +315,8 @@ export default async function PredictPage() {
                         onSave={saveAnswer}
                         crowd={toPct(tally)}
                         crowdTotal={tally.total}
+                        myUserId={user.id}
+                        onReveal={revealPikanteriaAnswers}
                       />
                     )
                   })}

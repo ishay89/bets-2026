@@ -3,7 +3,9 @@ import { useRef, useState, useTransition } from 'react'
 import type { Pick } from '@/lib/types'
 import type { Insight } from '@/lib/crowd'
 import type { SaveResult } from '@/lib/prediction-saves'
+import type { PlayerRevealRow } from '@/lib/prediction-reveals'
 import { CrowdInsight } from './crowd-insight'
+import { PredictionRevealSheet } from './prediction-reveal-sheet'
 
 const FLAGS: Record<string, string> = {
   France: '🇫🇷', Spain: '🇪🇸', Brazil: '🇧🇷', England: '🏴󠁧󠁢󠁥󠁮󠁧󠁿',
@@ -34,6 +36,10 @@ interface Props {
   /** Crowd-pick percentages keyed by pick, revealed only once the item is locked. */
   crowd?: Partial<Record<Pick, number>> | null
   crowdTotal?: number
+
+  // Player reveal — after lock, fetch who picked what (server action).
+  myUserId?: string
+  onReveal?: (id: string) => Promise<PlayerRevealRow[]>
 
   // Match-only presentation
   homeTeam?: string
@@ -68,7 +74,8 @@ const PIKA_SEG_COLORS = ['var(--color-amber)', 'var(--color-dim)', 'var(--color-
 export function BetCard(props: Props) {
   const {
     id, variant, options, result, currentPick, isLocked, onSave,
-    crowd, crowdTotal = 0, homeTeam, awayTeam, kickoffTime, stageLabel, insight, question,
+    crowd, crowdTotal = 0, myUserId, onReveal,
+    homeTeam, awayTeam, kickoffTime, stageLabel, insight, question,
   } = props
   const theme = THEME[variant]
 
@@ -85,6 +92,27 @@ export function BetCard(props: Props) {
   const [saving, setSaving] = useState(false)
   const [pending, startTransition] = useTransition()
   const inFlightRef = useRef(false)
+
+  // Player reveal sheet state.
+  const [revealRows, setRevealRows] = useState<PlayerRevealRow[] | null>(null)
+  const [revealLoading, setRevealLoading] = useState(false)
+  const [revealError, setRevealError] = useState(false)
+  const [sheetOpen, setSheetOpen] = useState(false)
+
+  async function handleReveal() {
+    if (!onReveal || sheetOpen) return
+    setRevealLoading(true)
+    setRevealError(false)
+    try {
+      const rows = await onReveal(id)
+      setRevealRows(rows)
+      setSheetOpen(true)
+    } catch {
+      setRevealError(true)
+    } finally {
+      setRevealLoading(false)
+    }
+  }
 
   const labelFor = (pick: Pick | null): string | null =>
     pick === null ? null : (options.find(o => o.pick === pick)?.label ?? pick)
@@ -186,7 +214,20 @@ export function BetCard(props: Props) {
         options={options}
         selected={selected}
         theme={theme}
+        onReveal={onReveal && myUserId ? handleReveal : undefined}
+        revealLoading={revealLoading}
+        revealError={revealError}
       />
+
+      {sheetOpen && revealRows !== null && myUserId && (
+        <PredictionRevealSheet
+          title={variant === 'match' ? `${homeTeam} vs ${awayTeam} · Picks` : (question ?? 'Picks')}
+          rows={revealRows}
+          myUserId={myUserId}
+          optionLabels={variant === 'pika' ? Object.fromEntries(options.map(o => [o.pick, o.label])) : undefined}
+          onClose={() => setSheetOpen(false)}
+        />
+      )}
     </div>
   )
 }
@@ -365,6 +406,7 @@ function ErrorMessage({ error }: { error: string | null }) {
 
 function CrowdSection({
   variant, isLocked, crowd, crowdTotal, insight, options, selected, theme,
+  onReveal, revealLoading, revealError,
 }: {
   variant: Variant
   isLocked: boolean
@@ -374,42 +416,12 @@ function CrowdSection({
   options: BetOption[]
   selected: Pick | null
   theme: typeof THEME[Variant]
+  onReveal?: () => void
+  revealLoading?: boolean
+  revealError?: boolean
 }) {
   const segColor = (pick: Pick, i: number) =>
     variant === 'match' ? MATCH_SEG_COLOR[pick] : PIKA_SEG_COLORS[i % PIKA_SEG_COLORS.length]
-
-  if (isLocked && crowd && crowdTotal > 0) {
-    return (
-      <div className="px-4 pb-4" style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: 12 }}>
-        <div className="flex items-center justify-between mb-2 gap-2">
-          <span style={{ fontFamily: 'var(--font-display)', fontSize: 12, letterSpacing: '0.04em', textTransform: 'uppercase', color: 'var(--color-muted)' }}>
-            Crowd · {crowdTotal} {crowdTotal === 1 ? 'pick' : 'picks'}
-          </span>
-          {insight && <CrowdInsight insight={insight} />}
-        </div>
-
-        <div className="flex w-full rounded-full overflow-hidden" style={{ height: 8, background: 'var(--color-elev)' }}>
-          {options.map(({ pick }, i) =>
-            (crowd[pick] ?? 0) > 0 ? (
-              <div key={pick} style={{ width: `${crowd[pick]}%`, background: segColor(pick, i), opacity: selected === pick ? 1 : 0.8 }} />
-            ) : null
-          )}
-        </div>
-
-        <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1.5">
-          {options.map(({ pick, label }) => (
-            <span key={pick} style={{
-              fontFamily: 'var(--font-mono)', fontSize: 12,
-              color: selected === pick ? theme.accent : 'var(--color-muted)',
-              fontWeight: selected === pick ? 700 : 400,
-            }}>
-              {crowd[pick] ?? 0}% · {variant === 'match' ? pick : label}
-            </span>
-          ))}
-        </div>
-      </div>
-    )
-  }
 
   if (!isLocked) {
     return (
@@ -419,7 +431,68 @@ function CrowdSection({
     )
   }
 
-  return null
+  const hasCrowd = !!crowd && crowdTotal > 0
+
+  return (
+    <div className="px-4 pb-4" style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: 12 }}>
+      {hasCrowd && (
+        <>
+          <div className="flex items-center justify-between mb-2 gap-2">
+            <span style={{ fontFamily: 'var(--font-display)', fontSize: 12, letterSpacing: '0.04em', textTransform: 'uppercase', color: 'var(--color-muted)' }}>
+              Crowd · {crowdTotal} {crowdTotal === 1 ? 'pick' : 'picks'}
+            </span>
+            {insight && <CrowdInsight insight={insight} />}
+          </div>
+
+          <div className="flex w-full rounded-full overflow-hidden" style={{ height: 8, background: 'var(--color-elev)' }}>
+            {options.map(({ pick }, i) =>
+              (crowd![pick] ?? 0) > 0 ? (
+                <div key={pick} style={{ width: `${crowd![pick]}%`, background: segColor(pick, i), opacity: selected === pick ? 1 : 0.8 }} />
+              ) : null
+            )}
+          </div>
+
+          <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1.5">
+            {options.map(({ pick, label }) => (
+              <span key={pick} style={{
+                fontFamily: 'var(--font-mono)', fontSize: 12,
+                color: selected === pick ? theme.accent : 'var(--color-muted)',
+                fontWeight: selected === pick ? 700 : 400,
+              }}>
+                {crowd![pick] ?? 0}% · {variant === 'match' ? pick : label}
+              </span>
+            ))}
+          </div>
+        </>
+      )}
+
+      {onReveal && (
+        <button
+          type="button"
+          onClick={onReveal}
+          disabled={revealLoading}
+          style={{
+            width: '100%',
+            marginTop: hasCrowd ? 10 : 0,
+            padding: '6px 12px',
+            borderRadius: 10,
+            fontFamily: 'var(--font-display)',
+            fontSize: 12,
+            fontWeight: 700,
+            letterSpacing: '0.06em',
+            textTransform: 'uppercase',
+            color: revealError ? 'var(--color-danger)' : theme.accent,
+            background: revealError ? 'var(--color-danger-soft)' : theme.accentSoft,
+            border: revealError ? '1px solid var(--border-danger)' : `1px solid ${theme.borderAccent}`,
+            cursor: revealLoading ? 'not-allowed' : 'pointer',
+            opacity: revealLoading ? 0.6 : 1,
+          }}
+        >
+          {revealLoading ? '…' : revealError ? 'Could not load picks' : '👁 Picks'}
+        </button>
+      )}
+    </div>
+  )
 }
 
 function TeamBlock({ name, selected }: { name: string; selected: boolean }) {
