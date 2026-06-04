@@ -5,6 +5,7 @@ import {
   buildAutomatedPikaRows,
   type AutomatedUser,
 } from '@/lib/monkey'
+import { setPikanteriaPublishedAt } from '@/lib/publishing'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { PicanteriaBuilder } from '@/components/pikanteria-builder'
@@ -83,10 +84,7 @@ async function publishExistingPikanteria(formData: FormData) {
   const pikanteriaId = parseUUID(formData.get('pikanteria_id'), 'pikanteria_id')
   const date = formData.get('date') as string
 
-  await supabase
-    .from('pikanteria')
-    .update({ published_at: new Date().toISOString() })
-    .eq('id', pikanteriaId)
+  await setPikanteriaPublishedAt(supabase, pikanteriaId, new Date().toISOString())
 
   const users = await getAutomatedUsers(supabase)
   if (users.length) {
@@ -128,7 +126,7 @@ async function unpublishPikanteria(formData: FormData) {
     redirect(`/admin/publish?date=${date}&notice=scored`)
   }
 
-  await supabase.from('pikanteria').update({ published_at: null }).eq('id', pikanteriaId)
+  await setPikanteriaPublishedAt(supabase, pikanteriaId, null)
 
   revalidatePath('/predict')
   redirect(`/admin/publish?date=${date}`)
@@ -165,7 +163,7 @@ async function publishNewPikanteria(formData: FormData) {
   if (error || !newId) redirect(`/admin/publish?date=${date}&notice=options`)
 
   const pikanteriaId = newId as string
-  await supabase.from('pikanteria').update({ published_at: new Date().toISOString() }).eq('id', pikanteriaId)
+  await setPikanteriaPublishedAt(supabase, pikanteriaId, new Date().toISOString())
 
   const users = await getAutomatedUsers(supabase)
   if (users.length) {
