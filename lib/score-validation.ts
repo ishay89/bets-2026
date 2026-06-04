@@ -17,12 +17,28 @@ interface SnapshotPayload {
   calculated_at: string
 }
 
+type ResultRow = { result: string | null }
+
+export type SnapshotScoredDay = {
+  id: string
+  stage: string
+  matches: ResultRow[]
+  pikanteria: ResultRow[]
+}
+
 function sumByUserId(rows: { user_id: string; points: number | null }[]): Map<string, number> {
   const map = new Map<string, number>()
   for (const r of rows) {
     map.set(r.user_id, (map.get(r.user_id) ?? 0) + Number(r.points ?? 0))
   }
   return map
+}
+
+export function selectScoredSnapshotDays(days: SnapshotScoredDay[]): SnapshotScoredDay[] {
+  return days.filter(day =>
+    day.matches.some(item => item.result !== null)
+    || day.pikanteria.some(item => item.result !== null)
+  )
 }
 
 export function buildMatchDaySnapshotPayloads(params: {
@@ -363,17 +379,14 @@ export async function recalculateAllSnapshots(
   const [{ data: matchDays }, { data: users }, { data: picks }] = await Promise.all([
     supabase
       .from('match_days')
-      .select('id, stage, matches(result)')
+      .select('id, stage, matches(result), pikanteria(result)')
       .not('published_at', 'is', null)
       .order('date', { ascending: true }),
     supabase.from('users').select('id'),
     supabase.from('pre_tournament_picks').select('user_id'),
   ])
 
-  type RecalcDay = { id: string; stage: string; matches: { result: string | null }[] }
-  const scoredDays = ((matchDays ?? []) as RecalcDay[]).filter(d =>
-    d.matches.some(m => m.result !== null)
-  )
+  const scoredDays = selectScoredSnapshotDays((matchDays ?? []) as SnapshotScoredDay[])
   const allUsers = users ?? []
   const allPicks = picks ?? []
 

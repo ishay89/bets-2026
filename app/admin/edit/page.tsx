@@ -1,5 +1,5 @@
 import { createAdminClient, assertAdmin } from '@/lib/supabase/server'
-import { parseUUID, parseOdds, parseNonEmpty } from '@/lib/validation'
+import { parseUUID, parseOdds, parseNonEmpty, parsePikanteriaOutcomes } from '@/lib/validation'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { PicanteriaBuilder } from '@/components/pikanteria-builder'
@@ -56,20 +56,17 @@ async function editPikanteria(formData: FormData) {
   const supabase = createAdminClient()
   const pikanteriaId = parseUUID(formData.get('pikanteria_id'), 'pikanteria_id')
   const question = parseNonEmpty(formData.get('question'), 'question')
+  const outcomes = parsePikanteriaOutcomes(formData)
 
-  const count = parseInt((formData.get('opt_count') as string) || '0')
-  const options: { id: string; label: string; odds: number; sort_order: number }[] = []
-  for (let k = 1; k <= count; k++) {
-    const id = parseUUID(formData.get(`opt_id_${k}`), `opt_id_${k}`)
-    const label = parseNonEmpty(formData.get(`opt_label_${k}`), `opt_label_${k}`)
-    const odds = parseOdds(formData.get(`opt_odds_${k}`), `opt_odds_${k}`)
-    options.push({ id, label, odds, sort_order: k - 1 })
-  }
-
-  const { error } = await supabase.rpc('update_pikanteria_with_options', {
+  const { error } = await supabase.rpc('update_pikanteria', {
     p_pikanteria_id: pikanteriaId,
     p_question: question,
-    p_options: options,
+    p_label_1: outcomes.label_1,
+    p_odds_1: outcomes.odds_1,
+    p_label_2: outcomes.label_2,
+    p_odds_2: outcomes.odds_2,
+    p_label_x: outcomes.label_x,
+    p_odds_x: outcomes.odds_x,
   })
   if (error) throw new Error(`Failed to update pikanteria: ${error.message}`)
 
@@ -86,25 +83,22 @@ async function addPikanteria(formData: FormData) {
   const q = (formData.get('pik_q_1') as string | null)?.trim()
   if (!q) redirect('/admin/edit')
 
-  const count = parseInt((formData.get('pik_opt_count_1') as string) || '0')
-  const optionRows: { label: string; odds: number; sort_order: number }[] = []
-  for (let j = 1; j <= count; j++) {
-    const label = (formData.get(`pik_opt_label_1_${j}`) as string | null)?.trim()
-    if (!label) continue
-    let odds: number
-    try {
-      odds = parseOdds(formData.get(`pik_opt_odds_1_${j}`), `pik_opt_odds_1_${j}`)
-    } catch {
-      continue
-    }
-    optionRows.push({ label, odds, sort_order: j - 1 })
+  let outcomes
+  try {
+    outcomes = parsePikanteriaOutcomes(formData)
+  } catch {
+    redirect('/admin/edit')
   }
-  if (optionRows.length < 2) redirect('/admin/edit')
 
-  await supabase.rpc('insert_pikanteria_with_options', {
+  await supabase.rpc('insert_pikanteria', {
     p_match_day_id: matchDayId,
     p_question: q,
-    p_options: optionRows,
+    p_label_1: outcomes.label_1,
+    p_odds_1: outcomes.odds_1,
+    p_label_2: outcomes.label_2,
+    p_odds_2: outcomes.odds_2,
+    p_label_x: outcomes.label_x,
+    p_odds_x: outcomes.odds_x,
   })
 
   revalidatePath('/predict')
@@ -129,7 +123,7 @@ export default async function EditPage() {
       .select(`
         id, stage, date,
         matches!inner(id, home_team, away_team, kickoff_time, odds_home, odds_draw, odds_away, result, locked, published_at),
-        pikanteria(id, question, locked, published_at, pikanteria_options(id, label, odds, sort_order, is_correct))
+        pikanteria(id, question, locked, published_at, label_1, label_2, label_x, odds_1, odds_2, odds_x, result)
       `)
       .not('matches.published_at', 'is', null)
       .is('matches.result', null)
@@ -181,7 +175,7 @@ export default async function EditPage() {
       )}
 
       {(days ?? []).map((day) => {
-        const dayPikanteria = (day.pikanteria ?? []).filter(p => !(p.pikanteria_options ?? []).some(o => o.is_correct))
+        const dayPikanteria = (day.pikanteria ?? []).filter(p => p.result == null)
         return (
           <div key={day.id} className="space-y-4">
             {/* Day header */}
@@ -261,61 +255,45 @@ export default async function EditPage() {
                 🌶️ Edit pikanteria
               </div>
             )}
-            {dayPikanteria.map(pika => {
-              const options = pika.pikanteria_options.toSorted((a, b) => a.sort_order - b.sort_order)
-              return (
-                <div key={pika.id} className="rounded-xl p-4 space-y-3"
-                  style={{ background: 'var(--color-panel)', border: '1px solid var(--border-base)' }}>
-                  <div className="flex items-center justify-between gap-2">
-                    {pika.published_at == null && (
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full"
-                        style={{ color: 'var(--color-muted)', border: '1px solid var(--border-base)' }}>○ Draft</span>
-                    )}
-                    <form action={togglePikanteriaLock} className="ml-auto">
-                      <input type="hidden" name="pikanteria_id" value={pika.id} />
-                      <input type="hidden" name="locked" value={String(pika.locked)} />
-                      <button type="submit" className="px-3 py-1.5 rounded-lg text-xs font-bold"
-                        style={{
-                          background: pika.locked ? 'var(--color-accent-soft)' : 'var(--color-danger-soft)',
-                          color: pika.locked ? 'var(--color-accent)' : 'var(--color-danger)',
-                          border: `1px solid ${pika.locked ? 'var(--border-accent)' : 'var(--border-danger)'}`,
-                        }}>
-                        {pika.locked ? '🔓 Unlock' : '🔒 Lock'}
-                      </button>
-                    </form>
-                  </div>
-                  <form action={editPikanteria} className="space-y-3">
+            {dayPikanteria.map(pika => (
+              <div key={pika.id} className="rounded-xl p-4 space-y-3"
+                style={{ background: 'var(--color-panel)', border: '1px solid var(--border-base)' }}>
+                <div className="flex items-center justify-between gap-2">
+                  {pika.published_at == null && (
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full"
+                      style={{ color: 'var(--color-muted)', border: '1px solid var(--border-base)' }}>○ Draft</span>
+                  )}
+                  <form action={togglePikanteriaLock} className="ml-auto">
                     <input type="hidden" name="pikanteria_id" value={pika.id} />
-                    <input type="hidden" name="opt_count" value={options.length} />
-                    <div className="space-y-1">
-                      <label htmlFor={`pika_question_${pika.id}`} className="text-muted text-xs">Question</label>
-                      <input type="text" id={`pika_question_${pika.id}`} aria-label="Question" name="question" defaultValue={pika.question} style={inputBase} className={cls} />
-                    </div>
-                    <div className="space-y-2">
-                      {options.map((opt, idx) => {
-                        const k = idx + 1
-                        return (
-                          <div key={opt.id} className="flex gap-2 items-center">
-                            <input type="hidden" name={`opt_id_${k}`} value={opt.id} />
-                            <input type="text" name={`opt_label_${k}`} defaultValue={opt.label}
-                              aria-label={`Option ${k} label`}
-                              style={inputBase} className="rounded-lg px-3 py-2 text-sm outline-none focus:ring-1 flex-1" />
-                            <input type="number" step="0.01" name={`opt_odds_${k}`} defaultValue={opt.odds.toFixed(2)}
-                              aria-label={`Option ${k} odds`}
-                              style={{ ...inputBase, color: 'var(--color-amber)', fontFamily: 'var(--font-mono)' }}
-                              className="rounded-lg px-3 py-2 text-sm outline-none focus:ring-1 w-24" />
-                          </div>
-                        )
-                      })}
-                    </div>
-                    <button type="submit" className="w-full py-2 rounded-lg font-bold text-sm"
-                      style={{ background: 'var(--color-amber)', color: 'var(--color-bg)' }}>
-                      💾 Save question
+                    <input type="hidden" name="locked" value={String(pika.locked)} />
+                    <button type="submit" className="px-3 py-1.5 rounded-lg text-xs font-bold"
+                      style={{
+                        background: pika.locked ? 'var(--color-accent-soft)' : 'var(--color-danger-soft)',
+                        color: pika.locked ? 'var(--color-accent)' : 'var(--color-danger)',
+                        border: `1px solid ${pika.locked ? 'var(--border-accent)' : 'var(--border-danger)'}`,
+                      }}>
+                      {pika.locked ? '🔓 Unlock' : '🔒 Lock'}
                     </button>
                   </form>
                 </div>
-              )
-            })}
+                <form action={editPikanteria} className="space-y-3">
+                  <input type="hidden" name="pikanteria_id" value={pika.id} />
+                  <div className="space-y-1">
+                    <label htmlFor={`pika_question_${pika.id}`} className="text-muted text-xs">Question</label>
+                    <input type="text" id={`pika_question_${pika.id}`} aria-label="Question" name="question" defaultValue={pika.question} style={inputBase} className={cls} />
+                  </div>
+                  <PicanteriaBuilder defaults={{
+                    label1: pika.label_1, odds1: Number(pika.odds_1).toFixed(2),
+                    label2: pika.label_2, odds2: Number(pika.odds_2).toFixed(2),
+                    labelX: pika.label_x, oddsX: pika.odds_x == null ? null : Number(pika.odds_x).toFixed(2),
+                  }} />
+                  <button type="submit" className="w-full py-2 rounded-lg font-bold text-sm"
+                    style={{ background: 'var(--color-amber)', color: 'var(--color-bg)' }}>
+                    💾 Save question
+                  </button>
+                </form>
+              </div>
+            ))}
 
             {/* Add new pikanteria (draft) */}
             <div className="font-bold text-xs uppercase tracking-wider" style={{ color: 'var(--color-muted)' }}>
@@ -328,7 +306,7 @@ export default async function EditPage() {
                 <label htmlFor={`pik_q_1_${day.id}`} className="text-muted text-xs">Question</label>
                 <input type="text" id={`pik_q_1_${day.id}`} aria-label="Question" name="pik_q_1" placeholder="e.g. Will Mbappé score?" style={inputBase} className={cls} />
               </div>
-              <PicanteriaBuilder questionIndex={1} />
+              <PicanteriaBuilder />
               <button type="submit" className="w-full py-2 rounded-lg font-bold text-sm"
                 style={{ background: 'var(--color-amber)', color: 'var(--color-bg)' }}>
                 ➕ Add question (draft)

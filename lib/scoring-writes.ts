@@ -10,7 +10,7 @@ import {
   calcPreTournamentWinnerPoints,
   calcTopScorerPoints,
 } from './scoring'
-import type { Stage, Pick } from './types'
+import type { Pick } from './types'
 
 /** {id, points} row, matching the RPC's jsonb_to_recordset shape. */
 export interface PointsWrite {
@@ -23,9 +23,9 @@ export interface MatchResultWrite {
   result: Pick
 }
 
-export interface PikanteriaWinnerWrite {
+export interface PikanteriaResultWrite {
   pikanteria_id: string
-  option_id: string
+  result: Pick
 }
 
 export interface ScoredMatchInput {
@@ -37,11 +37,15 @@ export interface ScoredMatchInput {
   predictions: { id: string; pick: Pick }[]
 }
 
-export interface PikanteriaInput {
+// Pikanteria scores exactly like a match now: pick the odds for the winning
+// outcome (odds_x is null for two-way questions and only read when result is X).
+export interface ScoredPikanteriaInput {
   id: string
-  winningOptionId: string
-  winningOdds: number
-  answers: { id: string; option_id: string }[]
+  odds_1: number
+  odds_2: number
+  odds_x: number | null
+  result: Pick
+  answers: { id: string; pick: Pick }[]
 }
 
 export interface PreTournamentPickInput {
@@ -61,7 +65,6 @@ export interface PreTournamentPointsWrite {
 /** Build the match-result + prediction-point writes for one match day. */
 export function buildMatchScoringPayload(
   matches: ScoredMatchInput[],
-  stage: Stage,
 ): { matchResults: MatchResultWrite[]; predictionPoints: PointsWrite[] } {
   const matchResults: MatchResultWrite[] = []
   const predictionPoints: PointsWrite[] = []
@@ -77,7 +80,7 @@ export function buildMatchScoringPayload(
     for (const pred of match.predictions) {
       predictionPoints.push({
         id: pred.id,
-        points: calcMatchPoints(oddsForResult, stage, pred.pick === match.result),
+        points: calcMatchPoints(oddsForResult, pred.pick === match.result),
       })
     }
   }
@@ -85,25 +88,36 @@ export function buildMatchScoringPayload(
   return { matchResults, predictionPoints }
 }
 
-/** Build the winner flips + answer-point writes for the day's pikanteria. */
+/** Build the result + answer-point writes for the day's pikanteria. */
 export function buildPikanteriaScoringPayload(
-  items: PikanteriaInput[],
-): { winners: PikanteriaWinnerWrite[]; answerPoints: PointsWrite[] } {
-  const winners: PikanteriaWinnerWrite[] = []
+  items: ScoredPikanteriaInput[],
+): { pikanteriaResults: PikanteriaResultWrite[]; answerPoints: PointsWrite[] } {
+  const pikanteriaResults: PikanteriaResultWrite[] = []
   const answerPoints: PointsWrite[] = []
 
   for (const item of items) {
-    winners.push({ pikanteria_id: item.id, option_id: item.winningOptionId })
+    pikanteriaResults.push({ pikanteria_id: item.id, result: item.result })
+
+    const oddsForResult = pikanteriaOddsForResult(item)
 
     for (const ans of item.answers) {
       answerPoints.push({
         id: ans.id,
-        points: calcPicanteriaPoints(item.winningOdds, ans.option_id === item.winningOptionId),
+        points: calcPicanteriaPoints(oddsForResult, ans.pick === item.result),
       })
     }
   }
 
-  return { winners, answerPoints }
+  return { pikanteriaResults, answerPoints }
+}
+
+function pikanteriaOddsForResult(item: ScoredPikanteriaInput): number {
+  if (item.result === '1') return item.odds_1
+  if (item.result === '2') return item.odds_2
+  if (item.odds_x == null) {
+    throw new Error(`Pikanteria ${item.id} cannot be resolved as X because it has no X odds`)
+  }
+  return item.odds_x
 }
 
 /** Build the per-pick bonus-point writes from the final tournament results. */

@@ -63,17 +63,17 @@ describe('prediction save RPC wrappers', () => {
     await expect(saveMatchPrediction(client, 'match-1', '2')).resolves.toEqual(expected)
   })
 
-  test('saves a pikanteria option through the atomic RPC', async () => {
+  test('saves a pikanteria answer through the atomic RPC', async () => {
     const client = rpcClient({
       data: { ok: true, status: 'created', record_id: 'answer-1', message: null },
       error: null,
     })
 
-    const result = await savePikanteriaAnswer(client, 'pika-1', 'option-1')
+    const result = await savePikanteriaAnswer(client, 'pika-1', '1')
 
     expect(client.rpc).toHaveBeenCalledWith('save_pikanteria_answer', {
       p_pikanteria_id: 'pika-1',
-      p_option_id: 'option-1',
+      p_pick: '1',
     })
     expect(result).toEqual<SaveResult>({
       ok: true,
@@ -132,5 +132,32 @@ describe('independent bet locks migration', () => {
     expect(sql).toMatch(/if v_item\.pikanteria_locked then/)
     expect(sql).toMatch(/and not pk\.locked/)
     expect(sql).toMatch(/where pk\.published_at is not null\s+and pk\.locked/)
+  })
+})
+
+describe('pikanteria match-model migration', () => {
+  const sql = readFileSync(
+    join(process.cwd(), 'supabase/migrations/20260604000000_pikanteria_match_model.sql'),
+    'utf8',
+  )
+
+  test('drops old option-aware policies and RPCs before removing old columns and tables', () => {
+    const dropOptionColumn = sql.indexOf('alter table public.pikanteria_answers drop column option_id')
+    const dropOptionsTable = sql.indexOf('drop table if exists public.pikanteria_options')
+
+    for (const statement of [
+      'drop policy if exists "pik_answers_write_own_unlocked" on public.pikanteria_answers',
+      'drop policy if exists "pik_answers_update_own_unlocked" on public.pikanteria_answers',
+      'drop function if exists public.crowd_pikanteria_picks()',
+    ]) {
+      const position = sql.indexOf(statement)
+      expect(position, `${statement} should exist`).toBeGreaterThanOrEqual(0)
+      expect(position, `${statement} should run before option_id is removed`).toBeLessThan(dropOptionColumn)
+      expect(position, `${statement} should run before pikanteria_options is removed`).toBeLessThan(dropOptionsTable)
+    }
+  })
+
+  test('prevents two-way pikanteria questions from being resolved as X in the database', () => {
+    expect(sql).toMatch(/check\s*\(\s*result\s*<>\s*'X'\s+or\s+odds_x\s+is\s+not\s+null\s*\)/i)
   })
 })

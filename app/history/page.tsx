@@ -80,13 +80,16 @@ export default async function HistoryPage() {
             ...m,
             myPick: m.predictions.find(p => p.user_id === user.id),
           }))
+          const labelForPick = (p: typeof day.pikanteria[number], pick: string | null) => {
+            if (pick === '1') return p.label_1
+            if (pick === '2') return p.label_2
+            if (pick === 'X') return p.label_x
+            return null
+          }
           const myPikaAnswers = day.pikanteria.map(p => {
             const myAnswer = p.pikanteria_answers.find(a => a.user_id === user.id)
-            const myOption = myAnswer
-              ? p.pikanteria_options.find(o => o.id === myAnswer.option_id) ?? null
-              : null
-            const correctOption = p.pikanteria_options.find(o => o.is_correct) ?? null
-            return { ...p, myAnswer, myOption, correctOption }
+            const myLabel = myAnswer ? labelForPick(p, myAnswer.pick) : null
+            return { ...p, myAnswer, myLabel }
           })
           const dayPoints = [
             ...myMatchPreds.map(m => m.myPick?.points ?? 0),
@@ -143,11 +146,11 @@ export default async function HistoryPage() {
                     <span className="text-[11px] flex-1" style={{ color: 'var(--color-amber)' }}>
                       🌶️ {p.question}
                     </span>
-                    <span className="text-[11px] text-text">{p.myOption?.label ?? '?'}</span>
-                    {p.correctOption && (
+                    <span className="text-[11px] text-text">{p.myLabel ?? '?'}</span>
+                    {p.result !== null && (
                       <span className="text-[10px] font-extrabold w-4 text-center"
-                        style={{ color: p.myAnswer.option_id === p.correctOption.id ? 'var(--color-accent)' : 'var(--color-danger)' }}>
-                        {p.myAnswer.option_id === p.correctOption.id ? '✓' : '✗'}
+                        style={{ color: p.myAnswer.pick === p.result ? 'var(--color-accent)' : 'var(--color-danger)' }}>
+                        {p.myAnswer.pick === p.result ? '✓' : '✗'}
                       </span>
                     )}
                   </div>

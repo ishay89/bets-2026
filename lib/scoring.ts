@@ -1,22 +1,14 @@
-import type { Stage } from './types'
-
-const STAGE_MULTIPLIERS: Record<Stage, number> = {
-  group: 1,
-  r32: 1.25,
-  r16: 1.5,
-  qf: 1.5,
-  sf: 2,
-  '3rd': 1.5,
-  final: 3,
-}
-
 function round4(n: number): number {
   return Math.round(n * 10000) / 10000
 }
 
-export function calcMatchPoints(odds: number, stage: Stage, isCorrect: boolean): number {
+// Ongoing bets (matches + pikanteria) score the plain result odds — no stage
+// multiplier. Any weighting an admin wants is baked into the odds when they are
+// set, so the leaderboard is a straight sum. The futures bonuses below keep
+// their multipliers: those are applied once, at tournament close.
+export function calcMatchPoints(odds: number, isCorrect: boolean): number {
   if (!isCorrect) return 0
-  return round4(odds * (STAGE_MULTIPLIERS[stage] ?? 1))
+  return round4(odds)
 }
 
 export function calcPicanteriaPoints(odds: number, isCorrect: boolean): number {
