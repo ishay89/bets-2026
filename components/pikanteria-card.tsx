@@ -3,6 +3,8 @@ import { useRef, useState, useTransition } from 'react'
 import type { Pikanteria, PicanteriaOption } from '@/lib/types'
 import { largestRemainder } from '@/lib/crowd'
 import type { SaveResult } from '@/lib/prediction-saves'
+import type { PlayerRevealRow } from '@/lib/prediction-reveals'
+import { PredictionRevealSheet } from './prediction-reveal-sheet'
 
 interface Props {
   item: Pikanteria & { options: PicanteriaOption[] }
@@ -12,12 +14,14 @@ interface Props {
   /** Per-option crowd counts, revealed only once the day is locked. */
   crowd?: Record<string, number> | null
   crowdTotal?: number
+  myUserId?: string
+  onReveal?: (picanteriaId: string) => Promise<PlayerRevealRow[]>
 }
 
 // Distinct segment colours cycled across N options (amber-led to stay on-theme).
 const SEG_COLORS = ['var(--color-amber)', 'var(--color-accent)', 'var(--color-dim)', 'var(--color-silver)', 'var(--color-sub)']
 
-export function PicanteriaCard({ item, currentAnswer, isLocked, onSave, crowd, crowdTotal = 0 }: Props) {
+export function PicanteriaCard({ item, currentAnswer, isLocked, onSave, crowd, crowdTotal = 0, myUserId, onReveal }: Props) {
   // Optimistic overlay instead of copying the prop into state. `optimisticAnswer`
   // is null when no in-flight pick exists; the effective selection is the
   // in-flight value or the authoritative prop.
@@ -27,6 +31,26 @@ export function PicanteriaCard({ item, currentAnswer, isLocked, onSave, crowd, c
   const [saving, setSaving] = useState(false)
   const [pending, startTransition] = useTransition()
   const inFlightRef = useRef(false)
+
+  const [revealRows, setRevealRows] = useState<PlayerRevealRow[] | null>(null)
+  const [revealLoading, setRevealLoading] = useState(false)
+  const [revealError, setRevealError] = useState(false)
+  const [sheetOpen, setSheetOpen] = useState(false)
+
+  async function handleReveal() {
+    if (!onReveal || sheetOpen) return
+    setRevealLoading(true)
+    setRevealError(false)
+    try {
+      const rows = await onReveal(item.id)
+      setRevealRows(rows)
+      setSheetOpen(true)
+    } catch {
+      setRevealError(true)
+    } finally {
+      setRevealLoading(false)
+    }
+  }
 
   function handleSelect(optionId: string) {
     if (isLocked || inFlightRef.current || selected === optionId) return
@@ -207,6 +231,43 @@ export function PicanteriaCard({ item, currentAnswer, isLocked, onSave, crowd, c
               ))}
             </div>
           </div>
+        )}
+
+        {isLocked && onReveal && (
+          <div style={{ marginTop: 8 }}>
+            <button
+              type="button"
+              onClick={handleReveal}
+              disabled={revealLoading}
+              style={{
+                width: '100%',
+                padding: '6px 12px',
+                borderRadius: 10,
+                fontFamily: 'var(--font-display)',
+                fontSize: 12,
+                fontWeight: 700,
+                letterSpacing: '0.06em',
+                textTransform: 'uppercase',
+                color: revealError ? 'var(--color-danger)' : 'var(--color-amber)',
+                background: revealError ? 'var(--color-danger-soft)' : 'var(--color-amber-soft)',
+                border: revealError ? '1px solid var(--border-danger)' : '1px solid var(--border-warn)',
+                cursor: revealLoading ? 'not-allowed' : 'pointer',
+                opacity: revealLoading ? 0.6 : 1,
+              }}
+            >
+              {revealLoading ? '…' : revealError ? 'Could not load picks' : '👁 Picks'}
+            </button>
+          </div>
+        )}
+
+        {sheetOpen && revealRows !== null && myUserId && (
+          <PredictionRevealSheet
+            title={item.question}
+            rows={revealRows}
+            myUserId={myUserId}
+            optionLabels={Object.fromEntries(item.options.map(o => [o.id, o.label]))}
+            onClose={() => setSheetOpen(false)}
+          />
         )}
       </div>
     </div>
