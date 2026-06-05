@@ -1,4 +1,4 @@
-import { createClient, createServiceClient, assertAdmin } from '@/lib/supabase/server'
+import { createClient, createAdminClient, assertAdmin } from '@/lib/supabase/server'
 import { parseUUID } from '@/lib/validation'
 import { revalidatePath } from 'next/cache'
 import Link from 'next/link'
@@ -7,7 +7,7 @@ import type { User, UserStatus } from '@/lib/types'
 async function toggleAdmin(formData: FormData) {
   'use server'
   await assertAdmin()
-  const supabase = await createServiceClient()
+  const supabase = createAdminClient()
   const userId = parseUUID(formData.get('user_id'), 'user_id')
   const isAdmin = formData.get('is_admin') === 'true'
   await supabase.from('users').update({ is_admin: !isAdmin }).eq('id', userId)
@@ -17,7 +17,7 @@ async function toggleAdmin(formData: FormData) {
 async function setStatus(formData: FormData) {
   'use server'
   await assertAdmin()
-  const supabase = await createServiceClient()
+  const supabase = createAdminClient()
   const userId = parseUUID(formData.get('user_id'), 'user_id')
   const status = formData.get('status')
   if (status !== 'pending' && status !== 'approved' && status !== 'blocked') {
