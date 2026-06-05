@@ -1,5 +1,6 @@
 import { createAdminClient, assertAdmin } from '@/lib/supabase/server'
-import { parseUUID, parseOdds, parsePikanteriaOutcomes } from '@/lib/validation'
+import { parseUUID, parseOdds, parseNonEmpty, parsePikanteriaOutcomes } from '@/lib/validation'
+import type { PikanteriaOutcomes } from '@/lib/validation'
 import {
   buildAutomatedMatchRows,
   buildAutomatedPikaRows,
@@ -22,6 +23,75 @@ async function getAutomatedUsers(supabase: AdminClient): Promise<AutomatedUser[]
   return data ?? []
 }
 
+function publishPath(date: string, notice?: string) {
+  const params = new URLSearchParams({ date })
+  if (notice) params.set('notice', notice)
+  return `/admin/publish?${params.toString()}`
+}
+
+function parsePikanteriaEditForm(formData: FormData, date: string) {
+  try {
+    return {
+      question: parseNonEmpty(formData.get('question'), 'question'),
+      outcomes: parsePikanteriaOutcomes(formData),
+    }
+  } catch {
+    redirect(publishPath(date, 'options'))
+  }
+}
+
+function parseNewPikanteriaOutcomes(formData: FormData, date: string): PikanteriaOutcomes {
+  try {
+    return parsePikanteriaOutcomes(formData)
+  } catch {
+    redirect(publishPath(date, 'options'))
+  }
+}
+
+async function ensureMatchIsUnscored(supabase: AdminClient, matchId: string, date: string) {
+  const { data: match } = await supabase
+    .from('matches')
+    .select('result')
+    .eq('id', matchId)
+    .single()
+
+  if (match?.result != null) {
+    redirect(publishPath(date, 'scored'))
+  }
+}
+
+async function ensurePikanteriaIsUnscored(supabase: AdminClient, pikanteriaId: string, date: string) {
+  const { data: pika } = await supabase
+    .from('pikanteria')
+    .select('result')
+    .eq('id', pikanteriaId)
+    .single()
+
+  if (pika?.result != null) {
+    redirect(publishPath(date, 'scored'))
+  }
+}
+
+async function publishPikanteriaWithAutomatedRows(
+  supabase: AdminClient,
+  pikanteriaId: string,
+  odds: { odds_1: number; odds_2: number; odds_x: number | null },
+  date: string,
+) {
+  await setPikanteriaPublishedAt(supabase, pikanteriaId, new Date().toISOString())
+
+  const users = await getAutomatedUsers(supabase)
+  if (!users.length) return
+
+  const rows = buildAutomatedPikaRows(users, [{
+    id: pikanteriaId,
+    odds_1: odds.odds_1,
+    odds_2: odds.odds_2,
+    odds_x: odds.odds_x,
+  }], date)
+  await supabase.from('pikanteria_answers').upsert(rows, { onConflict: 'user_id,pikanteria_id' })
+}
+
 // A database trigger keeps match_days.published_at + lock_time in sync whenever
 // an item's published_at flips, so these actions only flip the item flag and
 // (where relevant) generate the per-item automated benchmark picks.
@@ -32,7 +102,8 @@ async function publishMatch(formData: FormData) {
   const supabase = createAdminClient()
 
   const matchId = parseUUID(formData.get('match_id'), 'match_id')
-  const date = formData.get('date') as string
+  const date = parseNonEmpty(formData.get('date'), 'date')
+  await ensureMatchIsUnscored(supabase, matchId, date)
 
   const odds = {
     odds_home: parseOdds(formData.get('odds_home'), 'odds_home'),
@@ -53,7 +124,31 @@ async function publishMatch(formData: FormData) {
   }
 
   revalidatePath('/predict')
-  redirect(`/admin/publish?date=${date}`)
+  revalidatePath('/admin/publish')
+  redirect(publishPath(date))
+}
+
+async function saveMatchOdds(formData: FormData) {
+  'use server'
+  await assertAdmin()
+  const supabase = createAdminClient()
+
+  const matchId = parseUUID(formData.get('match_id'), 'match_id')
+  const date = parseNonEmpty(formData.get('date'), 'date')
+  await ensureMatchIsUnscored(supabase, matchId, date)
+
+  await supabase
+    .from('matches')
+    .update({
+      odds_home: parseOdds(formData.get('odds_home'), 'odds_home'),
+      odds_draw: parseOdds(formData.get('odds_draw'), 'odds_draw'),
+      odds_away: parseOdds(formData.get('odds_away'), 'odds_away'),
+    })
+    .eq('id', matchId)
+
+  revalidatePath('/predict')
+  revalidatePath('/admin/publish')
+  redirect(publishPath(date))
 }
 
 async function unpublishMatch(formData: FormData) {
@@ -62,50 +157,104 @@ async function unpublishMatch(formData: FormData) {
   const supabase = createAdminClient()
 
   const matchId = parseUUID(formData.get('match_id'), 'match_id')
-  const date = formData.get('date') as string
-
-  // Refuse to hide an already-scored match — its points are on the leaderboard.
-  const { data: match } = await supabase.from('matches').select('result').eq('id', matchId).single()
-  if (match?.result != null) {
-    redirect(`/admin/publish?date=${date}&notice=scored`)
-  }
+  const date = parseNonEmpty(formData.get('date'), 'date')
+  await ensureMatchIsUnscored(supabase, matchId, date)
 
   await supabase.from('matches').update({ published_at: null }).eq('id', matchId)
 
   revalidatePath('/predict')
-  redirect(`/admin/publish?date=${date}`)
+  revalidatePath('/admin/publish')
+  redirect(publishPath(date))
 }
 
-async function publishExistingPikanteria(formData: FormData) {
+async function toggleFuturesLock(formData: FormData) {
+  'use server'
+  await assertAdmin()
+  const supabase = createAdminClient()
+
+  const date = parseNonEmpty(formData.get('date'), 'date')
+  const locked = formData.get('futures_locked') === 'true'
+
+  await supabase.from('tournament_settings').update({ futures_locked: !locked }).eq('id', true)
+
+  revalidatePath('/predict')
+  revalidatePath('/admin/publish')
+  redirect(publishPath(date))
+}
+
+async function toggleMatchLock(formData: FormData) {
+  'use server'
+  await assertAdmin()
+  const supabase = createAdminClient()
+
+  const matchId = parseUUID(formData.get('match_id'), 'match_id')
+  const date = parseNonEmpty(formData.get('date'), 'date')
+  const locked = formData.get('locked') === 'true'
+  await ensureMatchIsUnscored(supabase, matchId, date)
+
+  await supabase.from('matches').update({ locked: !locked }).eq('id', matchId)
+
+  revalidatePath('/predict')
+  revalidatePath('/admin/publish')
+  redirect(publishPath(date))
+}
+
+async function savePikanteria(formData: FormData) {
   'use server'
   await assertAdmin()
   const supabase = createAdminClient()
 
   const pikanteriaId = parseUUID(formData.get('pikanteria_id'), 'pikanteria_id')
-  const date = formData.get('date') as string
+  const date = parseNonEmpty(formData.get('date'), 'date')
+  await ensurePikanteriaIsUnscored(supabase, pikanteriaId, date)
 
-  await setPikanteriaPublishedAt(supabase, pikanteriaId, new Date().toISOString())
+  const { question, outcomes } = parsePikanteriaEditForm(formData, date)
 
-  const users = await getAutomatedUsers(supabase)
-  if (users.length) {
-    const { data: pika } = await supabase
-      .from('pikanteria')
-      .select('odds_1, odds_2, odds_x')
-      .eq('id', pikanteriaId)
-      .single()
-    if (pika) {
-      const rows = buildAutomatedPikaRows(users, [{
-        id: pikanteriaId,
-        odds_1: Number(pika.odds_1),
-        odds_2: Number(pika.odds_2),
-        odds_x: pika.odds_x == null ? null : Number(pika.odds_x),
-      }], date)
-      await supabase.from('pikanteria_answers').upsert(rows, { onConflict: 'user_id,pikanteria_id' })
-    }
-  }
+  const { error } = await supabase.rpc('update_pikanteria', {
+    p_pikanteria_id: pikanteriaId,
+    p_question: question,
+    p_label_1: outcomes.label_1,
+    p_odds_1: outcomes.odds_1,
+    p_label_2: outcomes.label_2,
+    p_odds_2: outcomes.odds_2,
+    p_label_x: outcomes.label_x,
+    p_odds_x: outcomes.odds_x,
+  })
+  if (error) redirect(publishPath(date, 'options'))
 
   revalidatePath('/predict')
-  redirect(`/admin/publish?date=${date}`)
+  revalidatePath('/admin/publish')
+  redirect(publishPath(date))
+}
+
+async function saveAndPublishPikanteria(formData: FormData) {
+  'use server'
+  await assertAdmin()
+  const supabase = createAdminClient()
+
+  const pikanteriaId = parseUUID(formData.get('pikanteria_id'), 'pikanteria_id')
+  const date = parseNonEmpty(formData.get('date'), 'date')
+  await ensurePikanteriaIsUnscored(supabase, pikanteriaId, date)
+
+  const { question, outcomes } = parsePikanteriaEditForm(formData, date)
+
+  const { error } = await supabase.rpc('update_pikanteria', {
+    p_pikanteria_id: pikanteriaId,
+    p_question: question,
+    p_label_1: outcomes.label_1,
+    p_odds_1: outcomes.odds_1,
+    p_label_2: outcomes.label_2,
+    p_odds_2: outcomes.odds_2,
+    p_label_x: outcomes.label_x,
+    p_odds_x: outcomes.odds_x,
+  })
+  if (error) redirect(publishPath(date, 'options'))
+
+  await publishPikanteriaWithAutomatedRows(supabase, pikanteriaId, outcomes, date)
+
+  revalidatePath('/predict')
+  revalidatePath('/admin/publish')
+  redirect(publishPath(date))
 }
 
 async function unpublishPikanteria(formData: FormData) {
@@ -114,41 +263,44 @@ async function unpublishPikanteria(formData: FormData) {
   const supabase = createAdminClient()
 
   const pikanteriaId = parseUUID(formData.get('pikanteria_id'), 'pikanteria_id')
-  const date = formData.get('date') as string
-
-  // Refuse to hide an already-resolved question (one with a result entered).
-  const { data: pika } = await supabase
-    .from('pikanteria')
-    .select('result')
-    .eq('id', pikanteriaId)
-    .single()
-  if (pika?.result != null) {
-    redirect(`/admin/publish?date=${date}&notice=scored`)
-  }
+  const date = parseNonEmpty(formData.get('date'), 'date')
+  await ensurePikanteriaIsUnscored(supabase, pikanteriaId, date)
 
   await setPikanteriaPublishedAt(supabase, pikanteriaId, null)
 
   revalidatePath('/predict')
-  redirect(`/admin/publish?date=${date}`)
+  revalidatePath('/admin/publish')
+  redirect(publishPath(date))
 }
 
-async function publishNewPikanteria(formData: FormData) {
+async function togglePikanteriaLock(formData: FormData) {
   'use server'
   await assertAdmin()
   const supabase = createAdminClient()
 
+  const pikanteriaId = parseUUID(formData.get('pikanteria_id'), 'pikanteria_id')
+  const date = parseNonEmpty(formData.get('date'), 'date')
+  const locked = formData.get('locked') === 'true'
+  await ensurePikanteriaIsUnscored(supabase, pikanteriaId, date)
+
+  await supabase.from('pikanteria').update({ locked: !locked }).eq('id', pikanteriaId)
+
+  revalidatePath('/predict')
+  revalidatePath('/admin/publish')
+  redirect(publishPath(date))
+}
+
+async function createPikanteria(formData: FormData, publishNow: boolean) {
+  await assertAdmin()
+  const supabase = createAdminClient()
+
   const matchDayId = parseUUID(formData.get('match_day_id'), 'match_day_id')
-  const date = formData.get('date') as string
+  const date = parseNonEmpty(formData.get('date'), 'date')
 
   const q = (formData.get('pik_q_1') as string | null)?.trim()
-  if (!q) redirect(`/admin/publish?date=${date}`)
+  if (!q) redirect(publishPath(date))
 
-  let outcomes
-  try {
-    outcomes = parsePikanteriaOutcomes(formData)
-  } catch {
-    redirect(`/admin/publish?date=${date}&notice=options`)
-  }
+  const outcomes = parseNewPikanteriaOutcomes(formData, date)
 
   const { data: newId, error } = await supabase.rpc('insert_pikanteria', {
     p_match_day_id: matchDayId,
@@ -160,24 +312,26 @@ async function publishNewPikanteria(formData: FormData) {
     p_label_x: outcomes.label_x,
     p_odds_x: outcomes.odds_x,
   })
-  if (error || !newId) redirect(`/admin/publish?date=${date}&notice=options`)
+  if (error || !newId) redirect(publishPath(date, 'options'))
 
   const pikanteriaId = newId as string
-  await setPikanteriaPublishedAt(supabase, pikanteriaId, new Date().toISOString())
-
-  const users = await getAutomatedUsers(supabase)
-  if (users.length) {
-    const rows = buildAutomatedPikaRows(users, [{
-      id: pikanteriaId,
-      odds_1: outcomes.odds_1,
-      odds_2: outcomes.odds_2,
-      odds_x: outcomes.odds_x,
-    }], date)
-    await supabase.from('pikanteria_answers').upsert(rows, { onConflict: 'user_id,pikanteria_id' })
+  if (publishNow) {
+    await publishPikanteriaWithAutomatedRows(supabase, pikanteriaId, outcomes, date)
   }
 
   revalidatePath('/predict')
-  redirect(`/admin/publish?date=${date}`)
+  revalidatePath('/admin/publish')
+  redirect(publishPath(date))
+}
+
+async function publishNewPikanteria(formData: FormData) {
+  'use server'
+  await createPikanteria(formData, true)
+}
+
+async function addDraftPikanteria(formData: FormData) {
+  'use server'
+  await createPikanteria(formData, false)
 }
 
 const inputBase = {
@@ -193,7 +347,27 @@ function StatusBadge({ published }: { published: boolean }) {
       style={published
         ? { color: 'var(--color-accent)', background: 'var(--color-accent-soft)', border: '1px solid var(--border-accent)' }
         : { color: 'var(--color-muted)', background: 'var(--color-bg)', border: '1px solid var(--border-base)' }}>
-      {published ? '● Live' : '○ Draft'}
+      {published ? 'Live' : 'Draft'}
+    </span>
+  )
+}
+
+function LockBadge({ locked }: { locked: boolean }) {
+  return (
+    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full"
+      style={locked
+        ? { color: 'var(--color-danger)', background: 'var(--color-danger-soft)', border: '1px solid var(--border-danger)' }
+        : { color: 'var(--color-muted)', background: 'var(--color-bg)', border: '1px solid var(--border-base)' }}>
+      {locked ? 'Locked' : 'Open'}
+    </span>
+  )
+}
+
+function ScoredBadge() {
+  return (
+    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full"
+      style={{ color: 'var(--color-amber)', background: 'var(--color-amber-soft)', border: '1px solid var(--border-warn)' }}>
+      Scored
     </span>
   )
 }
@@ -210,55 +384,84 @@ export default async function PublishPage({
   type DayMatch = {
     id: string; home_team: string; away_team: string
     kickoff_time: string; odds_home: number; odds_draw: number; odds_away: number
-    result: string | null; published_at: string | null
+    result: string | null; published_at: string | null; locked: boolean
   }
   type DayPika = {
-    id: string; question: string; published_at: string | null
+    id: string; question: string; published_at: string | null; locked: boolean
     label_1: string; label_2: string; label_x: string | null
     odds_1: number; odds_2: number; odds_x: number | null
     result: string | null
   }
   type Day = { id: string; stage: string; date: string }
 
+  const supabase = createAdminClient()
+  const { data: settings } = await supabase
+    .from('tournament_settings')
+    .select('futures_locked')
+    .eq('id', true)
+    .single()
+
   let day: Day | null = null
   let matches: DayMatch[] = []
   let pikanteria: DayPika[] = []
 
-  if (date) {
-    const supabase = createAdminClient()
-    const { data: matchDay } = await supabase
-      .from('match_days')
-      .select('id, stage, date')
-      .eq('date', date)
-      .maybeSingle()
+  const { data: matchDay } = await supabase
+    .from('match_days')
+    .select('id, stage, date')
+    .eq('date', selectedDate)
+    .maybeSingle()
 
-    if (matchDay) {
-      day = matchDay as Day
-      const [{ data: matchRows }, { data: pikaRows }] = await Promise.all([
-        supabase
-          .from('matches')
-          .select('id, home_team, away_team, kickoff_time, odds_home, odds_draw, odds_away, result, published_at')
-          .eq('match_day_id', matchDay.id)
-          .order('kickoff_time'),
-        supabase
-          .from('pikanteria')
-          .select('id, question, published_at, label_1, label_2, label_x, odds_1, odds_2, odds_x, result')
-          .eq('match_day_id', matchDay.id)
-          .order('created_at'),
-      ])
-      matches = (matchRows ?? []) as DayMatch[]
-      pikanteria = (pikaRows ?? []) as DayPika[]
-    }
+  if (matchDay) {
+    day = matchDay as Day
+    const [{ data: matchRows }, { data: pikaRows }] = await Promise.all([
+      supabase
+        .from('matches')
+        .select('id, home_team, away_team, kickoff_time, odds_home, odds_draw, odds_away, result, published_at, locked')
+        .eq('match_day_id', matchDay.id)
+        .order('kickoff_time'),
+      supabase
+        .from('pikanteria')
+        .select('id, question, published_at, locked, label_1, label_2, label_x, odds_1, odds_2, odds_x, result')
+        .eq('match_day_id', matchDay.id)
+        .order('created_at'),
+    ])
+    matches = (matchRows ?? []) as DayMatch[]
+    pikanteria = (pikaRows ?? []) as DayPika[]
   }
+
+  const futuresLocked = settings?.futures_locked ?? false
 
   return (
     <div className="max-w-2xl mx-auto space-y-6 pb-10">
       <div>
-        <div className="font-black text-lg" style={{ color: 'var(--color-amber)' }}>📋 Publish Matches</div>
-        <div className="text-muted text-xs">Publish individual matches and pikanteria - players only see published items</div>
+        <div className="font-black text-lg" style={{ color: 'var(--color-amber)' }}>Publish &amp; Edit Bets</div>
+        <div className="text-muted text-xs">Manage odds, publishing, and locks from one admin screen</div>
       </div>
 
-      {/* Date picker — GET form loads the day */}
+      <div className="rounded-xl p-3 flex items-center justify-between gap-3"
+        style={{ background: 'var(--color-panel)', border: '1px solid var(--border-base)' }}>
+        <div className="min-w-0">
+          <div className="text-sm font-bold text-text">Winner &amp; Top Scorer</div>
+          <div className="text-xs text-muted">
+            {futuresLocked
+              ? 'Manually locked - users cannot change futures picks'
+              : 'Open - users can change futures picks'}
+          </div>
+        </div>
+        <form action={toggleFuturesLock}>
+          <input type="hidden" name="date" value={selectedDate} />
+          <input type="hidden" name="futures_locked" value={String(futuresLocked)} />
+          <button type="submit" className="px-4 py-2 rounded-lg text-sm font-bold whitespace-nowrap"
+            style={{
+              background: futuresLocked ? 'var(--color-accent-soft)' : 'var(--color-danger-soft)',
+              color: futuresLocked ? 'var(--color-accent)' : 'var(--color-danger)',
+              border: `1px solid ${futuresLocked ? 'var(--border-accent)' : 'var(--border-danger)'}`,
+            }}>
+            {futuresLocked ? 'Unlock' : 'Lock'}
+          </button>
+        </form>
+      </div>
+
       <form method="GET" className="rounded-xl p-4 space-y-4"
         style={{ background: 'var(--color-panel)', border: '1px solid var(--border-base)' }}>
         <div className="font-bold text-xs uppercase tracking-wider" style={{ color: 'var(--color-amber)' }}>
@@ -280,30 +483,24 @@ export default async function PublishPage({
       {notice === 'scored' && (
         <div className="rounded-xl p-4" style={{ background: 'var(--color-danger-soft)', border: '1px solid var(--border-danger)' }}>
           <div className="text-sm font-semibold" style={{ color: 'var(--color-danger)' }}>
-            Can&apos;t unpublish an item that&apos;s already scored
+            Can&apos;t change an item that&apos;s already scored
           </div>
-          <div className="text-xs text-muted mt-1">Its points are already on the leaderboard. Re-score or reset it first.</div>
+          <div className="text-xs text-muted mt-1">Reset its result first if the odds, visibility, or lock state need to change.</div>
         </div>
       )}
       {notice === 'options' && (
         <div className="rounded-xl p-4" style={{ background: 'var(--color-amber-soft)', border: '1px solid var(--border-warn)' }}>
           <div className="text-sm font-semibold" style={{ color: 'var(--color-amber)' }}>
-            A pikanteria question needs at least 2 valid options
+            A pikanteria question needs at least 2 valid outcomes
           </div>
         </div>
       )}
 
-      {!date && (
-        <div className="text-center py-8 text-muted text-sm">
-          Pick a date and click Load to see the scheduled matches
-        </div>
-      )}
-
-      {date && !day && (
+      {!day && (
         <div className="rounded-xl p-4"
           style={{ background: 'var(--color-amber-soft)', border: '1px solid var(--border-warn)' }}>
           <div className="text-sm font-semibold" style={{ color: 'var(--color-amber)' }}>
-            No match day found for {date}
+            No match day found for {selectedDate}
           </div>
           <div className="text-xs text-muted mt-1">
             No fixtures were seeded for this date.
@@ -315,7 +512,6 @@ export default async function PublishPage({
         <div className="space-y-6">
           <div className="rounded-xl p-3 flex items-center gap-3"
             style={{ background: 'var(--color-accent-soft)', border: '1px solid var(--border-accent)' }}>
-            <div className="text-lg">📅</div>
             <div>
               <div className="text-sm font-bold text-text">{day.date} - {day.stage}</div>
               <div className="text-xs text-muted">
@@ -325,93 +521,197 @@ export default async function PublishPage({
             </div>
           </div>
 
-          {/* Match cards — each is its own publish/unpublish form */}
           {matches.map(match => {
             const published = match.published_at != null
+            const scored = match.result != null
             const kickoffLabel = new Date(match.kickoff_time).toLocaleTimeString([], {
               hour: '2-digit', minute: '2-digit', timeZone: 'UTC',
             }) + ' UTC'
             return (
-              <form key={match.id} action={published ? unpublishMatch : publishMatch}
-                className="rounded-xl p-4 space-y-3"
+              <div key={match.id} className="rounded-xl p-4 space-y-3"
                 style={{ background: 'var(--color-panel)', border: '1px solid var(--border-base)' }}>
-                <input type="hidden" name="match_id" value={match.id} />
-                <input type="hidden" name="date" value={day!.date} />
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="font-bold text-sm text-text">{match.home_team} vs {match.away_team}</span>
-                    <StatusBadge published={published} />
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="font-bold text-sm text-text">{match.home_team} vs {match.away_team}</div>
+                    <div className="text-xs text-muted">{kickoffLabel}</div>
                   </div>
-                  <div className="text-xs text-muted">{kickoffLabel}</div>
+                  <div className="flex items-center gap-2 flex-wrap justify-end">
+                    <StatusBadge published={published} />
+                    <LockBadge locked={match.locked} />
+                    {scored && <ScoredBadge />}
+                  </div>
                 </div>
-                <div className="grid grid-cols-3 gap-2">
-                  {(['home', 'draw', 'away'] as const).map(k => (
-                    <div key={k} className="space-y-1">
-                      <label htmlFor={`publish_odds_${k}_${match.id}`} className="text-muted text-xs capitalize">Odds {k}</label>
-                      <input
-                        id={`publish_odds_${k}_${match.id}`}
-                        aria-label={`Odds ${k}`}
-                        type="number" step="0.01" name={`odds_${k}`}
-                        required
-                        defaultValue={(k === 'home' ? match.odds_home : k === 'draw' ? match.odds_draw : match.odds_away).toFixed(2)}
-                        disabled={published}
-                        style={{ ...inputBase, color: 'var(--color-accent)', fontFamily: 'var(--font-mono)' }}
-                        className={`${cls} disabled:opacity-50`}
-                      />
+
+                <form action={published ? saveMatchOdds : publishMatch} className="space-y-3">
+                  <input type="hidden" name="match_id" value={match.id} />
+                  <input type="hidden" name="date" value={day.date} />
+                  <div className="grid grid-cols-3 gap-2">
+                    {(['home', 'draw', 'away'] as const).map(k => (
+                      <div key={k} className="space-y-1">
+                        <label htmlFor={`publish_odds_${k}_${match.id}`} className="text-muted text-xs capitalize">Odds {k}</label>
+                        <input
+                          id={`publish_odds_${k}_${match.id}`}
+                          aria-label={`Odds ${k}`}
+                          type="number" step="0.01" name={`odds_${k}`}
+                          required
+                          defaultValue={(k === 'home' ? match.odds_home : k === 'draw' ? match.odds_draw : match.odds_away).toFixed(2)}
+                          disabled={scored}
+                          style={{ ...inputBase, color: 'var(--color-accent)', fontFamily: 'var(--font-mono)' }}
+                          className={`${cls} disabled:opacity-50`}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                  <button type="submit" disabled={scored} className="w-full py-2 rounded-lg font-bold text-sm disabled:opacity-50"
+                    style={{ background: 'var(--color-amber)', color: 'var(--color-bg)' }}>
+                    {published ? 'Save odds' : 'Save odds & publish'}
+                  </button>
+                </form>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <form action={toggleMatchLock}>
+                    <input type="hidden" name="match_id" value={match.id} />
+                    <input type="hidden" name="date" value={day.date} />
+                    <input type="hidden" name="locked" value={String(match.locked)} />
+                    <button type="submit" disabled={scored} className="w-full py-2 rounded-lg text-xs font-bold disabled:opacity-50"
+                      style={{
+                        background: match.locked ? 'var(--color-accent-soft)' : 'var(--color-danger-soft)',
+                        color: match.locked ? 'var(--color-accent)' : 'var(--color-danger)',
+                        border: `1px solid ${match.locked ? 'var(--border-accent)' : 'var(--border-danger)'}`,
+                      }}>
+                      {match.locked ? 'Unlock' : 'Lock'}
+                    </button>
+                  </form>
+
+                  {published ? (
+                    <form action={unpublishMatch}>
+                      <input type="hidden" name="match_id" value={match.id} />
+                      <input type="hidden" name="date" value={day.date} />
+                      <button type="submit" disabled={scored} className="w-full py-2 rounded-lg text-xs font-bold disabled:opacity-50"
+                        style={{ background: 'var(--color-danger-soft)', color: 'var(--color-danger)', border: '1px solid var(--border-danger)' }}>
+                        Unpublish
+                      </button>
+                    </form>
+                  ) : (
+                    <div className="rounded-lg px-3 py-2 text-xs text-muted text-center"
+                      style={{ border: '1px solid var(--border-base)', background: 'var(--color-bg)' }}>
+                      Draft
                     </div>
-                  ))}
+                  )}
                 </div>
-                <button type="submit" className="w-full py-2 rounded-lg font-bold text-sm"
-                  style={published
-                    ? { background: 'var(--color-danger-soft)', color: 'var(--color-danger)', border: '1px solid var(--border-danger)' }
-                    : { background: 'var(--color-amber)', color: 'var(--color-bg)' }}>
-                  {published ? '↩ Unpublish' : '🚀 Publish match'}
-                </button>
-              </form>
+              </div>
             )
           })}
 
-          {/* Existing pikanteria — each its own publish/unpublish form */}
           {pikanteria.length > 0 && (
             <div className="font-bold text-xs uppercase tracking-wider" style={{ color: 'var(--color-amber)' }}>
-              🌶️ Pikanteria
+              Pikanteria
             </div>
           )}
           {pikanteria.map(pika => {
             const published = pika.published_at != null
+            const scored = pika.result != null
             const outcomes = [
               { key: '1', label: pika.label_1, odds: pika.odds_1 },
               ...(pika.label_x != null && pika.odds_x != null ? [{ key: 'X', label: pika.label_x, odds: pika.odds_x }] : []),
               { key: '2', label: pika.label_2, odds: pika.odds_2 },
             ]
             return (
-              <form key={pika.id} action={published ? unpublishPikanteria : publishExistingPikanteria}
-                className="rounded-xl p-4 space-y-3"
+              <div key={pika.id} className="rounded-xl p-4 space-y-3"
                 style={{ background: 'var(--color-panel)', border: '1px solid var(--border-base)' }}>
-                <input type="hidden" name="pikanteria_id" value={pika.id} />
-                <input type="hidden" name="date" value={day!.date} />
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-semibold text-text">{pika.question}</span>
-                  <StatusBadge published={published} />
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0 text-sm font-semibold text-text">{pika.question}</div>
+                  <div className="flex items-center gap-2 flex-wrap justify-end">
+                    <StatusBadge published={published} />
+                    <LockBadge locked={pika.locked} />
+                    {scored && <ScoredBadge />}
+                  </div>
                 </div>
-                <div className="flex gap-2 flex-wrap">
-                  {outcomes.map(o => (
-                    <span key={o.key} className="text-xs rounded-lg px-2 py-1" style={inputBase}>
-                      <span className="text-muted">{o.key}</span> {o.label} <span className="text-muted" style={{ fontFamily: 'var(--font-mono)' }}>{Number(o.odds).toFixed(2)}</span>
-                    </span>
-                  ))}
-                </div>
-                <button type="submit" className="w-full py-2 rounded-lg font-bold text-sm"
-                  style={published
-                    ? { background: 'var(--color-danger-soft)', color: 'var(--color-danger)', border: '1px solid var(--border-danger)' }
-                    : { background: 'var(--color-amber)', color: 'var(--color-bg)' }}>
-                  {published ? '↩ Unpublish' : '🚀 Publish question'}
-                </button>
-              </form>
+
+                {scored ? (
+                  <>
+                    <div className="flex gap-2 flex-wrap">
+                      {outcomes.map(o => (
+                        <span key={o.key} className="text-xs rounded-lg px-2 py-1" style={inputBase}>
+                          <span className="text-muted">{o.key}</span> {o.label} <span className="text-muted" style={{ fontFamily: 'var(--font-mono)' }}>{Number(o.odds).toFixed(2)}</span>
+                        </span>
+                      ))}
+                    </div>
+                    <div className="text-xs text-muted">Reset this result before editing, unpublishing, or changing the lock.</div>
+                  </>
+                ) : (
+                  <>
+                    <form action={savePikanteria} className="space-y-3">
+                      <input type="hidden" name="pikanteria_id" value={pika.id} />
+                      <input type="hidden" name="date" value={day.date} />
+                      <div className="space-y-1">
+                        <label htmlFor={`pika_question_${pika.id}`} className="text-muted text-xs">Question</label>
+                        <input
+                          type="text"
+                          id={`pika_question_${pika.id}`}
+                          aria-label="Question"
+                          name="question"
+                          defaultValue={pika.question}
+                          style={inputBase}
+                          className={cls}
+                        />
+                      </div>
+                      <PicanteriaBuilder defaults={{
+                        label1: pika.label_1, odds1: Number(pika.odds_1).toFixed(2),
+                        label2: pika.label_2, odds2: Number(pika.odds_2).toFixed(2),
+                        labelX: pika.label_x, oddsX: pika.odds_x == null ? null : Number(pika.odds_x).toFixed(2),
+                      }} />
+                      <div className={published ? '' : 'grid grid-cols-2 gap-2'}>
+                        <button type="submit" className="w-full py-2 rounded-lg font-bold text-sm"
+                          style={{ background: 'var(--color-amber)', color: 'var(--color-bg)' }}>
+                          Save question
+                        </button>
+                        {!published && (
+                          <button type="submit" formAction={saveAndPublishPikanteria} className="w-full py-2 rounded-lg font-bold text-sm"
+                            style={{ background: 'var(--color-accent-soft)', color: 'var(--color-accent)', border: '1px solid var(--border-accent)' }}>
+                            Save & publish
+                          </button>
+                        )}
+                      </div>
+                    </form>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <form action={togglePikanteriaLock}>
+                        <input type="hidden" name="pikanteria_id" value={pika.id} />
+                        <input type="hidden" name="date" value={day.date} />
+                        <input type="hidden" name="locked" value={String(pika.locked)} />
+                        <button type="submit" className="w-full py-2 rounded-lg text-xs font-bold"
+                          style={{
+                            background: pika.locked ? 'var(--color-accent-soft)' : 'var(--color-danger-soft)',
+                            color: pika.locked ? 'var(--color-accent)' : 'var(--color-danger)',
+                            border: `1px solid ${pika.locked ? 'var(--border-accent)' : 'var(--border-danger)'}`,
+                          }}>
+                          {pika.locked ? 'Unlock' : 'Lock'}
+                        </button>
+                      </form>
+
+                      {published ? (
+                        <form action={unpublishPikanteria}>
+                          <input type="hidden" name="pikanteria_id" value={pika.id} />
+                          <input type="hidden" name="date" value={day.date} />
+                          <button type="submit" className="w-full py-2 rounded-lg text-xs font-bold"
+                            style={{ background: 'var(--color-danger-soft)', color: 'var(--color-danger)', border: '1px solid var(--border-danger)' }}>
+                            Unpublish
+                          </button>
+                        </form>
+                      ) : (
+                        <div className="rounded-lg px-3 py-2 text-xs text-muted text-center"
+                          style={{ border: '1px solid var(--border-base)', background: 'var(--color-bg)' }}>
+                          Draft
+                        </div>
+                      )}
+                    </div>
+                  </>
+                )}
+              </div>
             )
           })}
 
-          {/* Add a new pikanteria and publish it */}
           <div className="font-bold text-xs uppercase tracking-wider" style={{ color: 'var(--color-muted)' }}>
             Add a pikanteria question
           </div>
@@ -421,14 +721,20 @@ export default async function PublishPage({
             <input type="hidden" name="date" value={day.date} />
             <div className="space-y-1">
               <label htmlFor="publish-new-pik-question" className="text-muted text-xs">Question</label>
-              <input id="publish-new-pik-question" type="text" name="pik_q_1" placeholder="e.g. Will Mbappé score?"
+              <input id="publish-new-pik-question" type="text" name="pik_q_1" placeholder="e.g. Will Mbappe score?"
                 style={inputBase} className={cls} />
             </div>
             <PicanteriaBuilder />
-            <button type="submit" className="w-full py-2 rounded-lg font-bold text-sm"
-              style={{ background: 'var(--color-amber)', color: 'var(--color-bg)' }}>
-              🚀 Add &amp; publish question
-            </button>
+            <div className="grid grid-cols-2 gap-2">
+              <button type="submit" formAction={addDraftPikanteria} className="w-full py-2 rounded-lg font-bold text-sm"
+                style={{ background: 'var(--color-bg)', color: 'var(--color-text)', border: '1px solid var(--border-base)' }}>
+                Add draft
+              </button>
+              <button type="submit" className="w-full py-2 rounded-lg font-bold text-sm"
+                style={{ background: 'var(--color-amber)', color: 'var(--color-bg)' }}>
+                Add &amp; publish
+              </button>
+            </div>
           </form>
         </div>
       )}
