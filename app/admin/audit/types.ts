@@ -13,4 +13,10 @@ export type AuditRow = {
   users: { display_name: string; email: string; is_monkey: boolean }
 }
 
+export type AuditUser = {
+  id: string
+  display_name: string
+  email: string
+}
+
 export const PAGE_SIZE = 200
