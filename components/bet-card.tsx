@@ -79,9 +79,9 @@ export function BetCard(props: Props) {
   } = props
   const theme = THEME[variant]
 
-  // Optimistic overlay instead of copying the prop into state. `optimisticPick`
-  // is null when no in-flight pick exists; the effective selection is the
-  // in-flight value or the authoritative prop.
+  // Optimistic overlay instead of copying the prop into state. On a successful
+  // save, keep the optimistic pick visible until the keyed server refresh
+  // remounts the card with the new authoritative prop.
   const [optimisticPick, setOptimisticPick] = useState<Pick | null>(null)
   const selected = optimisticPick ?? currentPick
 
@@ -130,8 +130,6 @@ export function BetCard(props: Props) {
         if (!result.ok) {
           setOptimisticPick(previous)
           setError(result.message)
-        } else {
-          setOptimisticPick(null)
         }
       } catch {
         setOptimisticPick(previous)
