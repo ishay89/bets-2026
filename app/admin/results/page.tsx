@@ -120,6 +120,25 @@ async function scoreItems(
     throw new Error(`Scoring failed and was rolled back: ${error.message}`)
   }
 
+  // Scoring closes the bet, so lock each item we just scored. Locking is what
+  // reveals the crowd aggregate (crowd_match_picks / crowd_pikanteria_picks) and
+  // the individual picks (the per-item read RLS on predictions/pikanteria_answers
+  // both open up once the item is locked), so this is also the reveal step.
+  if (scoredMatches.length) {
+    const { error: lockError } = await supabase
+      .from('matches')
+      .update({ locked: true })
+      .in('id', scoredMatches.map(m => m.matchId))
+    if (lockError) throw lockError
+  }
+  if (resolvedPikas.length) {
+    const { error: lockError } = await supabase
+      .from('pikanteria')
+      .update({ locked: true })
+      .in('id', resolvedPikas.map(p => p.pikanteriaId))
+    if (lockError) throw lockError
+  }
+
   // Snapshots are derived/recoverable, so they stay outside the scoring txn.
   await snapshotMatchDay(supabase, matchDayId)
 

@@ -273,6 +273,33 @@ async function unpublishPikanteria(formData: FormData) {
   redirect(publishPath(date))
 }
 
+async function deleteDraftPikanteria(formData: FormData) {
+  'use server'
+  await assertAdmin()
+  const supabase = createAdminClient()
+
+  const pikanteriaId = parseUUID(formData.get('pikanteria_id'), 'pikanteria_id')
+  const date = parseNonEmpty(formData.get('date'), 'date')
+
+  // Only unpublished, unscored drafts can be deleted. A published or scored
+  // question must be unpublished/reset first so player answers are never
+  // orphaned (answers cascade-delete with the question regardless).
+  const { data: pika } = await supabase
+    .from('pikanteria')
+    .select('published_at, result')
+    .eq('id', pikanteriaId)
+    .single()
+  if (!pika || pika.published_at != null || pika.result != null) {
+    redirect(publishPath(date, 'scored'))
+  }
+
+  await supabase.from('pikanteria').delete().eq('id', pikanteriaId)
+
+  revalidatePath('/predict')
+  revalidatePath('/admin/publish')
+  redirect(publishPath(date))
+}
+
 async function togglePikanteriaLock(formData: FormData) {
   'use server'
   await assertAdmin()
@@ -700,10 +727,14 @@ export default async function PublishPage({
                           </button>
                         </form>
                       ) : (
-                        <div className="rounded-lg px-3 py-2 text-xs text-muted text-center"
-                          style={{ border: '1px solid var(--border-base)', background: 'var(--color-bg)' }}>
-                          Draft
-                        </div>
+                        <form action={deleteDraftPikanteria}>
+                          <input type="hidden" name="pikanteria_id" value={pika.id} />
+                          <input type="hidden" name="date" value={day.date} />
+                          <button type="submit" className="w-full py-2 rounded-lg text-xs font-bold"
+                            style={{ background: 'var(--color-danger-soft)', color: 'var(--color-danger)', border: '1px solid var(--border-danger)' }}>
+                            Delete draft
+                          </button>
+                        </form>
                       )}
                     </div>
                   </>
