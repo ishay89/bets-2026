@@ -3,8 +3,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 
 const tabs = [
-  { href: '/admin/publish', label: 'Publish' },
-  { href: '/admin/edit', label: 'Edit' },
+  { href: '/admin/publish', label: 'Bets' },
   { href: '/admin/results', label: 'Results' },
   { href: '/admin/tournament', label: 'Tourney' },
   { href: '/admin/players', label: 'Players' },
