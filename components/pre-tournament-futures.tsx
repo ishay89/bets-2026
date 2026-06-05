@@ -6,9 +6,15 @@ import {
 } from '@/app/predict/pre-tournament-actions'
 
 const FLAGS: Record<string, string> = {
-  Argentina: '🇦🇷', France: '🇫🇷', Brazil: '🇧🇷', England: '🏴󠁧󠁢󠁥󠁮󠁧󠁿',
-  Germany: '🇩🇪', Spain: '🇪🇸', Portugal: '🇵🇹', Netherlands: '🇳🇱',
-  USA: '🇺🇸', Mexico: '🇲🇽',
+  France: '🇫🇷', Spain: '🇪🇸', England: '🏴󠁧󠁢󠁥󠁮󠁧󠁿', Argentina: '🇦🇷',
+  Brazil: '🇧🇷', Portugal: '🇵🇹', Germany: '🇩🇪', Netherlands: '🇳🇱',
+  Norway: '🇳🇴', Belgium: '🇧🇪', Colombia: '🇨🇴', Japan: '🇯🇵',
+  Morocco: '🇲🇦', Uruguay: '🇺🇾', USA: '🇺🇸', Switzerland: '🇨🇭',
+  Mexico: '🇲🇽', Croatia: '🇭🇷', Turkey: '🇹🇷', Ecuador: '🇪🇨',
+  Senegal: '🇸🇳', Sweden: '🇸🇪', Austria: '🇦🇹', Paraguay: '🇵🇾',
+  Canada: '🇨🇦', 'Bosnia & Herzegovina': '🇧🇦', Scotland: '🏴󠁧󠁢󠁳󠁣󠁴󠁿',
+  'Ivory Coast': '🇨🇮', Egypt: '🇪🇬', 'Czech Republic': '🇨🇿',
+  Algeria: '🇩🇿', Ghana: '🇬🇭', 'South Korea': '🇰🇷',
 }
 
 type FuturesPick = {
