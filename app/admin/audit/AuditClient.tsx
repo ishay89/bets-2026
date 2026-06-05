@@ -2,7 +2,7 @@
 
 import React, { useReducer, useTransition } from 'react'
 import { fetchAuditEvents } from './actions'
-import { PAGE_SIZE, type AuditRow, type AuditValue } from './types'
+import { PAGE_SIZE, type AuditRow, type AuditUser, type AuditValue } from './types'
 
 function asText(value: unknown) {
   return typeof value === 'string' || typeof value === 'number' ? String(value) : ''
@@ -61,14 +61,17 @@ type AuditState = {
   events: AuditRow[]
   from: string
   to: string
+  userId: string
   activeFrom: string
   activeTo: string
+  activeUserId: string
 }
 
 type AuditAction =
   | { type: 'SET_FROM'; value: string }
   | { type: 'SET_TO'; value: string }
-  | { type: 'SET_EVENTS'; events: AuditRow[]; from: string; to: string }
+  | { type: 'SET_USER'; value: string }
+  | { type: 'SET_EVENTS'; events: AuditRow[]; from: string; to: string; userId: string }
   | { type: 'APPEND_EVENTS'; events: AuditRow[] }
   | { type: 'RESET'; events: AuditRow[] }
 
@@ -78,26 +81,30 @@ function auditReducer(state: AuditState, action: AuditAction): AuditState {
       return { ...state, from: action.value }
     case 'SET_TO':
       return { ...state, to: action.value }
+    case 'SET_USER':
+      return { ...state, userId: action.value }
     case 'SET_EVENTS':
-      return { ...state, events: action.events, activeFrom: action.from, activeTo: action.to }
+      return { ...state, events: action.events, activeFrom: action.from, activeTo: action.to, activeUserId: action.userId }
     case 'APPEND_EVENTS':
       return { ...state, events: [...state.events, ...action.events] }
     case 'RESET':
-      return { ...state, from: '', to: '', activeFrom: '', activeTo: '', events: action.events }
+      return { ...state, from: '', to: '', userId: '', activeFrom: '', activeTo: '', activeUserId: '', events: action.events }
     default:
       return state
   }
 }
 
-export default function AuditClient({ initialEvents }: { initialEvents: AuditRow[] }) {
+export default function AuditClient({ initialEvents, users }: { initialEvents: AuditRow[]; users: AuditUser[] }) {
   const [state, dispatch] = useReducer(auditReducer, {
     events: initialEvents,
     from: '',
     to: '',
+    userId: '',
     activeFrom: '',
     activeTo: '',
+    activeUserId: '',
   })
-  const { events, from, to, activeFrom, activeTo } = state
+  const { events, from, to, userId, activeFrom, activeTo, activeUserId } = state
   const [isPending, startTransition] = useTransition()
   const [isLoadingMore, startLoadMore] = useTransition()
 
@@ -105,8 +112,13 @@ export default function AuditClient({ initialEvents }: { initialEvents: AuditRow
 
   function handleSearch() {
     startTransition(async () => {
-      const results = await fetchAuditEvents({ from: from || undefined, to: to || undefined, offset: 0 })
-      dispatch({ type: 'SET_EVENTS', events: results, from, to })
+      const results = await fetchAuditEvents({
+        from: from || undefined,
+        to: to || undefined,
+        userId: userId || undefined,
+        offset: 0,
+      })
+      dispatch({ type: 'SET_EVENTS', events: results, from, to, userId })
     })
   }
 
@@ -122,6 +134,7 @@ export default function AuditClient({ initialEvents }: { initialEvents: AuditRow
       const results = await fetchAuditEvents({
         from: activeFrom || undefined,
         to: activeTo || undefined,
+        userId: activeUserId || undefined,
         offset: events.length,
       })
       dispatch({ type: 'APPEND_EVENTS', events: results })
@@ -145,8 +158,24 @@ export default function AuditClient({ initialEvents }: { initialEvents: AuditRow
         </div>
       </div>
 
-      {/* Date/time filter */}
+      {/* User + date/time filter */}
       <div className="rounded-xl p-4 flex flex-wrap items-end gap-3" style={panelStyle}>
+        <div className="flex flex-col gap-1">
+          <label htmlFor="audit-user" className="text-[10px] font-semibold" style={{ color: 'var(--color-muted)' }}>Player</label>
+          <select
+            id="audit-user"
+            value={userId}
+            onChange={(e: React.ChangeEvent<HTMLSelectElement>) => dispatch({ type: 'SET_USER', value: e.target.value })}
+            style={inputStyle}
+          >
+            <option value="">All players</option>
+            {users.map((u) => (
+              <option key={u.id} value={u.id}>
+                {u.display_name}
+              </option>
+            ))}
+          </select>
+        </div>
         <div className="flex flex-col gap-1">
           <label htmlFor="audit-from" className="text-[10px] font-semibold" style={{ color: 'var(--color-muted)' }}>From</label>
           <input
@@ -176,7 +205,7 @@ export default function AuditClient({ initialEvents }: { initialEvents: AuditRow
         >
           {isPending ? 'Loading...' : 'Search'}
         </button>
-        {(activeFrom || activeTo) && (
+        {(activeFrom || activeTo || activeUserId) && (
           <button
             type="button"
             onClick={handleReset}
