@@ -5,7 +5,7 @@ import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { TEAMS, SCORERS } from '@/lib/pre-tournament'
 import { parseTeamName, parseScorerName } from '@/lib/validation'
-import { isFuturesLocked } from '@/lib/data'
+import { isFuturesLocked, isFuturesPublished } from '@/lib/data'
 import { getFuturesReveal, type FuturesReveal } from '@/lib/prediction-reveals'
 
 /**
@@ -38,6 +38,7 @@ export async function savePreTournamentPick(formData: FormData) {
   const [
     { data: existing, error: existingError },
     locked,
+    published,
   ] = await Promise.all([
     service
       .from('pre_tournament_picks')
@@ -45,9 +46,11 @@ export async function savePreTournamentPick(formData: FormData) {
       .eq('user_id', user.id)
       .maybeSingle(),
     isFuturesLocked(service),
+    isFuturesPublished(service),
   ])
 
   if (existingError) throw existingError
+  if (!published) throw new Error('Pre-tournament picks are not published')
   if (locked) throw new Error('Pre-tournament picks are locked')
 
   const oldValue: AuditJson | null = existing ? {
@@ -101,17 +104,19 @@ export async function saveWinnerPick(formData: FormData) {
   const winner = TEAMS.find(t => t.name === winnerName)!
 
   const service = await createServiceClient()
-  const [{ data: existing, error: existingError }, locked] = await Promise.all([
+  const [{ data: existing, error: existingError }, locked, published] = await Promise.all([
     service
       .from('pre_tournament_picks')
       .select('id, winner_team, winner_odds, top_scorer, top_scorer_odds')
       .eq('user_id', user.id)
       .maybeSingle(),
     isFuturesLocked(service),
+    isFuturesPublished(service),
   ])
 
   if (existingError) throw existingError
   if (!existing) throw new Error('No existing pick to update')
+  if (!published) throw new Error('Pre-tournament picks are not published')
   if (locked) throw new Error('Pre-tournament picks are locked')
 
   const oldValue: AuditJson = {
@@ -163,17 +168,19 @@ export async function saveScorerPick(formData: FormData) {
   const scorer = SCORERS.find(s => s.name === scorerName)!
 
   const service = await createServiceClient()
-  const [{ data: existing, error: existingError }, locked] = await Promise.all([
+  const [{ data: existing, error: existingError }, locked, published] = await Promise.all([
     service
       .from('pre_tournament_picks')
       .select('id, winner_team, winner_odds, top_scorer, top_scorer_odds')
       .eq('user_id', user.id)
       .maybeSingle(),
     isFuturesLocked(service),
+    isFuturesPublished(service),
   ])
 
   if (existingError) throw existingError
   if (!existing) throw new Error('No existing pick to update')
+  if (!published) throw new Error('Pre-tournament picks are not published')
   if (locked) throw new Error('Pre-tournament picks are locked')
 
   const oldValue: AuditJson = {

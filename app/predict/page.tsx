@@ -146,7 +146,7 @@ export default async function PredictPage() {
     supabase.rpc('crowd_match_picks'),
     supabase.rpc('crowd_pikanteria_picks'),
     supabase.from('pre_tournament_picks').select('*').eq('user_id', user.id).maybeSingle(),
-    supabase.from('tournament_settings').select('futures_locked').eq('id', true).single(),
+    supabase.from('tournament_settings').select('futures_locked, futures_published').eq('id', true).single(),
   ])
   if (crowdMatchError) throw crowdMatchError
   if (crowdPikError) throw crowdPikError
@@ -157,6 +157,7 @@ export default async function PredictPage() {
   // so the points displayed match the current price (and the eventual scoring).
   const displayFuturesPick = futuresPick ? withCurrentFuturesOdds(futuresPick) : futuresPick
   const futuresLocked = tournamentSettings?.futures_locked ?? false
+  const futuresPublished = tournamentSettings?.futures_published ?? true
 
   // Surface the most recently published match days first, so a returning player
   // lands on the matches they still need to bet without scrolling.
@@ -193,7 +194,7 @@ export default async function PredictPage() {
       </div>
 
       <main className="px-4 pb-28 space-y-6 mt-2">
-        {!hasEntryPick && (
+        {futuresPublished && !hasEntryPick && (
           <PreTournamentFutures
             pick={displayFuturesPick}
             isLocked={futuresLocked}
@@ -339,7 +340,7 @@ export default async function PredictPage() {
           )
         })}
 
-        {hasEntryPick && (
+        {futuresPublished && hasEntryPick && (
           <PreTournamentFutures
             pick={displayFuturesPick}
             isLocked={futuresLocked}

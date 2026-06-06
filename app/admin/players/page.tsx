@@ -46,7 +46,7 @@ function StatusButton({ userId, status, label, color }: {
   )
 }
 
-function PlayerRow({ player }: { player: User }) {
+function PlayerRow({ player, futuresDone }: { player: User; futuresDone: boolean }) {
   return (
     <div className="rounded-xl px-4 py-3 space-y-2.5"
       style={{ background: 'var(--color-panel)', border: '1px solid var(--border-base)' }}>
@@ -57,6 +57,7 @@ function PlayerRow({ player }: { player: User }) {
             {player.is_admin && <StatusBadge label="admin" tone="amber" />}
             {player.status === 'pending' && <StatusBadge label="pending" tone="amber" />}
             {player.status === 'blocked' && <StatusBadge label="blocked" tone="danger" />}
+            <FuturesBadge done={futuresDone} />
           </div>
           <div className="text-muted text-[11px] mt-0.5 truncate">{player.email}</div>
         </Link>
@@ -91,6 +92,17 @@ function PlayerRow({ player }: { player: User }) {
   )
 }
 
+function FuturesBadge({ done }: { done: boolean }) {
+  const styles = done
+    ? { color: 'var(--color-accent)', background: 'var(--color-accent-soft)', border: '1px solid var(--border-accent)' }
+    : { color: 'var(--color-danger)', background: 'var(--color-danger-soft)', border: '1px solid var(--border-danger)' }
+  return (
+    <span className="text-[9px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full shrink-0" style={styles}>
+      {done ? '🏆 ✓' : '🏆 ✗'}
+    </span>
+  )
+}
+
 function StatusBadge({ label, tone }: { label: string; tone: 'amber' | 'danger' }) {
   const styles = tone === 'danger'
     ? { color: 'var(--color-danger)', background: 'var(--color-danger-soft, rgba(220,38,38,0.12))', border: '1px solid var(--border-base)' }
@@ -102,22 +114,29 @@ function StatusBadge({ label, tone }: { label: string; tone: 'amber' | 'danger' 
   )
 }
 
-function Section({ title, players }: { title: string; players: User[] }) {
+function Section({ title, players, futuresDone }: { title: string; players: User[]; futuresDone: Set<string> }) {
   if (players.length === 0) return null
   return (
     <div className="space-y-2">
       <div className="text-muted text-[11px] font-bold uppercase tracking-wide px-1">{title} · {players.length}</div>
-      {players.map(player => <PlayerRow key={player.id} player={player} />)}
+      {players.map(player => <PlayerRow key={player.id} player={player} futuresDone={futuresDone.has(player.id)} />)}
     </div>
   )
 }
 
 export default async function PlayersPage() {
   const supabase = await createClient()
-  const { data: players } = await supabase
-    .from('users')
-    .select('*')
-    .order('display_name')
+  const [{ data: players }, { data: futuresPicks }] = await Promise.all([
+    supabase.from('users').select('*').order('display_name'),
+    supabase.from('pre_tournament_picks').select('user_id, winner_team, top_scorer'),
+  ])
+
+  // Players who have completed both futures picks (winner + top scorer).
+  const futuresDone = new Set(
+    (futuresPicks ?? [])
+      .filter(p => p.winner_team && p.top_scorer)
+      .map(p => p.user_id as string)
+  )
 
   const allPlayers = (players ?? []) as User[]
   const realPlayers = allPlayers.filter(p => !p.is_monkey)
@@ -138,9 +157,9 @@ export default async function PlayersPage() {
         </div>
       </div>
 
-      <Section title="⏳ Awaiting approval" players={pending} />
-      <Section title="Active players" players={active} />
-      <Section title="🚫 Blocked" players={blocked} />
+      <Section title="⏳ Awaiting approval" players={pending} futuresDone={futuresDone} />
+      <Section title="Active players" players={active} futuresDone={futuresDone} />
+      <Section title="🚫 Blocked" players={blocked} futuresDone={futuresDone} />
 
       {automatedPlayers.length > 0 && (
         <div className="space-y-2">
