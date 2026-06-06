@@ -21,6 +21,10 @@ describe('formatTodayMovementPoints', () => {
     expect(formatTodayMovementPoints(8.5)).toBe('+8.50 today')
   })
 
+  it('formats positive points with a custom label', () => {
+    expect(formatTodayMovementPoints(4, 'day')).toBe('+4.00 day')
+  })
+
   it('hides zero and missing latest-day points', () => {
     expect(formatTodayMovementPoints(0)).toBeNull()
     expect(formatTodayMovementPoints(null)).toBeNull()
