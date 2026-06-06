@@ -100,6 +100,18 @@ export interface LeaderboardEntry {
   rank_delta: number | null
 }
 
+export interface ScoredLeaderboardDay {
+  id: string
+  date: string
+  stage: Stage
+}
+
+export interface HistoricalLeaderboardEntry extends LeaderboardEntry {
+  selected_match_day_id: string
+  selected_date: string
+  selected_stage: Stage
+}
+
 export interface ScoreSnapshot {
   id: string
   user_id: string
