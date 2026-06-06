@@ -9,6 +9,7 @@ import { isMatchLocked, matchLockMs } from '@/lib/lock'
 import { toPct, matchInsight, type CrowdTally } from '@/lib/crowd'
 import { parseUUID, parsePick } from '@/lib/validation'
 import { PreTournamentFutures } from '@/components/pre-tournament-futures'
+import { revealFuturesPicks } from '@/app/predict/pre-tournament-actions'
 import { hasCompletedPreTournamentPick } from '@/lib/pre-tournament'
 import {
   getPublishedMatchDaysWithAll,
@@ -190,7 +191,12 @@ export default async function PredictPage() {
 
       <main className="px-4 pb-28 space-y-6 mt-2">
         {!hasEntryPick && (
-          <PreTournamentFutures pick={futuresPick} isLocked={futuresLocked} />
+          <PreTournamentFutures
+            pick={futuresPick}
+            isLocked={futuresLocked}
+            myUserId={user.id}
+            onReveal={revealFuturesPicks}
+          />
         )}
 
         {matchDays.length === 0 && (
@@ -331,7 +337,12 @@ export default async function PredictPage() {
         })}
 
         {hasEntryPick && (
-          <PreTournamentFutures pick={futuresPick} isLocked={futuresLocked} />
+          <PreTournamentFutures
+            pick={futuresPick}
+            isLocked={futuresLocked}
+            myUserId={user.id}
+            onReveal={revealFuturesPicks}
+          />
         )}
       </main>
 
