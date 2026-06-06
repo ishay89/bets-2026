@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { buildHistoricalLeaderboardEntries } from './historical-leaderboard'
+import type { ScoredLeaderboardDay } from './types'
 
-const days = [
+const days: ScoredLeaderboardDay[] = [
   { id: 'day-1', date: '2026-06-11', stage: 'group' },
   { id: 'day-2', date: '2026-06-12', stage: 'group' },
   { id: 'day-3', date: '2026-06-13', stage: 'group' },
