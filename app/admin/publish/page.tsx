@@ -175,7 +175,11 @@ async function toggleFuturesLock(formData: FormData) {
   const date = parseNonEmpty(formData.get('date'), 'date')
   const locked = formData.get('futures_locked') === 'true'
 
-  await supabase.from('tournament_settings').update({ futures_locked: !locked }).eq('id', true)
+  // Upsert (not update): if the singleton settings row is missing, an update
+  // matches zero rows and silently no-ops, so the lock toggle never persists.
+  await supabase
+    .from('tournament_settings')
+    .upsert({ id: true, futures_locked: !locked }, { onConflict: 'id' })
 
   revalidatePath('/predict')
   revalidatePath('/admin/publish')
@@ -190,7 +194,9 @@ async function toggleFuturesPublish(formData: FormData) {
   const date = parseNonEmpty(formData.get('date'), 'date')
   const published = formData.get('futures_published') === 'true'
 
-  await supabase.from('tournament_settings').update({ futures_published: !published }).eq('id', true)
+  await supabase
+    .from('tournament_settings')
+    .upsert({ id: true, futures_published: !published }, { onConflict: 'id' })
 
   revalidatePath('/predict')
   revalidatePath('/admin/publish')
@@ -437,11 +443,13 @@ export default async function PublishPage({
   type Day = { id: string; stage: string; date: string }
 
   const supabase = createAdminClient()
-  const { data: settings } = await supabase
-    .from('tournament_settings')
-    .select('futures_locked, futures_published')
-    .eq('id', true)
-    .single()
+  // Read the lock and publish flags independently so a missing row (or a column
+  // that predates a migration) can't break the other control. A combined read
+  // that errors would null out both, leaving the Lock button stuck on "Lock".
+  const [{ data: lockRow }, { data: publishRow }] = await Promise.all([
+    supabase.from('tournament_settings').select('futures_locked').eq('id', true).maybeSingle(),
+    supabase.from('tournament_settings').select('futures_published').eq('id', true).maybeSingle(),
+  ])
 
   let day: Day | null = null
   let matches: DayMatch[] = []
@@ -471,8 +479,8 @@ export default async function PublishPage({
     pikanteria = (pikaRows ?? []) as DayPika[]
   }
 
-  const futuresLocked = settings?.futures_locked ?? false
-  const futuresPublished = settings?.futures_published ?? true
+  const futuresLocked = lockRow?.futures_locked ?? false
+  const futuresPublished = publishRow?.futures_published ?? true
 
   return (
     <div className="max-w-2xl mx-auto space-y-6 pb-10">
