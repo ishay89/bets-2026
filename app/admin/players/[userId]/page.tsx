@@ -40,12 +40,17 @@ export default async function PlayerDetailPage({
   await assertAdmin()
   const supabase = createAdminClient()
 
-  const [{ data: userRow }, matchDaysRaw, predictions, answers] =
+  const [{ data: userRow }, matchDaysRaw, predictions, answers, { data: futuresPick }] =
     await Promise.all([
       supabase.from('users').select('*').eq('id', userId).single(),
       getPublishedMatchDaysWithAll(supabase),
       getUserPredictions(supabase, userId),
       getUserPikanteriaAnswers(supabase, userId),
+      supabase
+        .from('pre_tournament_picks')
+        .select('winner_team, top_scorer')
+        .eq('user_id', userId)
+        .maybeSingle(),
     ])
 
   if (!userRow) notFound()
@@ -80,6 +85,26 @@ export default async function PlayerDetailPage({
         <div className="text-muted text-[11px]">{user.email}</div>
         <div className="text-xs mt-2" style={{ color: submittedBets === totalBets ? 'var(--color-accent)' : 'var(--color-text)' }}>
           {submittedBets} / {totalBets} open bets submitted
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <div className="text-muted text-[11px] font-bold uppercase tracking-wide px-1">🏆 Futures</div>
+        <div className="flex items-center justify-between rounded-xl px-4 py-3"
+          style={{ background: 'var(--color-panel)', border: '1px solid var(--border-base)' }}>
+          <div className="flex items-center gap-1.5">
+            <span>🥇</span>
+            <span className="font-semibold text-[13px] text-text">Tournament Winner</span>
+          </div>
+          <StatusBadge submitted={!!futuresPick?.winner_team} label={futuresPick?.winner_team ?? undefined} />
+        </div>
+        <div className="flex items-center justify-between rounded-xl px-4 py-3"
+          style={{ background: 'var(--color-panel)', border: '1px solid var(--border-base)' }}>
+          <div className="flex items-center gap-1.5">
+            <span>⚽</span>
+            <span className="font-semibold text-[13px] text-text">Top Scorer</span>
+          </div>
+          <StatusBadge submitted={!!futuresPick?.top_scorer} label={futuresPick?.top_scorer ?? undefined} />
         </div>
       </div>
 
