@@ -182,6 +182,21 @@ async function toggleFuturesLock(formData: FormData) {
   redirect(publishPath(date))
 }
 
+async function toggleFuturesPublish(formData: FormData) {
+  'use server'
+  await assertAdmin()
+  const supabase = createAdminClient()
+
+  const date = parseNonEmpty(formData.get('date'), 'date')
+  const published = formData.get('futures_published') === 'true'
+
+  await supabase.from('tournament_settings').update({ futures_published: !published }).eq('id', true)
+
+  revalidatePath('/predict')
+  revalidatePath('/admin/publish')
+  redirect(publishPath(date))
+}
+
 async function toggleMatchLock(formData: FormData) {
   'use server'
   await assertAdmin()
@@ -424,7 +439,7 @@ export default async function PublishPage({
   const supabase = createAdminClient()
   const { data: settings } = await supabase
     .from('tournament_settings')
-    .select('futures_locked')
+    .select('futures_locked, futures_published')
     .eq('id', true)
     .single()
 
@@ -457,6 +472,7 @@ export default async function PublishPage({
   }
 
   const futuresLocked = settings?.futures_locked ?? false
+  const futuresPublished = settings?.futures_published ?? true
 
   return (
     <div className="max-w-2xl mx-auto space-y-6 pb-10">
@@ -465,28 +481,52 @@ export default async function PublishPage({
         <div className="text-muted text-xs">Manage odds, publishing, and locks from one admin screen</div>
       </div>
 
-      <div className="rounded-xl p-3 flex items-center justify-between gap-3"
+      <div className="rounded-xl p-3 space-y-3"
         style={{ background: 'var(--color-panel)', border: '1px solid var(--border-base)' }}>
-        <div className="min-w-0">
-          <div className="text-sm font-bold text-text">Winner &amp; Top Scorer</div>
-          <div className="text-xs text-muted">
-            {futuresLocked
-              ? 'Manually locked - users cannot change futures picks'
-              : 'Open - users can change futures picks'}
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <div className="text-sm font-bold text-text">Winner &amp; Top Scorer</div>
+            <div className="text-xs text-muted">
+              {futuresPublished
+                ? 'Published - players can see and make futures picks'
+                : 'Unpublished - hidden from players on /predict'}
+            </div>
           </div>
+          <form action={toggleFuturesPublish}>
+            <input type="hidden" name="date" value={selectedDate} />
+            <input type="hidden" name="futures_published" value={String(futuresPublished)} />
+            <button type="submit" className="px-4 py-2 rounded-lg text-sm font-bold whitespace-nowrap"
+              style={{
+                background: futuresPublished ? 'var(--color-danger-soft)' : 'var(--color-accent-soft)',
+                color: futuresPublished ? 'var(--color-danger)' : 'var(--color-accent)',
+                border: `1px solid ${futuresPublished ? 'var(--border-danger)' : 'var(--border-accent)'}`,
+              }}>
+              {futuresPublished ? 'Unpublish' : 'Publish'}
+            </button>
+          </form>
         </div>
-        <form action={toggleFuturesLock}>
-          <input type="hidden" name="date" value={selectedDate} />
-          <input type="hidden" name="futures_locked" value={String(futuresLocked)} />
-          <button type="submit" className="px-4 py-2 rounded-lg text-sm font-bold whitespace-nowrap"
-            style={{
-              background: futuresLocked ? 'var(--color-accent-soft)' : 'var(--color-danger-soft)',
-              color: futuresLocked ? 'var(--color-accent)' : 'var(--color-danger)',
-              border: `1px solid ${futuresLocked ? 'var(--border-accent)' : 'var(--border-danger)'}`,
-            }}>
-            {futuresLocked ? 'Unlock' : 'Lock'}
-          </button>
-        </form>
+        <div className="flex items-center justify-between gap-3 pt-3"
+          style={{ borderTop: '1px solid var(--border-subtle)' }}>
+          <div className="min-w-0">
+            <div className="text-xs text-muted">
+              {futuresLocked
+                ? 'Manually locked - users cannot change futures picks'
+                : 'Open - users can change futures picks'}
+            </div>
+          </div>
+          <form action={toggleFuturesLock}>
+            <input type="hidden" name="date" value={selectedDate} />
+            <input type="hidden" name="futures_locked" value={String(futuresLocked)} />
+            <button type="submit" className="px-4 py-2 rounded-lg text-sm font-bold whitespace-nowrap"
+              style={{
+                background: futuresLocked ? 'var(--color-accent-soft)' : 'var(--color-danger-soft)',
+                color: futuresLocked ? 'var(--color-accent)' : 'var(--color-danger)',
+                border: `1px solid ${futuresLocked ? 'var(--border-accent)' : 'var(--border-danger)'}`,
+              }}>
+              {futuresLocked ? 'Unlock' : 'Lock'}
+            </button>
+          </form>
+        </div>
       </div>
 
       <form method="GET" className="rounded-xl p-4 space-y-4"

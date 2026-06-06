@@ -110,6 +110,19 @@ export async function isFuturesLocked(supabase: Db): Promise<boolean> {
   return settings?.futures_locked ?? false
 }
 
+/**
+ * Returns true if the futures picks (winner / top scorer) are published and
+ * therefore visible/savable on /predict. Defaults to true when unset.
+ */
+export async function isFuturesPublished(supabase: Db): Promise<boolean> {
+  const { data: settings } = await supabase
+    .from('tournament_settings')
+    .select('futures_published')
+    .eq('id', true)
+    .single()
+  return settings?.futures_published ?? true
+}
+
 export async function getLeaderboardEntries(supabase: Db): Promise<LeaderboardEntry[]> {
   const { data, error } = await supabase
     .from('leaderboard')
