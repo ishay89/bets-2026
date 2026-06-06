@@ -22,9 +22,9 @@ Each scored match day already has one snapshot row per user with:
 - `pikanteria_points`
 - validation fields used by `/admin/scores`
 
-The historical leaderboard should query those snapshots joined to `users` and `match_days`, filter users to `status = 'approved'`, rank by `cumulative_points`, and compare each row to the previous scored match day's snapshot for the same user.
+The historical leaderboard should query scored match-day snapshots joined to `users` and `match_days`, filter users to `status = 'approved'`, and compute chronological totals by summing each user's `day_points` through the selected scored match day. It should rank by that computed selected-day total and compare each row to the computed total and rank through the previous scored match day.
 
-This avoids replaying raw prediction rows in application code and keeps the user-facing audit view aligned with the existing validated snapshot model.
+This avoids replaying raw prediction rows in application code and keeps the user-facing audit view aligned with the existing validated snapshot model. The public historical standings should not use `score_snapshots.cumulative_points` as the display total, because that field is validation-oriented and can reflect the current raw total after snapshot recalculation rather than a chronological "as of this day" total.
 
 ## URL and Navigation
 
@@ -50,9 +50,9 @@ Create a historical leaderboard row shape that mirrors the live leaderboard row 
 - `display_name`
 - `is_monkey`
 - `automation_strategy`
-- `total_points`: snapshot `cumulative_points`
+- `total_points`: sum of match-day snapshot `day_points` through the selected scored day
 - `today_points`: snapshot `day_points`
-- `previous_total_points`: previous scored day `cumulative_points`, or `null`
+- `previous_total_points`: sum of match-day snapshot `day_points` through the previous scored day, or `null`
 - `current_rank`: rank within the selected scored day
 - `previous_rank`: rank within the previous scored day, or `null`
 - `rank_delta`: `previous_rank - current_rank`, or `null`
