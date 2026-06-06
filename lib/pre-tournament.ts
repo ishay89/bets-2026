@@ -83,6 +83,39 @@ export const SCORERS = [
 export const TEAM_NAMES = TEAMS.map(t => t.name)
 export const SCORER_NAMES = SCORERS.map(s => s.name)
 
+/** Current odds for a team by name, or undefined if no longer listed. */
+export function teamOdds(name: string): number | undefined {
+  return TEAMS.find(t => t.name === name)?.odds
+}
+
+/** Current odds for a top-scorer candidate by name, or undefined if no longer listed. */
+export function scorerOdds(name: string): number | undefined {
+  return SCORERS.find(s => s.name === name)?.odds
+}
+
+/**
+ * Re-derive a futures pick's odds from the canonical TEAMS / SCORERS lists.
+ *
+ * The `winner_odds` / `top_scorer_odds` stored on a pick are only a snapshot
+ * taken when the pick was saved, so they go stale whenever the odds lists are
+ * refreshed (e.g. a team's price moves after a player already locked it in).
+ * Looking the odds back up by name — falling back to the stored snapshot only
+ * if the name is no longer listed — keeps the displayed points and the points
+ * actually awarded at tournament close in agreement with the live odds.
+ */
+export function withCurrentFuturesOdds<T extends {
+  winner_team: string
+  winner_odds: number
+  top_scorer: string
+  top_scorer_odds: number
+}>(pick: T): T {
+  return {
+    ...pick,
+    winner_odds: teamOdds(pick.winner_team) ?? pick.winner_odds,
+    top_scorer_odds: scorerOdds(pick.top_scorer) ?? pick.top_scorer_odds,
+  }
+}
+
 type PreTournamentPickStatus = {
   winner_team?: string | null
   top_scorer?: string | null

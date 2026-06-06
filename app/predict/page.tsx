@@ -9,7 +9,8 @@ import { isMatchLocked, matchLockMs } from '@/lib/lock'
 import { toPct, matchInsight, type CrowdTally } from '@/lib/crowd'
 import { parseUUID, parsePick } from '@/lib/validation'
 import { PreTournamentFutures } from '@/components/pre-tournament-futures'
-import { hasCompletedPreTournamentPick } from '@/lib/pre-tournament'
+import { revealFuturesPicks } from '@/app/predict/pre-tournament-actions'
+import { hasCompletedPreTournamentPick, withCurrentFuturesOdds } from '@/lib/pre-tournament'
 import {
   getPublishedMatchDaysWithAll,
   getUserPredictions,
@@ -152,6 +153,9 @@ export default async function PredictPage() {
   if (futuresPickError) throw futuresPickError
 
   const hasEntryPick = hasCompletedPreTournamentPick(futuresPick)
+  // Stored odds are a snapshot from when the pick was made; show the live odds
+  // so the points displayed match the current price (and the eventual scoring).
+  const displayFuturesPick = futuresPick ? withCurrentFuturesOdds(futuresPick) : futuresPick
   const futuresLocked = tournamentSettings?.futures_locked ?? false
   const futuresPublished = tournamentSettings?.futures_published ?? true
 
@@ -191,7 +195,12 @@ export default async function PredictPage() {
 
       <main className="px-4 pb-28 space-y-6 mt-2">
         {futuresPublished && !hasEntryPick && (
-          <PreTournamentFutures pick={futuresPick} isLocked={futuresLocked} />
+          <PreTournamentFutures
+            pick={displayFuturesPick}
+            isLocked={futuresLocked}
+            myUserId={user.id}
+            onReveal={revealFuturesPicks}
+          />
         )}
 
         {matchDays.length === 0 && (
@@ -332,7 +341,12 @@ export default async function PredictPage() {
         })}
 
         {futuresPublished && hasEntryPick && (
-          <PreTournamentFutures pick={futuresPick} isLocked={futuresLocked} />
+          <PreTournamentFutures
+            pick={displayFuturesPick}
+            isLocked={futuresLocked}
+            myUserId={user.id}
+            onReveal={revealFuturesPicks}
+          />
         )}
       </main>
 

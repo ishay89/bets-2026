@@ -77,6 +77,41 @@ export async function getMatchPredictionsReveal(
   return sortAndRankRevealRows(unranked)
 }
 
+type FuturesRaw = {
+  user_id: string
+  winner_team: string
+  top_scorer: string
+  users: UserRaw
+}
+
+/** Both futures picks revealed together: one ranked list for the champion, one for the top scorer. */
+export type FuturesReveal = {
+  winner: PlayerRevealRow[]
+  scorer: PlayerRevealRow[]
+}
+
+export async function getFuturesReveal(supabase: Db): Promise<FuturesReveal> {
+  const [{ data }, pointsMap] = await Promise.all([
+    supabase
+      .from('pre_tournament_picks')
+      .select('user_id, winner_team, top_scorer, users(display_name, is_monkey, automation_strategy, status)'),
+    buildPointsMap(supabase),
+  ])
+  if (!data) return { winner: [], scorer: [] }
+  const approved = (data as unknown as FuturesRaw[]).filter(p => p.users.status === 'approved')
+  const base = (p: FuturesRaw) => ({
+    userId: p.user_id,
+    displayName: p.users.display_name,
+    isMonkey: p.users.is_monkey,
+    automationStrategy: p.users.automation_strategy,
+    totalPoints: pointsMap[p.user_id] ?? 0,
+  })
+  return {
+    winner: sortAndRankRevealRows(approved.map(p => ({ ...base(p), pick: p.winner_team }))),
+    scorer: sortAndRankRevealRows(approved.map(p => ({ ...base(p), pick: p.top_scorer }))),
+  }
+}
+
 export async function getPikanteriaAnswersReveal(
   supabase: Db,
   pikanteriaId: string,

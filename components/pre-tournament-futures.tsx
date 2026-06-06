@@ -1,9 +1,13 @@
+'use client'
+import { useState } from 'react'
 import { TEAMS, SCORERS } from '@/lib/pre-tournament'
 import {
   savePreTournamentPick,
   saveWinnerPick,
   saveScorerPick,
 } from '@/app/predict/pre-tournament-actions'
+import type { FuturesReveal } from '@/lib/prediction-reveals'
+import { PredictionRevealSheet } from '@/components/prediction-reveal-sheet'
 
 const FLAGS: Record<string, string> = {
   France: '🇫🇷', Spain: '🇪🇸', England: '🏴󠁧󠁢󠁥󠁮󠁧󠁿', Argentina: '🇦🇷',
@@ -30,8 +34,47 @@ const inputStyle = {
   color: 'var(--color-text)',
 }
 
-export function PreTournamentFutures({ pick, isLocked }: { pick: FuturesPick; isLocked: boolean }) {
+type RevealTarget = 'winner' | 'scorer'
+
+export function PreTournamentFutures({
+  pick,
+  isLocked,
+  myUserId,
+  onReveal,
+}: {
+  pick: FuturesPick
+  isLocked: boolean
+  myUserId?: string
+  onReveal?: () => Promise<FuturesReveal>
+}) {
   const cls = 'rounded-lg px-3 py-2 text-sm w-full'
+
+  // Player reveal — after lock, fetch what everyone picked once, cache it, and
+  // open the relevant sheet (champion or top scorer).
+  const [reveal, setReveal] = useState<FuturesReveal | null>(null)
+  const [loading, setLoading] = useState<RevealTarget | null>(null)
+  const [revealError, setRevealError] = useState(false)
+  const [sheet, setSheet] = useState<RevealTarget | null>(null)
+  const canReveal = isLocked && !!onReveal && !!myUserId
+
+  async function openSheet(target: RevealTarget) {
+    if (!onReveal || loading) return
+    setRevealError(false)
+    let data = reveal
+    if (!data) {
+      setLoading(target)
+      try {
+        data = await onReveal()
+        setReveal(data)
+      } catch {
+        setRevealError(true)
+        setLoading(null)
+        return
+      }
+      setLoading(null)
+    }
+    setSheet(target)
+  }
 
   return (
     <div className="space-y-6">
@@ -96,6 +139,14 @@ export function PreTournamentFutures({ pick, isLocked }: { pick: FuturesPick; is
                 </button>
               </form>
             )}
+            {canReveal && (
+              <RevealButton
+                label="See everyone's champion"
+                loading={loading === 'winner'}
+                error={revealError}
+                onClick={() => openSheet('winner')}
+              />
+            )}
           </div>
 
           {/* Scorer section */}
@@ -135,8 +186,25 @@ export function PreTournamentFutures({ pick, isLocked }: { pick: FuturesPick; is
                 </button>
               </form>
             )}
+            {canReveal && (
+              <RevealButton
+                label="See everyone's top scorer"
+                loading={loading === 'scorer'}
+                error={revealError}
+                onClick={() => openSheet('scorer')}
+              />
+            )}
           </div>
         </>
+      )}
+
+      {sheet && reveal && myUserId && (
+        <PredictionRevealSheet
+          title={sheet === 'winner' ? '🏆 Champion · Picks' : '⚽ Top scorer · Picks'}
+          rows={sheet === 'winner' ? reveal.winner : reveal.scorer}
+          myUserId={myUserId}
+          onClose={() => setSheet(null)}
+        />
       )}
 
       {/* Initial combined form (no existing pick yet) */}
@@ -176,6 +244,55 @@ export function PreTournamentFutures({ pick, isLocked }: { pick: FuturesPick; is
           </button>
         </form>
       )}
+
+      {/* Locked without a pick: still let the player see what everyone else chose. */}
+      {!pick && canReveal && (
+        <div className="space-y-2">
+          <RevealButton
+            label="See everyone's champion"
+            loading={loading === 'winner'}
+            error={revealError}
+            onClick={() => openSheet('winner')}
+          />
+          <RevealButton
+            label="See everyone's top scorer"
+            loading={loading === 'scorer'}
+            error={revealError}
+            onClick={() => openSheet('scorer')}
+          />
+        </div>
+      )}
     </div>
+  )
+}
+
+function RevealButton({
+  label, loading, error, onClick,
+}: {
+  label: string; loading: boolean; error: boolean; onClick: () => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={loading}
+      className="w-full mt-3"
+      style={{
+        padding: '8px 12px',
+        borderRadius: 10,
+        fontFamily: 'var(--font-display)',
+        fontSize: 12,
+        fontWeight: 700,
+        letterSpacing: '0.06em',
+        textTransform: 'uppercase',
+        color: error ? 'var(--color-danger)' : 'var(--color-gold)',
+        background: error ? 'var(--color-danger-soft)' : 'var(--color-amber-soft)',
+        border: error ? '1px solid var(--border-danger)' : '1px solid var(--border-warn)',
+        cursor: loading ? 'not-allowed' : 'pointer',
+        opacity: loading ? 0.6 : 1,
+      }}
+    >
+      {loading ? '…' : error ? 'Could not load picks' : `👁 ${label}`}
+    </button>
   )
 }

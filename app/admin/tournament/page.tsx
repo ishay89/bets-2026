@@ -3,7 +3,7 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { upsertPreTournamentSnapshot } from '@/lib/score-validation'
 import { buildTournamentScoringPayload } from '@/lib/scoring-writes'
-import { TEAMS, SCORERS } from '@/lib/pre-tournament'
+import { TEAMS, SCORERS, withCurrentFuturesOdds } from '@/lib/pre-tournament'
 import { parseTeamName, parseScorerName, parseNonEmpty } from '@/lib/validation'
 
 async function scoreTournamentEnd(formData: FormData) {
@@ -20,7 +20,11 @@ async function scoreTournamentEnd(formData: FormData) {
     .select('id, user_id, winner_team, winner_odds, top_scorer, top_scorer_odds')
   if (picksError) throw picksError
 
-  const pickPoints = buildTournamentScoringPayload(picks ?? [], winner, runnerUp, topScorer)
+  // Score against the live odds, not the snapshot stored when each pick was
+  // made, so the bonus awarded matches the odds shown on the predict screen.
+  const pickPoints = buildTournamentScoringPayload(
+    (picks ?? []).map(withCurrentFuturesOdds), winner, runnerUp, topScorer,
+  )
 
   // Single atomic write: all picks scored together, or none (rolled back).
   const { error } = await supabase.rpc('score_tournament_end', {

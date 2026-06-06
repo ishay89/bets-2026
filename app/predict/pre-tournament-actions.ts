@@ -6,6 +6,23 @@ import { revalidatePath } from 'next/cache'
 import { TEAMS, SCORERS } from '@/lib/pre-tournament'
 import { parseTeamName, parseScorerName } from '@/lib/validation'
 import { isFuturesLocked, isFuturesPublished } from '@/lib/data'
+import { getFuturesReveal, type FuturesReveal } from '@/lib/prediction-reveals'
+
+/**
+ * Reveal what every approved player picked for the futures (champion + top scorer).
+ * Gated on the futures lock: nothing is exposed until picks are locked.
+ */
+export async function revealFuturesPicks(): Promise<FuturesReveal> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { winner: [], scorer: [] }
+
+  const service = await createServiceClient()
+  const locked = await isFuturesLocked(service)
+  if (!locked) return { winner: [], scorer: [] }
+
+  return getFuturesReveal(service)
+}
 
 export async function savePreTournamentPick(formData: FormData) {
   const supabase = await createClient()
