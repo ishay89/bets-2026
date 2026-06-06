@@ -10,7 +10,7 @@ import { toPct, matchInsight, type CrowdTally } from '@/lib/crowd'
 import { parseUUID, parsePick } from '@/lib/validation'
 import { PreTournamentFutures } from '@/components/pre-tournament-futures'
 import { revealFuturesPicks } from '@/app/predict/pre-tournament-actions'
-import { hasCompletedPreTournamentPick } from '@/lib/pre-tournament'
+import { hasCompletedPreTournamentPick, withCurrentFuturesOdds } from '@/lib/pre-tournament'
 import {
   getPublishedMatchDaysWithAll,
   getUserPredictions,
@@ -153,6 +153,9 @@ export default async function PredictPage() {
   if (futuresPickError) throw futuresPickError
 
   const hasEntryPick = hasCompletedPreTournamentPick(futuresPick)
+  // Stored odds are a snapshot from when the pick was made; show the live odds
+  // so the points displayed match the current price (and the eventual scoring).
+  const displayFuturesPick = futuresPick ? withCurrentFuturesOdds(futuresPick) : futuresPick
   const futuresLocked = tournamentSettings?.futures_locked ?? false
 
   // Surface the most recently published match days first, so a returning player
@@ -192,7 +195,7 @@ export default async function PredictPage() {
       <main className="px-4 pb-28 space-y-6 mt-2">
         {!hasEntryPick && (
           <PreTournamentFutures
-            pick={futuresPick}
+            pick={displayFuturesPick}
             isLocked={futuresLocked}
             myUserId={user.id}
             onReveal={revealFuturesPicks}
@@ -338,7 +341,7 @@ export default async function PredictPage() {
 
         {hasEntryPick && (
           <PreTournamentFutures
-            pick={futuresPick}
+            pick={displayFuturesPick}
             isLocked={futuresLocked}
             myUserId={user.id}
             onReveal={revealFuturesPicks}
