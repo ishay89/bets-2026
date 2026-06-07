@@ -34,3 +34,27 @@ describe('audit event RLS migration', () => {
     }
   })
 })
+
+describe('admin audit player filter', () => {
+  test('loads player options from the users table', () => {
+    const actions = readFileSync(
+      join(process.cwd(), 'app/admin/audit/actions.ts'),
+      'utf8'
+    )
+    const fetchUsersAction = actions.slice(actions.indexOf('export async function fetchAuditUsers'))
+
+    expect(fetchUsersAction).toMatch(/\.from\('users'\)/)
+    expect(fetchUsersAction).not.toMatch(/\.from\('user_prediction_audit_events'\)/)
+  })
+
+  test('refreshes player options when the client reloads audit data', () => {
+    const client = readFileSync(
+      join(process.cwd(), 'app/admin/audit/AuditClient.tsx'),
+      'utf8'
+    )
+
+    expect(client).toMatch(/import \{ fetchAuditEvents, fetchAuditUsers \} from '\.\/actions'/)
+    expect(client).toMatch(/users: AuditUser\[\]/)
+    expect(client.match(/fetchAuditUsers\(\)/g)?.length ?? 0).toBeGreaterThanOrEqual(2)
+  })
+})

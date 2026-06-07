@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useReducer, useTransition } from 'react'
-import { fetchAuditEvents } from './actions'
+import { fetchAuditEvents, fetchAuditUsers } from './actions'
 import { PAGE_SIZE, type AuditRow, type AuditUser, type AuditValue } from './types'
 
 function asText(value: unknown) {
@@ -59,6 +59,7 @@ const inputStyle: React.CSSProperties = {
 
 type AuditState = {
   events: AuditRow[]
+  users: AuditUser[]
   from: string
   to: string
   userId: string
@@ -71,9 +72,9 @@ type AuditAction =
   | { type: 'SET_FROM'; value: string }
   | { type: 'SET_TO'; value: string }
   | { type: 'SET_USER'; value: string }
-  | { type: 'SET_EVENTS'; events: AuditRow[]; from: string; to: string; userId: string }
-  | { type: 'APPEND_EVENTS'; events: AuditRow[] }
-  | { type: 'RESET'; events: AuditRow[] }
+  | { type: 'SET_EVENTS'; events: AuditRow[]; users: AuditUser[]; from: string; to: string; userId: string }
+  | { type: 'APPEND_EVENTS'; events: AuditRow[]; users: AuditUser[] }
+  | { type: 'RESET'; events: AuditRow[]; users: AuditUser[] }
 
 function auditReducer(state: AuditState, action: AuditAction): AuditState {
   switch (action.type) {
@@ -84,11 +85,11 @@ function auditReducer(state: AuditState, action: AuditAction): AuditState {
     case 'SET_USER':
       return { ...state, userId: action.value }
     case 'SET_EVENTS':
-      return { ...state, events: action.events, activeFrom: action.from, activeTo: action.to, activeUserId: action.userId }
+      return { ...state, events: action.events, users: action.users, activeFrom: action.from, activeTo: action.to, activeUserId: action.userId }
     case 'APPEND_EVENTS':
-      return { ...state, events: [...state.events, ...action.events] }
+      return { ...state, events: [...state.events, ...action.events], users: action.users }
     case 'RESET':
-      return { ...state, from: '', to: '', userId: '', activeFrom: '', activeTo: '', activeUserId: '', events: action.events }
+      return { ...state, from: '', to: '', userId: '', activeFrom: '', activeTo: '', activeUserId: '', events: action.events, users: action.users }
     default:
       return state
   }
@@ -97,6 +98,7 @@ function auditReducer(state: AuditState, action: AuditAction): AuditState {
 export default function AuditClient({ initialEvents, users }: { initialEvents: AuditRow[]; users: AuditUser[] }) {
   const [state, dispatch] = useReducer(auditReducer, {
     events: initialEvents,
+    users,
     from: '',
     to: '',
     userId: '',
@@ -104,7 +106,7 @@ export default function AuditClient({ initialEvents, users }: { initialEvents: A
     activeTo: '',
     activeUserId: '',
   })
-  const { events, from, to, userId, activeFrom, activeTo, activeUserId } = state
+  const { events, users: currentUsers, from, to, userId, activeFrom, activeTo, activeUserId } = state
   const [isPending, startTransition] = useTransition()
   const [isLoadingMore, startLoadMore] = useTransition()
 
@@ -112,32 +114,41 @@ export default function AuditClient({ initialEvents, users }: { initialEvents: A
 
   function handleSearch() {
     startTransition(async () => {
-      const results = await fetchAuditEvents({
-        from: from || undefined,
-        to: to || undefined,
-        userId: userId || undefined,
-        offset: 0,
-      })
-      dispatch({ type: 'SET_EVENTS', events: results, from, to, userId })
+      const [results, nextUsers] = await Promise.all([
+        fetchAuditEvents({
+          from: from || undefined,
+          to: to || undefined,
+          userId: userId || undefined,
+          offset: 0,
+        }),
+        fetchAuditUsers(),
+      ])
+      dispatch({ type: 'SET_EVENTS', events: results, users: nextUsers, from, to, userId })
     })
   }
 
   function handleReset() {
     startTransition(async () => {
-      const results = await fetchAuditEvents({ offset: 0 })
-      dispatch({ type: 'RESET', events: results })
+      const [results, nextUsers] = await Promise.all([
+        fetchAuditEvents({ offset: 0 }),
+        fetchAuditUsers(),
+      ])
+      dispatch({ type: 'RESET', events: results, users: nextUsers })
     })
   }
 
   function handleLoadMore() {
     startLoadMore(async () => {
-      const results = await fetchAuditEvents({
-        from: activeFrom || undefined,
-        to: activeTo || undefined,
-        userId: activeUserId || undefined,
-        offset: events.length,
-      })
-      dispatch({ type: 'APPEND_EVENTS', events: results })
+      const [results, nextUsers] = await Promise.all([
+        fetchAuditEvents({
+          from: activeFrom || undefined,
+          to: activeTo || undefined,
+          userId: activeUserId || undefined,
+          offset: events.length,
+        }),
+        fetchAuditUsers(),
+      ])
+      dispatch({ type: 'APPEND_EVENTS', events: results, users: nextUsers })
     })
   }
 
@@ -169,7 +180,7 @@ export default function AuditClient({ initialEvents, users }: { initialEvents: A
             style={inputStyle}
           >
             <option value="">All players</option>
-            {users.map((u) => (
+            {currentUsers.map((u) => (
               <option key={u.id} value={u.id}>
                 {u.display_name}
               </option>

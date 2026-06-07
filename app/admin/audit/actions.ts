@@ -48,22 +48,11 @@ export async function fetchAuditUsers(): Promise<AuditUser[]> {
   const admin = createAdminClient()
 
   const { data, error } = await admin
-    .from('user_prediction_audit_events')
-    .select('user_id, users(display_name, email)')
-    .order('committed_at', { ascending: false })
+    .from('users')
+    .select('id, display_name, email')
+    .order('display_name', { ascending: true })
 
   if (error) throw error
 
-  const seen = new Map<string, AuditUser>()
-  const rows = (data ?? []) as unknown as { user_id: string; users: { display_name: string; email: string } | null }[]
-  for (const row of rows) {
-    if (!row.users || seen.has(row.user_id)) continue
-    seen.set(row.user_id, {
-      id: row.user_id,
-      display_name: row.users.display_name,
-      email: row.users.email,
-    })
-  }
-
-  return [...seen.values()].sort((a, b) => a.display_name.localeCompare(b.display_name))
+  return ((data ?? []) as AuditUser[]).sort((a, b) => a.display_name.localeCompare(b.display_name))
 }
