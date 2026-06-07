@@ -6,6 +6,8 @@
 
 **Architecture:** Keep the live leaderboard backed by `public.leaderboard`. Add a pure TypeScript historical builder that treats `score_snapshots.day_points` as ledger entries, computes chronological totals through the selected scored day, ranks selected and previous-day standings, and feeds those rows into the existing leaderboard UI.
 
+**Review follow-up:** Selector options must be based on current scored result state (`matches.result` or `pikanteria.result`), not the mere existence of snapshot rows, because resets leave snapshot rows behind. Pre-tournament futures snapshots (`match_day_id = null`) are folded into historical totals only when the selected scored day is the final, matching the app flow where futures are scored after the last game.
+
 **Tech Stack:** Next.js 16 App Router, React 19, TypeScript, Supabase JS, Vitest, ESLint.
 
 ---
@@ -670,6 +672,6 @@ Expected: branch pushed and PR URL returned.
 
 ## Self-Review
 
-- Spec coverage: the plan implements scored-match-day selection, public visibility, snapshot-derived chronological totals, previous-day movement, live default behavior, and focused tests.
+- Spec coverage: the implementation covers scored-match-day selection, public visibility, snapshot-derived chronological totals, final-day futures points, reset-day filtering, previous-day movement, live default behavior, and focused tests.
 - Placeholder scan: no `TBD`, `TODO`, or open implementation placeholders remain.
 - Type consistency: `ScoredLeaderboardDay`, `HistoricalLeaderboardEntry`, and `LeaderboardEntry` fields match the planned consumers.

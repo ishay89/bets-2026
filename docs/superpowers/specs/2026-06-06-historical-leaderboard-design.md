@@ -24,6 +24,8 @@ Each scored match day already has one snapshot row per user with:
 
 The historical leaderboard should query scored match-day snapshots joined to `users` and `match_days`, filter users to `status = 'approved'`, and compute chronological totals by summing each user's `day_points` through the selected scored match day. It should rank by that computed selected-day total and compare each row to the computed total and rank through the previous scored match day.
 
+Pre-tournament futures snapshots use `match_day_id = null`. Because futures are scored after the last game, those null snapshot points should be folded into the final match day's historical total only. Earlier selected days must not receive those points retroactively.
+
 This avoids replaying raw prediction rows in application code and keeps the user-facing audit view aligned with the existing validated snapshot model. The public historical standings should not use `score_snapshots.cumulative_points` as the display total, because that field is validation-oriented and can reflect the current raw total after snapshot recalculation rather than a chronological "as of this day" total.
 
 ## URL and Navigation
@@ -50,8 +52,8 @@ Create a historical leaderboard row shape that mirrors the live leaderboard row 
 - `display_name`
 - `is_monkey`
 - `automation_strategy`
-- `total_points`: sum of match-day snapshot `day_points` through the selected scored day
-- `today_points`: snapshot `day_points`
+- `total_points`: sum of match-day snapshot `day_points` through the selected scored day, plus null pre-tournament snapshot points only when the selected day is the final
+- `today_points`: selected-day snapshot `day_points`, plus null pre-tournament snapshot points only when the selected day is the final
 - `previous_total_points`: sum of match-day snapshot `day_points` through the previous scored day, or `null`
 - `current_rank`: rank within the selected scored day
 - `previous_rank`: rank within the previous scored day, or `null`
@@ -93,7 +95,9 @@ The selected day's standings should be rankable even if some users have no previ
 ## Edge Cases
 
 - No score snapshots exist: show live leaderboard and no historical day options.
+- A reset day with leftover zeroed snapshot rows but no current match or pikanteria result is not a scored-day selector option.
 - Selected day has snapshots but no previous scored day: show day points and current rank, but no rank delta.
+- Final selected day after tournament futures scoring: include pre-tournament bonus points in the final total and final movement.
 - A user's selected-day snapshot is invalid: still show the row. Validation status stays on `/admin/scores` and is not rendered on the public leaderboard in this version.
 - Admin recalculates snapshots: historical rows should update on the next page load.
 - Ties should use PostgreSQL `rank()` semantics so tied users share the same rank.
@@ -106,5 +110,7 @@ Add pure helper tests for building historical leaderboard rows:
 - Computes positive and negative `rank_delta` against the previous scored day.
 - Hides previous-rank fields when no previous scored day exists.
 - Filters out non-approved users.
+- Includes pre-tournament snapshot points only for the final selected day.
+- Filters scored-day selector options by current match/pikanteria result state, not stale snapshot row existence.
 
 Add page/data tests only where existing patterns make them practical. At minimum, run the new helper tests and lint before finishing implementation.

@@ -19,6 +19,24 @@ type HistoricalSnapshot = {
   day_points: number | null
 }
 
+type ScoredLeaderboardDayRow = ScoredLeaderboardDay & {
+  matches?: readonly { result: string | null }[] | null
+  pikanteria?: readonly { result: string | null }[] | null
+}
+
+export function selectScoredLeaderboardDays(days: readonly ScoredLeaderboardDayRow[]): ScoredLeaderboardDay[] {
+  return days
+    .filter(day =>
+      (day.matches ?? []).some(item => item.result !== null)
+      || (day.pikanteria ?? []).some(item => item.result !== null)
+    )
+    .map(day => ({
+      id: day.id,
+      date: day.date,
+      stage: day.stage,
+    }))
+}
+
 function rankByTotal(rows: { id: string; total: number }[]): Map<string, number> {
   const sorted = rows.toSorted((a, b) => b.total - a.total || a.id.localeCompare(b.id))
   const ranks = new Map<string, number>()
@@ -47,16 +65,23 @@ export function buildHistoricalLeaderboardEntries(params: {
 
   const selectedDay = orderedDays[selectedIndex]
   const previousDay = selectedIndex > 0 ? orderedDays[selectedIndex - 1] : null
+  const includePreTournament = selectedDay.stage === 'final'
   const selectedDayIds = new Set(orderedDays.slice(0, selectedIndex + 1).map(day => day.id))
   const previousDayIds = new Set(orderedDays.slice(0, selectedIndex).map(day => day.id))
 
   const selectedDayPoints = new Map<string, number>()
   const selectedTotals = new Map<string, number>()
   const previousTotals = new Map<string, number>()
+  const preTournamentPoints = new Map<string, number>()
 
   for (const snapshot of params.snapshots) {
-    if (!snapshot.match_day_id) continue
     const points = Number(snapshot.day_points ?? 0)
+    if (!snapshot.match_day_id) {
+      if (includePreTournament) {
+        preTournamentPoints.set(snapshot.user_id, (preTournamentPoints.get(snapshot.user_id) ?? 0) + points)
+      }
+      continue
+    }
     if (snapshot.match_day_id === selectedDay.id) {
       selectedDayPoints.set(snapshot.user_id, (selectedDayPoints.get(snapshot.user_id) ?? 0) + points)
     }
@@ -71,7 +96,7 @@ export function buildHistoricalLeaderboardEntries(params: {
   const approvedUsers = params.users.filter(user => user.status === 'approved')
   const selectedRankInput = approvedUsers.map(user => ({
     id: user.id,
-    total: selectedTotals.get(user.id) ?? 0,
+    total: (selectedTotals.get(user.id) ?? 0) + (preTournamentPoints.get(user.id) ?? 0),
   }))
   const previousRankInput = previousDay
     ? approvedUsers.map(user => ({
@@ -85,7 +110,8 @@ export function buildHistoricalLeaderboardEntries(params: {
 
   return approvedUsers
     .map(user => {
-      const total = selectedTotals.get(user.id) ?? 0
+      const preTournament = preTournamentPoints.get(user.id) ?? 0
+      const total = (selectedTotals.get(user.id) ?? 0) + preTournament
       const previousTotal = previousDay ? (previousTotals.get(user.id) ?? 0) : null
       const currentRank = currentRanks.get(user.id) ?? null
       const previousRank = previousDay ? (previousRanks.get(user.id) ?? null) : null
@@ -96,7 +122,7 @@ export function buildHistoricalLeaderboardEntries(params: {
         is_monkey: user.is_monkey,
         automation_strategy: user.automation_strategy,
         total_points: total,
-        today_points: selectedDayPoints.get(user.id) ?? 0,
+        today_points: (selectedDayPoints.get(user.id) ?? 0) + preTournament,
         previous_total_points: previousTotal,
         current_rank: currentRank,
         previous_rank: previousRank,

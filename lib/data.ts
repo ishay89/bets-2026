@@ -9,7 +9,7 @@ import type {
   HistoricalLeaderboardEntry,
 } from './types'
 import type { Database } from './supabase/types'
-import { buildHistoricalLeaderboardEntries } from './historical-leaderboard'
+import { buildHistoricalLeaderboardEntries, selectScoredLeaderboardDays } from './historical-leaderboard'
 
 type Db = SupabaseClient<Database>
 
@@ -144,15 +144,14 @@ export async function getLeaderboardEntries(supabase: Db): Promise<LeaderboardEn
 export async function getScoredLeaderboardDays(supabase: Db): Promise<ScoredLeaderboardDay[]> {
   const { data, error } = await supabase
     .from('match_days')
-    .select('id, date, stage, score_snapshots!inner(id)')
+    .select('id, date, stage, matches(result), pikanteria(result)')
     .order('date', { ascending: false })
   if (error) throw error
 
-  return (data ?? []).map(day => ({
-    id: day.id,
-    date: day.date,
-    stage: day.stage,
-  })) as ScoredLeaderboardDay[]
+  return selectScoredLeaderboardDays((data ?? []) as Array<ScoredLeaderboardDay & {
+    matches: { result: string | null }[]
+    pikanteria: { result: string | null }[]
+  }>)
 }
 
 export async function getHistoricalLeaderboardEntries(
@@ -166,8 +165,7 @@ export async function getHistoricalLeaderboardEntries(
       .select('id, display_name, is_monkey, automation_strategy, status'),
     supabase
       .from('score_snapshots')
-      .select('user_id, match_day_id, day_points')
-      .not('match_day_id', 'is', null),
+      .select('user_id, match_day_id, day_points'),
   ])
 
   if (usersError) throw usersError
