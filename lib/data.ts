@@ -1,6 +1,15 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
-import type { MatchDay, Match, Pikanteria, LeaderboardEntry, Pick } from './types'
+import type {
+  MatchDay,
+  Match,
+  Pikanteria,
+  LeaderboardEntry,
+  Pick,
+  ScoredLeaderboardDay,
+  HistoricalLeaderboardEntry,
+} from './types'
 import type { Database } from './supabase/types'
+import { buildHistoricalLeaderboardEntries, selectScoredLeaderboardDays } from './historical-leaderboard'
 
 type Db = SupabaseClient<Database>
 
@@ -130,4 +139,42 @@ export async function getLeaderboardEntries(supabase: Db): Promise<LeaderboardEn
     .returns<LeaderboardEntry[]>()
   if (error) throw error
   return data ?? []
+}
+
+export async function getScoredLeaderboardDays(supabase: Db): Promise<ScoredLeaderboardDay[]> {
+  const { data, error } = await supabase
+    .from('match_days')
+    .select('id, date, stage, matches(result), pikanteria(result)')
+    .order('date', { ascending: false })
+  if (error) throw error
+
+  return selectScoredLeaderboardDays((data ?? []) as Array<ScoredLeaderboardDay & {
+    matches: { result: string | null }[]
+    pikanteria: { result: string | null }[]
+  }>)
+}
+
+export async function getHistoricalLeaderboardEntries(
+  supabase: Db,
+  selectedDayId: string,
+  days: ScoredLeaderboardDay[],
+): Promise<HistoricalLeaderboardEntry[]> {
+  const [{ data: users, error: usersError }, { data: snapshots, error: snapshotsError }] = await Promise.all([
+    supabase
+      .from('users')
+      .select('id, display_name, is_monkey, automation_strategy, status'),
+    supabase
+      .from('score_snapshots')
+      .select('user_id, match_day_id, day_points'),
+  ])
+
+  if (usersError) throw usersError
+  if (snapshotsError) throw snapshotsError
+
+  return buildHistoricalLeaderboardEntries({
+    selectedDayId,
+    days,
+    users: users ?? [],
+    snapshots: snapshots ?? [],
+  })
 }
