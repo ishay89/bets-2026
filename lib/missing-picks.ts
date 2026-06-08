@@ -1,4 +1,5 @@
 import { isMatchLocked } from './lock'
+import { hasCompletedPreTournamentPick } from './pre-tournament'
 
 export type OpenMatch = {
   id: string
@@ -64,4 +65,113 @@ export function computeUserMissingCounts(params: {
   }
 
   return { total, submitted, missing: total - submitted }
+}
+
+export type DayMissingSummary = {
+  matchDayId: string
+  date: string
+  stage: string
+  totalSlots: number
+  submittedCount: number
+  missingCount: number
+}
+
+export type FuturesMissingSummary = {
+  totalPlayers: number
+  completedCount: number
+}
+
+export type PlayerMissingRow = {
+  player: { id: string; display_name: string }
+  missingCount: number
+  futuresMissing: boolean
+}
+
+export type MissingPicksSummary = {
+  days: DayMissingSummary[]
+  futures: FuturesMissingSummary | null
+  players: PlayerMissingRow[]
+}
+
+function groupByUser<T extends { user_id: string }, K extends string>(
+  rows: T[],
+  keyOf: (row: T) => K,
+): Map<string, Set<K>> {
+  const map = new Map<string, Set<K>>()
+  for (const row of rows) {
+    const set = map.get(row.user_id) ?? new Set<K>()
+    set.add(keyOf(row))
+    map.set(row.user_id, set)
+  }
+  return map
+}
+
+export function computeAllPlayersMissingPicks(params: {
+  matchDays: MatchDayWithItems[]
+  players: { id: string; display_name: string }[]
+  predictions: { user_id: string; match_id: string }[]
+  answers: { user_id: string; pikanteria_id: string }[]
+  futuresPicks: { user_id: string; winner_team: string | null; top_scorer: string | null }[]
+  futuresOpen: boolean
+}): MissingPicksSummary {
+  const { matchDays, players, predictions, answers, futuresPicks, futuresOpen } = params
+
+  const predictionsByUser = groupByUser(predictions, p => p.match_id)
+  const answersByUser = groupByUser(answers, a => a.pikanteria_id)
+  const completedFuturesByUser = new Set(
+    futuresPicks.filter(hasCompletedPreTournamentPick).map(f => f.user_id),
+  )
+
+  const openByDay = matchDays.map(day => ({ day, open: openItemsForDay(day) }))
+
+  const days: DayMissingSummary[] = []
+  for (const { day, open } of openByDay) {
+    const itemCount = open.matches.length + open.pikanteria.length
+    if (itemCount === 0) continue
+
+    let submittedCount = 0
+    for (const player of players) {
+      const predicted = predictionsByUser.get(player.id) ?? new Set<string>()
+      const answered = answersByUser.get(player.id) ?? new Set<string>()
+      submittedCount += open.matches.filter(m => predicted.has(m.id)).length
+      submittedCount += open.pikanteria.filter(p => answered.has(p.id)).length
+    }
+
+    const totalSlots = itemCount * players.length
+    days.push({
+      matchDayId: day.id,
+      date: day.date,
+      stage: day.stage,
+      totalSlots,
+      submittedCount,
+      missingCount: totalSlots - submittedCount,
+    })
+  }
+
+  const futures: FuturesMissingSummary | null = futuresOpen
+    ? {
+        totalPlayers: players.length,
+        completedCount: players.filter(p => completedFuturesByUser.has(p.id)).length,
+      }
+    : null
+
+  const playerRows: PlayerMissingRow[] = players.map(player => {
+    const predicted = predictionsByUser.get(player.id) ?? new Set<string>()
+    const answered = answersByUser.get(player.id) ?? new Set<string>()
+
+    let missingCount = 0
+    for (const { open } of openByDay) {
+      missingCount += open.matches.filter(m => !predicted.has(m.id)).length
+      missingCount += open.pikanteria.filter(p => !answered.has(p.id)).length
+    }
+
+    const futuresMissing = futuresOpen && !completedFuturesByUser.has(player.id)
+    if (futuresMissing) missingCount += 1
+
+    return { player, missingCount, futuresMissing }
+  })
+
+  playerRows.sort((a, b) => b.missingCount - a.missingCount)
+
+  return { days, futures, players: playerRows }
 }

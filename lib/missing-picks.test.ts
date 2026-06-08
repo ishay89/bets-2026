@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { computeUserMissingCounts } from './missing-picks'
+import { computeAllPlayersMissingPicks, computeUserMissingCounts } from './missing-picks'
 
 const day = (overrides: Partial<{
   id: string
@@ -133,5 +133,86 @@ describe('computeUserMissingCounts', () => {
       futuresCompleted: false,
     })
     expect(result).toEqual({ total: 4, submitted: 1, missing: 3 })
+  })
+})
+
+describe('computeAllPlayersMissingPicks', () => {
+  const players = [
+    { id: 'u1', display_name: 'Alice' },
+    { id: 'u2', display_name: 'Bob' },
+  ]
+
+  const oneOpenMatchDay = [day({
+    id: 'day-1',
+    matches: [
+      { id: 'm1', kickoff_time: FUTURE_KICKOFF, locked: false, published_at: '2026-06-01T00:00:00Z' },
+    ],
+  })]
+
+  it('aggregates per-day submitted counts across all players', () => {
+    const result = computeAllPlayersMissingPicks({
+      matchDays: oneOpenMatchDay,
+      players,
+      predictions: [{ user_id: 'u1', match_id: 'm1' }],
+      answers: [],
+      futuresPicks: [],
+      futuresOpen: false,
+    })
+    expect(result.days).toEqual([
+      { matchDayId: 'day-1', date: '2026-06-10', stage: 'group', totalSlots: 2, submittedCount: 1, missingCount: 1 },
+    ])
+  })
+
+  it('omits days with no open items from the aggregate', () => {
+    const lockedDay = [day({
+      id: 'day-locked',
+      matches: [{ id: 'm-locked', kickoff_time: PAST_KICKOFF, locked: false, published_at: '2026-06-01T00:00:00Z' }],
+    })]
+    const result = computeAllPlayersMissingPicks({
+      matchDays: lockedDay,
+      players,
+      predictions: [],
+      answers: [],
+      futuresPicks: [],
+      futuresOpen: false,
+    })
+    expect(result.days).toEqual([])
+  })
+
+  it('builds a futures aggregate only when futures is open', () => {
+    const closed = computeAllPlayersMissingPicks({
+      matchDays: [],
+      players,
+      predictions: [],
+      answers: [],
+      futuresPicks: [{ user_id: 'u1', winner_team: 'Brazil', top_scorer: 'Mbappé' }],
+      futuresOpen: false,
+    })
+    expect(closed.futures).toBeNull()
+
+    const open = computeAllPlayersMissingPicks({
+      matchDays: [],
+      players,
+      predictions: [],
+      answers: [],
+      futuresPicks: [{ user_id: 'u1', winner_team: 'Brazil', top_scorer: 'Mbappé' }],
+      futuresOpen: true,
+    })
+    expect(open.futures).toEqual({ totalPlayers: 2, completedCount: 1 })
+  })
+
+  it('builds a per-player row with total missing across days and futures, sorted by most missing first', () => {
+    const result = computeAllPlayersMissingPicks({
+      matchDays: oneOpenMatchDay,
+      players,
+      predictions: [{ user_id: 'u1', match_id: 'm1' }],
+      answers: [],
+      futuresPicks: [{ user_id: 'u1', winner_team: 'Brazil', top_scorer: 'Mbappé' }],
+      futuresOpen: true,
+    })
+    expect(result.players).toEqual([
+      { player: { id: 'u2', display_name: 'Bob' }, missingCount: 2, futuresMissing: true },
+      { player: { id: 'u1', display_name: 'Alice' }, missingCount: 0, futuresMissing: false },
+    ])
   })
 })
