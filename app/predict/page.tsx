@@ -9,6 +9,8 @@ import { isMatchLocked, matchLockMs } from '@/lib/lock'
 import { toPct, matchInsight, type CrowdTally } from '@/lib/crowd'
 import { parseUUID, parsePick } from '@/lib/validation'
 import { PreTournamentFutures } from '@/components/pre-tournament-futures'
+import { MissingPicksBanner } from '@/components/missing-picks-banner'
+import { computeUserMissingCounts } from '@/lib/missing-picks'
 import { revealFuturesPicks } from '@/app/predict/pre-tournament-actions'
 import { hasCompletedPreTournamentPick, withCurrentFuturesOdds } from '@/lib/pre-tournament'
 import {
@@ -172,6 +174,17 @@ export default async function PredictPage() {
     existingAnswers.map(a => [a.pikanteria_id, a.pick as Pick])
   )
 
+  const predictedMatchIds = new Set(existingPredictions.map(p => p.match_id))
+  const answeredPikanteriaIds = new Set(existingAnswers.map(a => a.pikanteria_id))
+  const futuresOpen = futuresPublished && !futuresLocked
+  const { missing: missingPicks } = computeUserMissingCounts({
+    matchDays,
+    predictedMatchIds,
+    answeredPikanteriaIds,
+    futuresOpen,
+    futuresCompleted: hasEntryPick,
+  })
+
   // Aggregate crowd picks (counts only; revealed by the RPCs only after lock).
   // Both matches and pikanteria are tallied by the 1/X/2 pick now.
   const crowdTally: Record<string, CrowdTally> = {}
@@ -194,6 +207,8 @@ export default async function PredictPage() {
       </div>
 
       <main className="px-4 pb-28 space-y-6 mt-2">
+        <MissingPicksBanner missing={missingPicks} />
+
         {futuresPublished && !hasEntryPick && (
           <PreTournamentFutures
             pick={displayFuturesPick}
