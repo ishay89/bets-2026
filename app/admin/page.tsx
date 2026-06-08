@@ -7,6 +7,7 @@ const sections = [
   { href: '/admin/players', icon: '👥', label: 'Manage Players', desc: 'View players and admin roles' },
   { href: '/admin/scores', icon: '📊', label: 'Score Snapshots', desc: 'Per-day breakdown and validation audit' },
   { href: '/admin/audit', icon: '🧾', label: 'User Audit', desc: 'Track user prediction commits and changes' },
+  { href: '/admin/missing-picks', icon: '🔔', label: 'Missing Picks', desc: 'See who still needs to submit picks' },
 ]
 
 export default function AdminHome() {
