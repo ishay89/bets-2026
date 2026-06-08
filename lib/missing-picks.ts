@@ -93,6 +93,22 @@ export type MissingPicksSummary = {
   players: PlayerMissingRow[]
 }
 
+export type MissingPicksViewState = {
+  hasOpenItems: boolean
+  hasMissingPicks: boolean
+}
+
+export function computeMissingPicksViewState(summary: MissingPicksSummary): MissingPicksViewState {
+  const openDaySlots = summary.days.reduce((total, day) => total + day.totalSlots, 0)
+  const openFuturesSlots = summary.futures?.totalPlayers ?? 0
+  const hasOpenItems = openDaySlots + openFuturesSlots > 0
+  const hasMissingPicks =
+    summary.days.some(day => day.missingCount > 0) ||
+    (summary.futures ? summary.futures.completedCount < summary.futures.totalPlayers : false)
+
+  return { hasOpenItems, hasMissingPicks }
+}
+
 function groupByUser<T extends { user_id: string }, K extends string>(
   rows: T[],
   keyOf: (row: T) => K,

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { computeAllPlayersMissingPicks, computeUserMissingCounts } from './missing-picks'
+import { computeAllPlayersMissingPicks, computeMissingPicksViewState, computeUserMissingCounts } from './missing-picks'
 
 const day = (overrides: Partial<{
   id: string
@@ -214,5 +214,39 @@ describe('computeAllPlayersMissingPicks', () => {
       { player: { id: 'u2', display_name: 'Bob' }, missingCount: 2, futuresMissing: true },
       { player: { id: 'u1', display_name: 'Alice' }, missingCount: 0, futuresMissing: false },
     ])
+  })
+})
+
+describe('computeMissingPicksViewState', () => {
+  it('distinguishes no open slots from open slots that are fully submitted', () => {
+    expect(computeMissingPicksViewState({
+      days: [],
+      futures: null,
+      players: [],
+    })).toEqual({ hasOpenItems: false, hasMissingPicks: false })
+
+    expect(computeMissingPicksViewState({
+      days: [
+        { matchDayId: 'day-1', date: '2026-06-10', stage: 'group', totalSlots: 2, submittedCount: 2, missingCount: 0 },
+      ],
+      futures: { totalPlayers: 2, completedCount: 2 },
+      players: [],
+    })).toEqual({ hasOpenItems: true, hasMissingPicks: false })
+  })
+
+  it('reports missing picks when any open day or futures slot is incomplete', () => {
+    expect(computeMissingPicksViewState({
+      days: [
+        { matchDayId: 'day-1', date: '2026-06-10', stage: 'group', totalSlots: 2, submittedCount: 1, missingCount: 1 },
+      ],
+      futures: null,
+      players: [],
+    })).toEqual({ hasOpenItems: true, hasMissingPicks: true })
+
+    expect(computeMissingPicksViewState({
+      days: [],
+      futures: { totalPlayers: 2, completedCount: 1 },
+      players: [],
+    })).toEqual({ hasOpenItems: true, hasMissingPicks: true })
   })
 })

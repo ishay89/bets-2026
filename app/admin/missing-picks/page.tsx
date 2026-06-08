@@ -1,7 +1,11 @@
 import { createAdminClient, assertAdmin } from '@/lib/supabase/server'
 import Link from 'next/link'
 import { getPublishedMatchDaysWithAll } from '@/lib/data'
-import { computeAllPlayersMissingPicks, type MissingPicksSummary } from '@/lib/missing-picks'
+import {
+  computeAllPlayersMissingPicks,
+  computeMissingPicksViewState,
+  type MissingPicksSummary,
+} from '@/lib/missing-picks'
 
 export const metadata = { title: 'Missing Picks | Admin' }
 
@@ -10,11 +14,17 @@ const STAGE_LABELS: Record<string, string> = {
   sf: 'Semi Finals', '3rd': 'Third Place', final: 'Final',
 }
 
+function throwQueryError(label: string, error: { message: string } | null) {
+  if (error) {
+    throw new Error(`Failed to load missing-picks ${label}: ${error.message}`)
+  }
+}
+
 export default async function MissingPicksPage() {
   await assertAdmin()
   const supabase = createAdminClient()
 
-  const [matchDays, { data: predictions }, { data: answers }, { data: futuresPicks }, { data: players }, { data: tournamentSettings }] =
+  const [matchDays, predictionsResult, answersResult, futuresPicksResult, playersResult, tournamentSettingsResult] =
     await Promise.all([
       getPublishedMatchDaysWithAll(supabase),
       supabase.from('predictions').select('user_id, match_id'),
@@ -23,6 +33,18 @@ export default async function MissingPicksPage() {
       supabase.from('users').select('id, display_name').eq('status', 'approved').eq('is_monkey', false),
       supabase.from('tournament_settings').select('futures_locked, futures_published').eq('id', true).single(),
     ])
+
+  const { data: predictions, error: predictionsError } = predictionsResult
+  const { data: answers, error: answersError } = answersResult
+  const { data: futuresPicks, error: futuresPicksError } = futuresPicksResult
+  const { data: players, error: playersError } = playersResult
+  const { data: tournamentSettings, error: tournamentSettingsError } = tournamentSettingsResult
+
+  throwQueryError('predictions', predictionsError)
+  throwQueryError('pikanteria answers', answersError)
+  throwQueryError('futures picks', futuresPicksError)
+  throwQueryError('players', playersError)
+  throwQueryError('tournament settings', tournamentSettingsError)
 
   const futuresOpen = (tournamentSettings?.futures_published ?? true) && !(tournamentSettings?.futures_locked ?? false)
 
@@ -35,7 +57,7 @@ export default async function MissingPicksPage() {
     futuresOpen,
   })
 
-  const nothingOpen = summary.days.length === 0 && summary.futures === null
+  const { hasOpenItems, hasMissingPicks } = computeMissingPicksViewState(summary)
 
   return (
     <div className="max-w-lg mx-auto space-y-4 pb-10">
@@ -49,15 +71,17 @@ export default async function MissingPicksPage() {
         <div className="text-muted text-xs">Who still needs to submit before bets lock</div>
       </div>
 
-      {nothingOpen && (
+      {!hasMissingPicks && (
         <div className="text-center py-16">
           <div className="text-4xl mb-3">✅</div>
           <div className="text-text font-semibold">Everyone&apos;s caught up</div>
-          <div className="text-muted text-sm mt-1">Nothing is currently open for predictions.</div>
+          <div className="text-muted text-sm mt-1">
+            {hasOpenItems ? 'All currently open predictions are submitted.' : 'Nothing is currently open for predictions.'}
+          </div>
         </div>
       )}
 
-      {!nothingOpen && (
+      {hasMissingPicks && (
         <>
           <DaySummarySection summary={summary} />
           <PlayerBreakdownSection summary={summary} />
