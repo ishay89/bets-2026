@@ -24,7 +24,7 @@ import {
   type SaveResult,
 } from '@/lib/prediction-saves'
 import { getMatchPredictionsReveal, getPikanteriaAnswersReveal } from '@/lib/prediction-reveals'
-import { formatUtcDate, utcDateKey } from '@/lib/time'
+import { appDateKey, formatAppDate } from '@/lib/time'
 
 export const metadata = { title: 'Predict | Mondial Bets 2026' }
 
@@ -134,7 +134,7 @@ export default async function PredictPage() {
 
   const matchDays = await getPublishedMatchDaysWithAll(supabase)
 
-  const today = utcDateKey()
+  const today = appDateKey()
 
   const [
     existingPredictions,
@@ -234,7 +234,7 @@ export default async function PredictPage() {
           const sortedMatches = matchDay.matches.toSorted(
             (a, b) => new Date(a.kickoff_time).getTime() - new Date(b.kickoff_time).getTime()
           )
-          const dateLabel = formatUtcDate(matchDay.date)
+          const dateLabel = formatAppDate(matchDay.date)
 
           const allMatchesLocked = sortedMatches.length > 0 && sortedMatches.every(m => isMatchLocked(m))
 

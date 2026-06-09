@@ -6,7 +6,7 @@ import {
   buildAutomatedPikaRows,
   type AutomatedUser,
 } from '@/lib/monkey'
-import { formatUtcTime, utcDateKey } from '@/lib/time'
+import { appDateKey, formatAppTime } from '@/lib/time'
 import { setPikanteriaPublishedAt } from '@/lib/publishing'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
@@ -427,7 +427,7 @@ export default async function PublishPage({
   searchParams: Promise<{ date?: string; notice?: string }>
 }) {
   const { date, notice } = await searchParams
-  const today = utcDateKey()
+  const today = appDateKey()
   const selectedDate = date ?? today
 
   type DayMatch = {
@@ -600,7 +600,7 @@ export default async function PublishPage({
           {matches.map(match => {
             const published = match.published_at != null
             const scored = match.result != null
-            const kickoffLabel = `${formatUtcTime(match.kickoff_time)} UTC`
+            const kickoffLabel = `${formatAppTime(match.kickoff_time)} Jerusalem`
             return (
               <div key={match.id} className="rounded-xl p-4 space-y-3"
                 style={{ background: 'var(--color-panel)', border: '1px solid var(--border-base)' }}>

@@ -4,7 +4,7 @@ import Image from 'next/image'
 import { ChangeEvent, FormEvent, useEffect, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { getAvatar } from '@/lib/display'
-import { formatUtcDateTime } from '@/lib/time'
+import { formatAppDateTime } from '@/lib/time'
 import type { AutomationStrategy } from '@/lib/types'
 
 const IMAGE_BUCKET = 'message-board-images'
@@ -41,7 +41,7 @@ interface Props {
 }
 
 function formatPostTime(createdAt: string): string {
-  return formatUtcDateTime(createdAt, {
+  return formatAppDateTime(createdAt, {
     month: 'short',
     day: 'numeric',
     hour: '2-digit',

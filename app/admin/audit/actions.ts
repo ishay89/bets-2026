@@ -1,7 +1,7 @@
 'use server'
 
 import { createClient, createAdminClient } from '@/lib/supabase/server'
-import { utcDateTimeLocalToIso } from '@/lib/time'
+import { appDateTimeLocalToIso } from '@/lib/time'
 import { redirect } from 'next/navigation'
 import { PAGE_SIZE, type AuditRow, type AuditUser } from './types'
 
@@ -34,8 +34,8 @@ export async function fetchAuditEvents({
     .order('committed_at', { ascending: false })
     .range(offset, offset + PAGE_SIZE - 1)
 
-  const fromIso = utcDateTimeLocalToIso(from)
-  const toIso = utcDateTimeLocalToIso(to)
+  const fromIso = appDateTimeLocalToIso(from)
+  const toIso = appDateTimeLocalToIso(to)
 
   if (fromIso) query = query.gte('committed_at', fromIso)
   if (toIso) query = query.lte('committed_at', toIso)

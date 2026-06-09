@@ -4,7 +4,7 @@ import type { Pick } from '@/lib/types'
 import type { Insight } from '@/lib/crowd'
 import type { SaveResult } from '@/lib/prediction-saves'
 import type { PlayerRevealRow } from '@/lib/prediction-reveals'
-import { formatUtcTime } from '@/lib/time'
+import { formatAppTime } from '@/lib/time'
 import { CrowdInsight } from './crowd-insight'
 import { PredictionRevealSheet } from './prediction-reveal-sheet'
 
@@ -167,7 +167,7 @@ export function BetCard(props: Props) {
     >
       {variant === 'match' ? (
         <MatchHeader
-          kickoff={formatUtcTime(kickoffTime!)}
+          kickoff={formatAppTime(kickoffTime!)}
           stageLabel={stageLabel ?? ''}
           isCorrect={isCorrect}
           isWrong={isWrong}

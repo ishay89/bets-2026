@@ -2,7 +2,7 @@ import { createAdminClient, assertAdmin } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { isMatchLocked } from '@/lib/lock'
-import { formatUtcDate, formatUtcDateTime } from '@/lib/time'
+import { formatAppDate, formatAppDateTime } from '@/lib/time'
 import type { Pick, User } from '@/lib/types'
 import {
   getPublishedMatchDaysWithAll,
@@ -118,7 +118,7 @@ export default async function PlayerDetailPage({
       )}
 
       {openDays.map(({ day, openMatches, openPikanteria }) => {
-        const dateLabel = formatUtcDate(day.date)
+        const dateLabel = formatAppDate(day.date)
         return (
           <div key={day.id} className="space-y-2">
             <div className="flex items-center gap-2 pt-1">
@@ -139,10 +139,10 @@ export default async function PlayerDetailPage({
                       {match.home_team} vs {match.away_team}
                     </div>
                     <div className="text-muted text-[11px] mt-0.5">
-                      {formatUtcDateTime(match.kickoff_time, {
+                      {formatAppDateTime(match.kickoff_time, {
                         month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
                         hour12: false,
-                      })} UTC
+                      })} Jerusalem
                     </div>
                   </div>
                   <StatusBadge submitted={!!pick} label={pick ? `${pick} · ${PICK_LABELS[pick]}` : undefined} />
