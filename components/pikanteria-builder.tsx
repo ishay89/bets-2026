@@ -42,15 +42,6 @@ export function PicanteriaBuilder({ defaults }: Props) {
           defaultValue={defaults?.odds1 ?? ''} style={oddsStyle} className={oddsCls} />
       </div>
 
-      {/* Outcome 2 */}
-      <div className="flex gap-2 items-center">
-        <span className="text-xs font-bold w-4 text-center" style={{ color: 'var(--color-amber)' }}>2</span>
-        <input name="pik_label_2" aria-label="Outcome 2 label" type="text" placeholder="No"
-          defaultValue={defaults?.label2 ?? ''} style={inputBase} className={labelCls} />
-        <input name="pik_odds_2" aria-label="Outcome 2 odds" type="number" step="0.01" placeholder="2.10"
-          defaultValue={defaults?.odds2 ?? ''} style={oddsStyle} className={oddsCls} />
-      </div>
-
       {/* Optional X (draw / middle) outcome */}
       <label className="flex items-center gap-2 text-xs text-muted mt-1 cursor-pointer">
         <input type="checkbox" name="pik_has_x" checked={hasX} onChange={e => setHasX(e.target.checked)} />
@@ -65,6 +56,15 @@ export function PicanteriaBuilder({ defaults }: Props) {
             defaultValue={defaults?.oddsX ?? ''} style={oddsStyle} className={oddsCls} />
         </div>
       )}
+
+      {/* Outcome 2 */}
+      <div className="flex gap-2 items-center">
+        <span className="text-xs font-bold w-4 text-center" style={{ color: 'var(--color-amber)' }}>2</span>
+        <input name="pik_label_2" aria-label="Outcome 2 label" type="text" placeholder="No"
+          defaultValue={defaults?.label2 ?? ''} style={inputBase} className={labelCls} />
+        <input name="pik_odds_2" aria-label="Outcome 2 odds" type="number" step="0.01" placeholder="2.10"
+          defaultValue={defaults?.odds2 ?? ''} style={oddsStyle} className={oddsCls} />
+      </div>
     </div>
   )
 }
