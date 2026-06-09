@@ -26,7 +26,7 @@ const oddsStyle = { ...inputBase, color: 'var(--color-amber)', fontFamily: 'var(
 
 export function PicanteriaBuilder({ defaults }: Props) {
   const [hasX, setHasX] = useState<boolean>(
-    defaults?.labelX != null && defaults?.labelX !== '',
+    defaults === undefined ? true : (defaults.labelX != null && defaults.labelX !== ''),
   )
 
   return (
@@ -54,7 +54,7 @@ export function PicanteriaBuilder({ defaults }: Props) {
       {/* Optional X (draw / middle) outcome */}
       <label className="flex items-center gap-2 text-xs text-muted mt-1 cursor-pointer">
         <input type="checkbox" name="pik_has_x" checked={hasX} onChange={e => setHasX(e.target.checked)} />
-        Add a third outcome (X)
+        {hasX ? 'Remove third outcome (X)' : 'Add a third outcome (X)'}
       </label>
       {hasX && (
         <div className="flex gap-2 items-center">
