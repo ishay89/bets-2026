@@ -11,9 +11,9 @@
  *   - NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY set in .env.local
  *   - Migration 003_add_r32_stage.sql applied in Supabase SQL Editor
  *
- * All kickoff times are UTC. Match-day dates use ET (Eastern Time) calendar date
- * as the reference — the same date shown on the official schedule.
- * Lock times are 30 minutes before the earliest kickoff of each day.
+ * All kickoff times are UTC. Match-day dates use the UTC calendar date
+ * as the reference, matching the timestamp date stored in Supabase.
+ * Lock times are 5 minutes before the earliest kickoff of each UTC day.
  *
  * Odds are pre-tournament estimates; update via /admin/results before each day.
  */
@@ -44,9 +44,9 @@ interface MatchInput {
 }
 
 interface MatchDayInput {
-  date: string        // ET calendar date (YYYY-MM-DD)
+  date: string        // UTC calendar date (YYYY-MM-DD)
   stage: string
-  lock_time: string   // UTC timestamp, 30 min before earliest kickoff
+  lock_time: string   // UTC timestamp, 5 min before earliest kickoff
   matches: MatchInput[]
 }
 
@@ -65,224 +65,220 @@ interface MatchDayInput {
 // L: England, Croatia, Ghana, Panama
 
 const groupStage: MatchDayInput[] = [
-  // ── June 11 — Group A MD1 ──────────────────────────────────────────────────
+  // 2026-06-11 UTC
   {
     date: '2026-06-11',
     stage: 'group',
-    lock_time: '2026-06-11T18:30:00Z',
+    lock_time: '2026-06-11T18:55:00Z',
     matches: [
-      { home_team: 'Mexico',      away_team: 'South Africa', kickoff_utc: '2026-06-11T19:00:00Z', odds_home: 1.65, odds_draw: 3.50, odds_away: 4.50 },
-      { home_team: 'South Korea', away_team: 'Czechia',      kickoff_utc: '2026-06-12T02:00:00Z', odds_home: 2.10, odds_draw: 3.25, odds_away: 3.30 },
+      { home_team: 'Mexico', away_team: 'South Africa', kickoff_utc: '2026-06-11T19:00:00Z', odds_home: 1.65, odds_draw: 3.50, odds_away: 4.50 },
     ],
   },
-  // ── June 12 — Groups B & D MD1 ─────────────────────────────────────────────
+  // 2026-06-12 UTC
   {
     date: '2026-06-12',
     stage: 'group',
-    lock_time: '2026-06-12T18:30:00Z',
+    lock_time: '2026-06-12T01:55:00Z',
     matches: [
-      { home_team: 'Canada',       away_team: 'Bosnia-Herzegovina', kickoff_utc: '2026-06-12T19:00:00Z', odds_home: 2.30, odds_draw: 3.20, odds_away: 3.00 },
-      { home_team: 'USA',          away_team: 'Paraguay',           kickoff_utc: '2026-06-13T01:00:00Z', odds_home: 1.75, odds_draw: 3.40, odds_away: 4.50 },
+      { home_team: 'South Korea', away_team: 'Czechia', kickoff_utc: '2026-06-12T02:00:00Z', odds_home: 2.10, odds_draw: 3.25, odds_away: 3.30 },
+      { home_team: 'Canada', away_team: 'Bosnia-Herzegovina', kickoff_utc: '2026-06-12T19:00:00Z', odds_home: 2.30, odds_draw: 3.20, odds_away: 3.00 },
     ],
   },
-  // ── June 13 — Groups B, C & D MD1 ──────────────────────────────────────────
+  // 2026-06-13 UTC
   {
     date: '2026-06-13',
     stage: 'group',
-    lock_time: '2026-06-13T18:30:00Z',
+    lock_time: '2026-06-13T00:55:00Z',
     matches: [
-      { home_team: 'Qatar',     away_team: 'Switzerland', kickoff_utc: '2026-06-13T19:00:00Z', odds_home: 3.80, odds_draw: 3.30, odds_away: 1.85 },
-      { home_team: 'Brazil',    away_team: 'Morocco',     kickoff_utc: '2026-06-13T22:00:00Z', odds_home: 1.40, odds_draw: 4.50, odds_away: 7.00 },
-      { home_team: 'Haiti',     away_team: 'Scotland',    kickoff_utc: '2026-06-14T01:00:00Z', odds_home: 3.50, odds_draw: 3.20, odds_away: 2.00 },
-      { home_team: 'Australia', away_team: 'Türkiye',     kickoff_utc: '2026-06-14T04:00:00Z', odds_home: 2.50, odds_draw: 3.20, odds_away: 2.70 },
+      { home_team: 'USA', away_team: 'Paraguay', kickoff_utc: '2026-06-13T01:00:00Z', odds_home: 1.75, odds_draw: 3.40, odds_away: 4.50 },
+      { home_team: 'Qatar', away_team: 'Switzerland', kickoff_utc: '2026-06-13T19:00:00Z', odds_home: 3.80, odds_draw: 3.30, odds_away: 1.85 },
+      { home_team: 'Brazil', away_team: 'Morocco', kickoff_utc: '2026-06-13T22:00:00Z', odds_home: 1.40, odds_draw: 4.50, odds_away: 7.00 },
     ],
   },
-  // ── June 14 — Groups E & F MD1 ─────────────────────────────────────────────
+  // 2026-06-14 UTC
   {
     date: '2026-06-14',
     stage: 'group',
-    lock_time: '2026-06-14T16:30:00Z',
+    lock_time: '2026-06-14T00:55:00Z',
     matches: [
-      { home_team: 'Germany',      away_team: 'Curaçao',  kickoff_utc: '2026-06-14T17:00:00Z', odds_home: 1.05, odds_draw: 14.00, odds_away: 25.00 },
-      { home_team: 'Netherlands',  away_team: 'Japan',    kickoff_utc: '2026-06-14T20:00:00Z', odds_home: 1.60, odds_draw:  3.60, odds_away:  5.00 },
-      { home_team: 'Côte d\'Ivoire', away_team: 'Ecuador', kickoff_utc: '2026-06-14T23:00:00Z', odds_home: 2.40, odds_draw:  3.20, odds_away:  2.80 },
-      { home_team: 'Sweden',       away_team: 'Tunisia',  kickoff_utc: '2026-06-15T02:00:00Z', odds_home: 1.80, odds_draw:  3.35, odds_away:  4.00 },
+      { home_team: 'Haiti', away_team: 'Scotland', kickoff_utc: '2026-06-14T01:00:00Z', odds_home: 3.50, odds_draw: 3.20, odds_away: 2.00 },
+      { home_team: 'Australia', away_team: 'Türkiye', kickoff_utc: '2026-06-14T16:00:00Z', odds_home: 2.50, odds_draw: 3.20, odds_away: 2.70 },
+      { home_team: 'Germany', away_team: 'Curaçao', kickoff_utc: '2026-06-14T17:00:00Z', odds_home: 1.05, odds_draw: 14.00, odds_away: 25.00 },
+      { home_team: 'Netherlands', away_team: 'Japan', kickoff_utc: '2026-06-14T20:00:00Z', odds_home: 1.60, odds_draw: 3.60, odds_away: 5.00 },
+      { home_team: 'Côte d\'Ivoire', away_team: 'Ecuador', kickoff_utc: '2026-06-14T23:00:00Z', odds_home: 2.40, odds_draw: 3.20, odds_away: 2.80 },
     ],
   },
-  // ── June 15 — Groups G & H MD1 ─────────────────────────────────────────────
+  // 2026-06-15 UTC
   {
     date: '2026-06-15',
     stage: 'group',
-    lock_time: '2026-06-15T15:30:00Z',
+    lock_time: '2026-06-15T01:55:00Z',
     matches: [
-      { home_team: 'Spain',        away_team: 'Cabo Verde',  kickoff_utc: '2026-06-15T16:00:00Z', odds_home: 1.10, odds_draw:  8.00, odds_away: 18.00 },
-      { home_team: 'Belgium',      away_team: 'Egypt',       kickoff_utc: '2026-06-15T19:00:00Z', odds_home: 1.50, odds_draw:  3.80, odds_away:  6.00 },
-      { home_team: 'Saudi Arabia', away_team: 'Uruguay',     kickoff_utc: '2026-06-15T22:00:00Z', odds_home: 3.00, odds_draw:  3.30, odds_away:  2.20 },
-      { home_team: 'Iran',         away_team: 'New Zealand', kickoff_utc: '2026-06-16T01:00:00Z', odds_home: 2.10, odds_draw:  3.25, odds_away:  3.30 },
+      { home_team: 'Sweden', away_team: 'Tunisia', kickoff_utc: '2026-06-15T02:00:00Z', odds_home: 1.80, odds_draw: 3.35, odds_away: 4.00 },
+      { home_team: 'Spain', away_team: 'Cabo Verde', kickoff_utc: '2026-06-15T16:00:00Z', odds_home: 1.10, odds_draw: 8.00, odds_away: 18.00 },
+      { home_team: 'Belgium', away_team: 'Egypt', kickoff_utc: '2026-06-15T19:00:00Z', odds_home: 1.50, odds_draw: 3.80, odds_away: 6.00 },
+      { home_team: 'Saudi Arabia', away_team: 'Uruguay', kickoff_utc: '2026-06-15T22:00:00Z', odds_home: 3.00, odds_draw: 3.30, odds_away: 2.20 },
     ],
   },
-  // ── June 16 — Groups I & J MD1 ─────────────────────────────────────────────
+  // 2026-06-16 UTC
   {
     date: '2026-06-16',
     stage: 'group',
-    lock_time: '2026-06-16T18:30:00Z',
+    lock_time: '2026-06-16T00:55:00Z',
     matches: [
-      { home_team: 'France',    away_team: 'Senegal', kickoff_utc: '2026-06-16T19:00:00Z', odds_home: 1.65, odds_draw: 3.50, odds_away: 4.50 },
-      { home_team: 'Iraq',      away_team: 'Norway',  kickoff_utc: '2026-06-16T22:00:00Z', odds_home: 4.00, odds_draw: 3.30, odds_away: 1.80 },
-      { home_team: 'Argentina', away_team: 'Algeria', kickoff_utc: '2026-06-17T01:00:00Z', odds_home: 1.30, odds_draw: 5.00, odds_away: 8.00 },
-      { home_team: 'Austria',   away_team: 'Jordan',  kickoff_utc: '2026-06-17T04:00:00Z', odds_home: 1.60, odds_draw: 3.60, odds_away: 5.50 },
+      { home_team: 'Iran', away_team: 'New Zealand', kickoff_utc: '2026-06-16T01:00:00Z', odds_home: 2.10, odds_draw: 3.25, odds_away: 3.30 },
+      { home_team: 'France', away_team: 'Senegal', kickoff_utc: '2026-06-16T19:00:00Z', odds_home: 1.65, odds_draw: 3.50, odds_away: 4.50 },
+      { home_team: 'Iraq', away_team: 'Norway', kickoff_utc: '2026-06-16T22:00:00Z', odds_home: 4.00, odds_draw: 3.30, odds_away: 1.80 },
     ],
   },
-  // ── June 17 — Groups K & L MD1 ─────────────────────────────────────────────
+  // 2026-06-17 UTC
   {
     date: '2026-06-17',
     stage: 'group',
-    lock_time: '2026-06-17T16:30:00Z',
+    lock_time: '2026-06-17T00:55:00Z',
     matches: [
-      { home_team: 'Portugal',   away_team: 'DR Congo',  kickoff_utc: '2026-06-17T17:00:00Z', odds_home: 1.35, odds_draw: 4.50, odds_away: 7.50 },
-      { home_team: 'England',    away_team: 'Croatia',   kickoff_utc: '2026-06-17T20:00:00Z', odds_home: 1.55, odds_draw: 3.70, odds_away: 5.50 },
-      { home_team: 'Ghana',      away_team: 'Panama',    kickoff_utc: '2026-06-17T23:00:00Z', odds_home: 2.10, odds_draw: 3.20, odds_away: 3.30 },
-      { home_team: 'Uzbekistan', away_team: 'Colombia',  kickoff_utc: '2026-06-18T02:00:00Z', odds_home: 4.50, odds_draw: 3.40, odds_away: 1.70 },
+      { home_team: 'Argentina', away_team: 'Algeria', kickoff_utc: '2026-06-17T01:00:00Z', odds_home: 1.30, odds_draw: 5.00, odds_away: 8.00 },
+      { home_team: 'Austria', away_team: 'Jordan', kickoff_utc: '2026-06-17T04:00:00Z', odds_home: 1.60, odds_draw: 3.60, odds_away: 5.50 },
+      { home_team: 'Portugal', away_team: 'DR Congo', kickoff_utc: '2026-06-17T17:00:00Z', odds_home: 1.35, odds_draw: 4.50, odds_away: 7.50 },
+      { home_team: 'England', away_team: 'Croatia', kickoff_utc: '2026-06-17T20:00:00Z', odds_home: 1.55, odds_draw: 3.70, odds_away: 5.50 },
+      { home_team: 'Ghana', away_team: 'Panama', kickoff_utc: '2026-06-17T23:00:00Z', odds_home: 2.10, odds_draw: 3.20, odds_away: 3.30 },
     ],
   },
-  // ── June 18 — Groups A & B MD2 ─────────────────────────────────────────────
+  // 2026-06-18 UTC
   {
     date: '2026-06-18',
     stage: 'group',
-    lock_time: '2026-06-18T15:30:00Z',
+    lock_time: '2026-06-18T01:55:00Z',
     matches: [
-      { home_team: 'Czechia',              away_team: 'South Africa',     kickoff_utc: '2026-06-18T16:00:00Z', odds_home: 1.85, odds_draw: 3.35, odds_away: 3.80 },
-      { home_team: 'Switzerland',          away_team: 'Bosnia-Herzegovina', kickoff_utc: '2026-06-18T19:00:00Z', odds_home: 1.75, odds_draw: 3.40, odds_away: 4.50 },
-      { home_team: 'Canada',               away_team: 'Qatar',            kickoff_utc: '2026-06-18T22:00:00Z', odds_home: 1.70, odds_draw: 3.45, odds_away: 4.80 },
-      { home_team: 'Mexico',               away_team: 'South Korea',      kickoff_utc: '2026-06-19T01:00:00Z', odds_home: 1.80, odds_draw: 3.40, odds_away: 4.00 },
+      { home_team: 'Uzbekistan', away_team: 'Colombia', kickoff_utc: '2026-06-18T02:00:00Z', odds_home: 4.50, odds_draw: 3.40, odds_away: 1.70 },
+      { home_team: 'Czechia', away_team: 'South Africa', kickoff_utc: '2026-06-18T16:00:00Z', odds_home: 1.85, odds_draw: 3.35, odds_away: 3.80 },
+      { home_team: 'Switzerland', away_team: 'Bosnia-Herzegovina', kickoff_utc: '2026-06-18T19:00:00Z', odds_home: 1.75, odds_draw: 3.40, odds_away: 4.50 },
+      { home_team: 'Canada', away_team: 'Qatar', kickoff_utc: '2026-06-18T22:00:00Z', odds_home: 1.70, odds_draw: 3.45, odds_away: 4.80 },
     ],
   },
-  // ── June 19 — Groups C & D MD2 ─────────────────────────────────────────────
+  // 2026-06-19 UTC
   {
     date: '2026-06-19',
     stage: 'group',
-    lock_time: '2026-06-19T18:30:00Z',
+    lock_time: '2026-06-19T00:55:00Z',
     matches: [
-      { home_team: 'USA',      away_team: 'Australia',  kickoff_utc: '2026-06-19T19:00:00Z', odds_home: 1.85, odds_draw: 3.40, odds_away: 3.80 },
-      { home_team: 'Scotland', away_team: 'Morocco',    kickoff_utc: '2026-06-19T22:00:00Z', odds_home: 2.50, odds_draw: 3.20, odds_away: 2.70 },
-      { home_team: 'Brazil',   away_team: 'Haiti',      kickoff_utc: '2026-06-20T01:00:00Z', odds_home: 1.08, odds_draw: 10.00, odds_away: 22.00 },
-      { home_team: 'Türkiye',  away_team: 'Paraguay',   kickoff_utc: '2026-06-20T04:00:00Z', odds_home: 2.00, odds_draw:  3.30, odds_away:  3.50 },
+      { home_team: 'Mexico', away_team: 'South Korea', kickoff_utc: '2026-06-19T01:00:00Z', odds_home: 1.80, odds_draw: 3.40, odds_away: 4.00 },
+      { home_team: 'USA', away_team: 'Australia', kickoff_utc: '2026-06-19T19:00:00Z', odds_home: 1.85, odds_draw: 3.40, odds_away: 3.80 },
+      { home_team: 'Scotland', away_team: 'Morocco', kickoff_utc: '2026-06-19T22:00:00Z', odds_home: 2.50, odds_draw: 3.20, odds_away: 2.70 },
     ],
   },
-  // ── June 20 — Groups E & F MD2 ─────────────────────────────────────────────
+  // 2026-06-20 UTC
   {
     date: '2026-06-20',
     stage: 'group',
-    lock_time: '2026-06-20T16:30:00Z',
+    lock_time: '2026-06-20T00:25:00Z',
     matches: [
-      { home_team: 'Netherlands',    away_team: 'Sweden',        kickoff_utc: '2026-06-20T17:00:00Z', odds_home: 1.70, odds_draw: 3.45, odds_away: 4.80 },
-      { home_team: 'Germany',        away_team: 'Côte d\'Ivoire', kickoff_utc: '2026-06-20T20:00:00Z', odds_home: 1.55, odds_draw: 3.70, odds_away: 5.50 },
-      { home_team: 'Ecuador',        away_team: 'Curaçao',       kickoff_utc: '2026-06-21T00:00:00Z', odds_home: 1.45, odds_draw: 4.00, odds_away: 7.00 },
-      { home_team: 'Tunisia',        away_team: 'Japan',         kickoff_utc: '2026-06-21T04:00:00Z', odds_home: 3.00, odds_draw: 3.30, odds_away: 2.20 },
+      { home_team: 'Brazil', away_team: 'Haiti', kickoff_utc: '2026-06-20T00:30:00Z', odds_home: 1.08, odds_draw: 10.00, odds_away: 22.00 },
+      { home_team: 'Türkiye', away_team: 'Paraguay', kickoff_utc: '2026-06-20T03:00:00Z', odds_home: 2.00, odds_draw: 3.30, odds_away: 3.50 },
+      { home_team: 'Netherlands', away_team: 'Sweden', kickoff_utc: '2026-06-20T17:00:00Z', odds_home: 1.70, odds_draw: 3.45, odds_away: 4.80 },
+      { home_team: 'Germany', away_team: 'Côte d\'Ivoire', kickoff_utc: '2026-06-20T20:00:00Z', odds_home: 1.55, odds_draw: 3.70, odds_away: 5.50 },
     ],
   },
-  // ── June 21 — Groups G & H MD2 ─────────────────────────────────────────────
+  // 2026-06-21 UTC
   {
     date: '2026-06-21',
     stage: 'group',
-    lock_time: '2026-06-21T15:30:00Z',
+    lock_time: '2026-06-20T23:55:00Z',
     matches: [
-      { home_team: 'Spain',        away_team: 'Saudi Arabia', kickoff_utc: '2026-06-21T16:00:00Z', odds_home: 1.40, odds_draw: 4.50, odds_away: 7.00 },
-      { home_team: 'Belgium',      away_team: 'Iran',         kickoff_utc: '2026-06-21T19:00:00Z', odds_home: 1.45, odds_draw: 4.00, odds_away: 6.50 },
-      { home_team: 'Uruguay',      away_team: 'Cabo Verde',   kickoff_utc: '2026-06-21T22:00:00Z', odds_home: 1.35, odds_draw: 4.80, odds_away: 8.00 },
-      { home_team: 'New Zealand',  away_team: 'Egypt',        kickoff_utc: '2026-06-22T01:00:00Z', odds_home: 2.80, odds_draw: 3.20, odds_away: 2.40 },
+      { home_team: 'Ecuador', away_team: 'Curaçao', kickoff_utc: '2026-06-21T00:00:00Z', odds_home: 1.45, odds_draw: 4.00, odds_away: 7.00 },
+      { home_team: 'Tunisia', away_team: 'Japan', kickoff_utc: '2026-06-21T04:00:00Z', odds_home: 3.00, odds_draw: 3.30, odds_away: 2.20 },
+      { home_team: 'Spain', away_team: 'Saudi Arabia', kickoff_utc: '2026-06-21T16:00:00Z', odds_home: 1.40, odds_draw: 4.50, odds_away: 7.00 },
+      { home_team: 'Belgium', away_team: 'Iran', kickoff_utc: '2026-06-21T19:00:00Z', odds_home: 1.45, odds_draw: 4.00, odds_away: 6.50 },
+      { home_team: 'Uruguay', away_team: 'Cabo Verde', kickoff_utc: '2026-06-21T22:00:00Z', odds_home: 1.35, odds_draw: 4.80, odds_away: 8.00 },
     ],
   },
-  // ── June 22 — Groups I & J MD2 ─────────────────────────────────────────────
+  // 2026-06-22 UTC
   {
     date: '2026-06-22',
     stage: 'group',
-    lock_time: '2026-06-22T16:30:00Z',
+    lock_time: '2026-06-22T00:55:00Z',
     matches: [
-      { home_team: 'Argentina', away_team: 'Austria',  kickoff_utc: '2026-06-22T17:00:00Z', odds_home: 1.65, odds_draw: 3.50, odds_away: 4.50 },
-      { home_team: 'France',    away_team: 'Iraq',     kickoff_utc: '2026-06-22T21:00:00Z', odds_home: 1.30, odds_draw: 5.00, odds_away: 8.50 },
-      { home_team: 'Norway',    away_team: 'Senegal',  kickoff_utc: '2026-06-23T00:00:00Z', odds_home: 1.80, odds_draw: 3.40, odds_away: 4.00 },
-      { home_team: 'Jordan',    away_team: 'Algeria',  kickoff_utc: '2026-06-23T03:00:00Z', odds_home: 3.20, odds_draw: 3.20, odds_away: 2.10 },
+      { home_team: 'New Zealand', away_team: 'Egypt', kickoff_utc: '2026-06-22T01:00:00Z', odds_home: 2.80, odds_draw: 3.20, odds_away: 2.40 },
+      { home_team: 'Argentina', away_team: 'Austria', kickoff_utc: '2026-06-22T17:00:00Z', odds_home: 1.65, odds_draw: 3.50, odds_away: 4.50 },
+      { home_team: 'France', away_team: 'Iraq', kickoff_utc: '2026-06-22T21:00:00Z', odds_home: 1.30, odds_draw: 5.00, odds_away: 8.50 },
     ],
   },
-  // ── June 23 — Groups K & L MD2 ─────────────────────────────────────────────
+  // 2026-06-23 UTC
   {
     date: '2026-06-23',
     stage: 'group',
-    lock_time: '2026-06-23T16:30:00Z',
+    lock_time: '2026-06-22T23:55:00Z',
     matches: [
-      { home_team: 'Portugal',  away_team: 'Uzbekistan', kickoff_utc: '2026-06-23T17:00:00Z', odds_home: 1.20, odds_draw: 6.00, odds_away: 12.00 },
-      { home_team: 'England',   away_team: 'Ghana',      kickoff_utc: '2026-06-23T20:00:00Z', odds_home: 1.55, odds_draw: 3.75, odds_away:  5.50 },
-      { home_team: 'Panama',    away_team: 'Croatia',    kickoff_utc: '2026-06-23T23:00:00Z', odds_home: 3.00, odds_draw: 3.30, odds_away:  2.20 },
-      { home_team: 'Colombia',  away_team: 'DR Congo',   kickoff_utc: '2026-06-24T02:00:00Z', odds_home: 1.55, odds_draw: 3.80, odds_away:  5.50 },
+      { home_team: 'Norway', away_team: 'Senegal', kickoff_utc: '2026-06-23T00:00:00Z', odds_home: 1.80, odds_draw: 3.40, odds_away: 4.00 },
+      { home_team: 'Jordan', away_team: 'Algeria', kickoff_utc: '2026-06-23T03:00:00Z', odds_home: 3.20, odds_draw: 3.20, odds_away: 2.10 },
+      { home_team: 'Portugal', away_team: 'Uzbekistan', kickoff_utc: '2026-06-23T17:00:00Z', odds_home: 1.20, odds_draw: 6.00, odds_away: 12.00 },
+      { home_team: 'England', away_team: 'Ghana', kickoff_utc: '2026-06-23T20:00:00Z', odds_home: 1.55, odds_draw: 3.75, odds_away: 5.50 },
+      { home_team: 'Panama', away_team: 'Croatia', kickoff_utc: '2026-06-23T23:00:00Z', odds_home: 3.00, odds_draw: 3.30, odds_away: 2.20 },
     ],
   },
-  // ── June 24 — Groups A, B & C MD3 (simultaneous finales) ───────────────────
+  // 2026-06-24 UTC
   {
     date: '2026-06-24',
     stage: 'group',
-    lock_time: '2026-06-24T18:30:00Z',
+    lock_time: '2026-06-24T01:55:00Z',
     matches: [
-      // Group B finale (3pm ET = 19:00 UTC, simultaneous)
-      { home_team: 'Switzerland',       away_team: 'Canada',     kickoff_utc: '2026-06-24T19:00:00Z', odds_home: 1.85, odds_draw: 3.40, odds_away: 3.80 },
-      { home_team: 'Bosnia-Herzegovina', away_team: 'Qatar',     kickoff_utc: '2026-06-24T19:00:00Z', odds_home: 1.75, odds_draw: 3.40, odds_away: 4.50 },
-      // Group C finale (6pm ET = 22:00 UTC, simultaneous)
-      { home_team: 'Scotland',          away_team: 'Brazil',     kickoff_utc: '2026-06-24T22:00:00Z', odds_home: 5.50, odds_draw: 3.80, odds_away: 1.45 },
-      { home_team: 'Morocco',           away_team: 'Haiti',      kickoff_utc: '2026-06-24T22:00:00Z', odds_home: 1.65, odds_draw: 3.50, odds_away: 4.50 },
-      // Group A finale (9pm ET = 01:00 UTC +1, simultaneous)
-      { home_team: 'Czechia',           away_team: 'Mexico',     kickoff_utc: '2026-06-25T01:00:00Z', odds_home: 2.50, odds_draw: 3.20, odds_away: 2.70 },
-      { home_team: 'South Korea',       away_team: 'South Africa', kickoff_utc: '2026-06-25T01:00:00Z', odds_home: 1.80, odds_draw: 3.40, odds_away: 4.00 },
+      { home_team: 'Colombia', away_team: 'DR Congo', kickoff_utc: '2026-06-24T02:00:00Z', odds_home: 1.55, odds_draw: 3.80, odds_away: 5.50 },
+      { home_team: 'Switzerland', away_team: 'Canada', kickoff_utc: '2026-06-24T19:00:00Z', odds_home: 1.85, odds_draw: 3.40, odds_away: 3.80 },
+      { home_team: 'Bosnia-Herzegovina', away_team: 'Qatar', kickoff_utc: '2026-06-24T19:00:00Z', odds_home: 1.75, odds_draw: 3.40, odds_away: 4.50 },
+      { home_team: 'Scotland', away_team: 'Brazil', kickoff_utc: '2026-06-24T22:00:00Z', odds_home: 5.50, odds_draw: 3.80, odds_away: 1.45 },
+      { home_team: 'Morocco', away_team: 'Haiti', kickoff_utc: '2026-06-24T22:00:00Z', odds_home: 1.65, odds_draw: 3.50, odds_away: 4.50 },
     ],
   },
-  // ── June 25 — Groups D, E & F MD3 (simultaneous finales) ───────────────────
+  // 2026-06-25 UTC
   {
     date: '2026-06-25',
     stage: 'group',
-    lock_time: '2026-06-25T15:30:00Z',
+    lock_time: '2026-06-25T00:55:00Z',
     matches: [
-      // Group E finale (12pm ET = 16:00 UTC, simultaneous)
-      { home_team: 'Germany',       away_team: 'Ecuador',     kickoff_utc: '2026-06-25T16:00:00Z', odds_home: 1.65, odds_draw: 3.50, odds_away: 4.50 },
-      { home_team: 'Côte d\'Ivoire', away_team: 'Curaçao',    kickoff_utc: '2026-06-25T16:00:00Z', odds_home: 1.40, odds_draw: 4.50, odds_away: 7.00 },
-      // Group F finale (6pm ET = 22:00 UTC, simultaneous)
-      { home_team: 'Netherlands',   away_team: 'Tunisia',     kickoff_utc: '2026-06-25T22:00:00Z', odds_home: 1.45, odds_draw: 4.00, odds_away: 6.50 },
-      { home_team: 'Japan',         away_team: 'Sweden',      kickoff_utc: '2026-06-25T22:00:00Z', odds_home: 2.10, odds_draw: 3.25, odds_away: 3.30 },
-      // Group D finale (10pm ET = 02:00 UTC +1, simultaneous)
-      { home_team: 'Türkiye',       away_team: 'USA',         kickoff_utc: '2026-06-26T02:00:00Z', odds_home: 2.50, odds_draw: 3.20, odds_away: 2.70 },
-      { home_team: 'Paraguay',      away_team: 'Australia',   kickoff_utc: '2026-06-26T02:00:00Z', odds_home: 2.80, odds_draw: 3.20, odds_away: 2.40 },
+      { home_team: 'Czechia', away_team: 'Mexico', kickoff_utc: '2026-06-25T01:00:00Z', odds_home: 2.50, odds_draw: 3.20, odds_away: 2.70 },
+      { home_team: 'South Korea', away_team: 'South Africa', kickoff_utc: '2026-06-25T01:00:00Z', odds_home: 1.80, odds_draw: 3.40, odds_away: 4.00 },
+      { home_team: 'Germany', away_team: 'Ecuador', kickoff_utc: '2026-06-25T20:00:00Z', odds_home: 1.65, odds_draw: 3.50, odds_away: 4.50 },
+      { home_team: 'Côte d\'Ivoire', away_team: 'Curaçao', kickoff_utc: '2026-06-25T20:00:00Z', odds_home: 1.40, odds_draw: 4.50, odds_away: 7.00 },
+      { home_team: 'Netherlands', away_team: 'Tunisia', kickoff_utc: '2026-06-25T23:00:00Z', odds_home: 1.45, odds_draw: 4.00, odds_away: 6.50 },
+      { home_team: 'Japan', away_team: 'Sweden', kickoff_utc: '2026-06-25T23:00:00Z', odds_home: 2.10, odds_draw: 3.25, odds_away: 3.30 },
     ],
   },
-  // ── June 26 — Groups G, H & I MD3 (simultaneous finales) ───────────────────
+  // 2026-06-26 UTC
   {
     date: '2026-06-26',
     stage: 'group',
-    lock_time: '2026-06-26T18:30:00Z',
+    lock_time: '2026-06-26T01:55:00Z',
     matches: [
-      // Group I finale (3pm ET = 19:00 UTC, simultaneous)
-      { home_team: 'Norway',       away_team: 'France',      kickoff_utc: '2026-06-26T19:00:00Z', odds_home: 3.50, odds_draw: 3.20, odds_away: 2.00 },
-      { home_team: 'Senegal',      away_team: 'Iraq',        kickoff_utc: '2026-06-26T19:00:00Z', odds_home: 1.75, odds_draw: 3.40, odds_away: 4.50 },
-      // Group G finale (6pm ET = 22:00 UTC, simultaneous)
-      { home_team: 'Belgium',      away_team: 'New Zealand', kickoff_utc: '2026-06-26T22:00:00Z', odds_home: 1.40, odds_draw: 4.80, odds_away: 7.00 },
-      { home_team: 'Egypt',        away_team: 'Iran',        kickoff_utc: '2026-06-26T22:00:00Z', odds_home: 2.10, odds_draw: 3.25, odds_away: 3.30 },
-      // Group H finale (9pm ET = 01:00 UTC +1, simultaneous)
-      { home_team: 'Spain',        away_team: 'Uruguay',     kickoff_utc: '2026-06-27T01:00:00Z', odds_home: 1.65, odds_draw: 3.50, odds_away: 4.50 },
-      { home_team: 'Saudi Arabia', away_team: 'Cabo Verde',  kickoff_utc: '2026-06-27T01:00:00Z', odds_home: 1.60, odds_draw: 3.55, odds_away: 5.00 },
+      { home_team: 'Türkiye', away_team: 'USA', kickoff_utc: '2026-06-26T02:00:00Z', odds_home: 2.50, odds_draw: 3.20, odds_away: 2.70 },
+      { home_team: 'Paraguay', away_team: 'Australia', kickoff_utc: '2026-06-26T02:00:00Z', odds_home: 2.80, odds_draw: 3.20, odds_away: 2.40 },
+      { home_team: 'Norway', away_team: 'France', kickoff_utc: '2026-06-26T19:00:00Z', odds_home: 3.50, odds_draw: 3.20, odds_away: 2.00 },
+      { home_team: 'Senegal', away_team: 'Iraq', kickoff_utc: '2026-06-26T19:00:00Z', odds_home: 1.75, odds_draw: 3.40, odds_away: 4.50 },
     ],
   },
-  // ── June 27 — Groups J, K & L MD3 (simultaneous finales) ───────────────────
+  // 2026-06-27 UTC
   {
     date: '2026-06-27',
     stage: 'group',
-    lock_time: '2026-06-27T20:30:00Z',
+    lock_time: '2026-06-26T23:55:00Z',
     matches: [
-      // Group L finale (5pm ET = 21:00 UTC, simultaneous)
-      { home_team: 'Panama',    away_team: 'England',    kickoff_utc: '2026-06-27T21:00:00Z', odds_home: 5.50, odds_draw: 3.80, odds_away: 1.45 },
-      { home_team: 'Croatia',   away_team: 'Ghana',      kickoff_utc: '2026-06-27T21:00:00Z', odds_home: 1.70, odds_draw: 3.45, odds_away: 4.80 },
-      // Group K finale (~7:30pm ET = 23:30 UTC, simultaneous)
-      { home_team: 'Colombia',  away_team: 'Portugal',   kickoff_utc: '2026-06-27T23:30:00Z', odds_home: 3.00, odds_draw: 3.30, odds_away: 2.20 },
-      { home_team: 'DR Congo',  away_team: 'Uzbekistan', kickoff_utc: '2026-06-27T23:30:00Z', odds_home: 2.50, odds_draw: 3.20, odds_away: 2.70 },
-      // Group J finale (10pm ET = 02:00 UTC +1, simultaneous)
-      { home_team: 'Algeria',   away_team: 'Austria',    kickoff_utc: '2026-06-28T02:00:00Z', odds_home: 2.20, odds_draw: 3.25, odds_away: 3.20 },
-      { home_team: 'Jordan',    away_team: 'Argentina',  kickoff_utc: '2026-06-28T02:00:00Z', odds_home: 10.00, odds_draw: 6.00, odds_away: 1.22 },
+      { home_team: 'Belgium', away_team: 'New Zealand', kickoff_utc: '2026-06-27T00:00:00Z', odds_home: 1.40, odds_draw: 4.80, odds_away: 7.00 },
+      { home_team: 'Egypt', away_team: 'Iran', kickoff_utc: '2026-06-27T00:00:00Z', odds_home: 2.10, odds_draw: 3.25, odds_away: 3.30 },
+      { home_team: 'Spain', away_team: 'Uruguay', kickoff_utc: '2026-06-27T03:00:00Z', odds_home: 1.65, odds_draw: 3.50, odds_away: 4.50 },
+      { home_team: 'Saudi Arabia', away_team: 'Cabo Verde', kickoff_utc: '2026-06-27T03:00:00Z', odds_home: 1.60, odds_draw: 3.55, odds_away: 5.00 },
+      { home_team: 'Panama', away_team: 'England', kickoff_utc: '2026-06-27T21:00:00Z', odds_home: 5.50, odds_draw: 3.80, odds_away: 1.45 },
+      { home_team: 'Croatia', away_team: 'Ghana', kickoff_utc: '2026-06-27T21:00:00Z', odds_home: 1.70, odds_draw: 3.45, odds_away: 4.80 },
+      { home_team: 'Colombia', away_team: 'Portugal', kickoff_utc: '2026-06-27T23:30:00Z', odds_home: 3.00, odds_draw: 3.30, odds_away: 2.20 },
+      { home_team: 'DR Congo', away_team: 'Uzbekistan', kickoff_utc: '2026-06-27T23:30:00Z', odds_home: 2.50, odds_draw: 3.20, odds_away: 2.70 },
+    ],
+  },
+  // 2026-06-28 UTC
+  {
+    date: '2026-06-28',
+    stage: 'group',
+    lock_time: '2026-06-28T01:55:00Z',
+    matches: [
+      { home_team: 'Algeria', away_team: 'Austria', kickoff_utc: '2026-06-28T02:00:00Z', odds_home: 2.20, odds_draw: 3.25, odds_away: 3.20 },
+      { home_team: 'Jordan', away_team: 'Argentina', kickoff_utc: '2026-06-28T02:00:00Z', odds_home: 10.00, odds_draw: 6.00, odds_away: 1.22 },
     ],
   },
 ]

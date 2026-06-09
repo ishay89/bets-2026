@@ -1,6 +1,7 @@
 import { createAdminClient, assertAdmin } from '@/lib/supabase/server'
 import Link from 'next/link'
 import { getPublishedMatchDaysWithAll } from '@/lib/data'
+import { formatUtcDate } from '@/lib/time'
 import {
   computeAllPlayersMissingPicks,
   computeMissingPicksViewState,
@@ -96,9 +97,7 @@ function DaySummarySection({ summary }: { summary: MissingPicksSummary }) {
     <div className="space-y-2">
       <div className="text-muted text-[11px] font-bold uppercase tracking-wide px-1">Open match days</div>
       {summary.days.map(d => {
-        const dateLabel = new Date(d.date + 'T12:00:00Z').toLocaleDateString('en-US', {
-          weekday: 'short', month: 'short', day: 'numeric',
-        })
+        const dateLabel = formatUtcDate(d.date)
         return (
           <div key={d.matchDayId} className="rounded-xl px-4 py-3"
             style={{ background: 'var(--color-panel)', border: '1px solid var(--border-base)' }}>

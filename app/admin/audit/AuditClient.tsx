@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useReducer, useTransition } from 'react'
+import { formatUtcDateTime } from '@/lib/time'
 import { fetchAuditEvents, fetchAuditUsers } from './actions'
 import { PAGE_SIZE, type AuditRow, type AuditUser, type AuditValue } from './types'
 
@@ -34,7 +35,7 @@ function valueLabel(row: AuditRow, value: AuditValue) {
 }
 
 function formatTimestamp(value: string) {
-  return new Date(value).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })
+  return formatUtcDateTime(value)
 }
 
 const typeLabels: Record<AuditRow['event_type'], string> = {
@@ -188,7 +189,7 @@ export default function AuditClient({ initialEvents, users }: { initialEvents: A
           </select>
         </div>
         <div className="flex flex-col gap-1">
-          <label htmlFor="audit-from" className="text-[10px] font-semibold" style={{ color: 'var(--color-muted)' }}>From</label>
+          <label htmlFor="audit-from" className="text-[10px] font-semibold" style={{ color: 'var(--color-muted)' }}>From UTC</label>
           <input
             id="audit-from"
             type="datetime-local"
@@ -198,7 +199,7 @@ export default function AuditClient({ initialEvents, users }: { initialEvents: A
           />
         </div>
         <div className="flex flex-col gap-1">
-          <label htmlFor="audit-to" className="text-[10px] font-semibold" style={{ color: 'var(--color-muted)' }}>To</label>
+          <label htmlFor="audit-to" className="text-[10px] font-semibold" style={{ color: 'var(--color-muted)' }}>To UTC</label>
           <input
             id="audit-to"
             type="datetime-local"
