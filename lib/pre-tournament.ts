@@ -1,5 +1,3 @@
-export const PRE_TOURNAMENT_PATH = '/predict'
-
 export const TEAMS = [
   { name: 'France', odds: 4.50 },
   { name: 'Spain', odds: 5.00 },
@@ -84,12 +82,12 @@ export const TEAM_NAMES = TEAMS.map(t => t.name)
 export const SCORER_NAMES = SCORERS.map(s => s.name)
 
 /** Current odds for a team by name, or undefined if no longer listed. */
-export function teamOdds(name: string): number | undefined {
+function teamOdds(name: string): number | undefined {
   return TEAMS.find(t => t.name === name)?.odds
 }
 
 /** Current odds for a top-scorer candidate by name, or undefined if no longer listed. */
-export function scorerOdds(name: string): number | undefined {
+function scorerOdds(name: string): number | undefined {
   return SCORERS.find(s => s.name === name)?.odds
 }
 

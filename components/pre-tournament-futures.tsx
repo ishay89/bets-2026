@@ -276,19 +276,12 @@ function RevealButton({
       type="button"
       onClick={onClick}
       disabled={loading}
-      className="w-full mt-3"
+      className="mt-3 w-full rounded-[10px] px-3 py-2 text-[12px] font-bold uppercase disabled:cursor-not-allowed"
       style={{
-        padding: '8px 12px',
-        borderRadius: 10,
         fontFamily: 'var(--font-display)',
-        fontSize: 12,
-        fontWeight: 700,
-        letterSpacing: '0.06em',
-        textTransform: 'uppercase',
         color: error ? 'var(--color-danger)' : 'var(--color-gold)',
         background: error ? 'var(--color-danger-soft)' : 'var(--color-amber-soft)',
         border: error ? '1px solid var(--border-danger)' : '1px solid var(--border-warn)',
-        cursor: loading ? 'not-allowed' : 'pointer',
         opacity: loading ? 0.6 : 1,
       }}
     >

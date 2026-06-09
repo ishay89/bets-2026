@@ -1,7 +1,7 @@
 'use client'
 
 import Image from 'next/image'
-import { ChangeEvent, FormEvent, useEffect, useRef, useState } from 'react'
+import { ChangeEvent, FormEvent, useEffect, useReducer, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { getAvatar } from '@/lib/display'
 import { formatAppDateTime } from '@/lib/time'
@@ -40,6 +40,44 @@ interface Props {
   currentUserIsAdmin: boolean
 }
 
+type BoardFeedState = {
+  posts: BoardPost[]
+  aiPosts: AiSocialPost[]
+  body: string
+  previewUrl: string | null
+  error: string | null
+  isPosting: boolean
+  deletingPostId: string | null
+}
+
+type BoardFeedAction =
+  | { type: 'postsLoaded'; posts: BoardPost[] }
+  | { type: 'aiPostsLoaded'; aiPosts: AiSocialPost[] }
+  | { type: 'bodyChanged'; body: string }
+  | { type: 'previewChanged'; previewUrl: string | null }
+  | { type: 'errorChanged'; error: string | null }
+  | { type: 'postingChanged'; isPosting: boolean }
+  | { type: 'deletingChanged'; deletingPostId: string | null }
+
+function boardFeedReducer(state: BoardFeedState, action: BoardFeedAction): BoardFeedState {
+  switch (action.type) {
+    case 'postsLoaded':
+      return { ...state, posts: action.posts }
+    case 'aiPostsLoaded':
+      return { ...state, aiPosts: action.aiPosts }
+    case 'bodyChanged':
+      return { ...state, body: action.body }
+    case 'previewChanged':
+      return { ...state, previewUrl: action.previewUrl }
+    case 'errorChanged':
+      return { ...state, error: action.error }
+    case 'postingChanged':
+      return { ...state, isPosting: action.isPosting }
+    case 'deletingChanged':
+      return { ...state, deletingPostId: action.deletingPostId }
+  }
+}
+
 function formatPostTime(createdAt: string): string {
   return formatAppDateTime(createdAt, {
     month: 'short',
@@ -55,14 +93,17 @@ function getImageUrl(path: string): string {
 }
 
 export function BoardFeed({ initialPosts, initialAiPosts, currentUserId, currentUserIsAdmin }: Props) {
-  const [posts, setPosts] = useState(initialPosts)
-  const [aiPosts, setAiPosts] = useState(initialAiPosts)
-  const [body, setBody] = useState('')
-  const [image, setImage] = useState<File | null>(null)
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const [isPosting, setIsPosting] = useState(false)
-  const [deletingPostId, setDeletingPostId] = useState<string | null>(null)
+  const [state, dispatch] = useReducer(boardFeedReducer, {
+    posts: initialPosts,
+    aiPosts: initialAiPosts,
+    body: '',
+    previewUrl: null,
+    error: null,
+    isPosting: false,
+    deletingPostId: null,
+  })
+  const { posts, aiPosts, body, previewUrl, error, isPosting, deletingPostId } = state
+  const imageRef = useRef<File | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   async function refreshPosts() {
@@ -74,7 +115,7 @@ export function BoardFeed({ initialPosts, initialAiPosts, currentUserId, current
       .limit(100)
       .returns<BoardPost[]>()
 
-    if (data) setPosts(data)
+    if (data) dispatch({ type: 'postsLoaded', posts: data })
   }
 
   async function refreshAiPosts() {
@@ -86,7 +127,7 @@ export function BoardFeed({ initialPosts, initialAiPosts, currentUserId, current
       .limit(50)
       .returns<AiSocialPost[]>()
 
-    if (data) setAiPosts(data)
+    if (data) dispatch({ type: 'aiPostsLoaded', aiPosts: data })
   }
 
   useEffect(() => {
@@ -107,44 +148,45 @@ export function BoardFeed({ initialPosts, initialAiPosts, currentUserId, current
   }, [previewUrl])
 
   function clearImage() {
-    setImage(null)
-    setPreviewUrl(null)
+    imageRef.current = null
+    dispatch({ type: 'previewChanged', previewUrl: null })
     if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
   function handleImageChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0] ?? null
-    setError(null)
+    dispatch({ type: 'errorChanged', error: null })
 
     if (!file) {
       clearImage()
       return
     }
     if (!ACCEPTED_IMAGE_TYPES.includes(file.type)) {
-      setError('Choose a JPG, PNG, WebP, or GIF image.')
+      dispatch({ type: 'errorChanged', error: 'Choose a JPG, PNG, WebP, or GIF image.' })
       clearImage()
       return
     }
     if (file.size > MAX_IMAGE_BYTES) {
-      setError('Images must be 5 MB or smaller.')
+      dispatch({ type: 'errorChanged', error: 'Images must be 5 MB or smaller.' })
       clearImage()
       return
     }
 
-    setImage(file)
-    setPreviewUrl(URL.createObjectURL(file))
+    imageRef.current = file
+    dispatch({ type: 'previewChanged', previewUrl: URL.createObjectURL(file) })
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     const trimmedBody = body.trim()
+    const image = imageRef.current
     if (!trimmedBody && !image) {
-      setError('Write a message or add an image.')
+      dispatch({ type: 'errorChanged', error: 'Write a message or add an image.' })
       return
     }
 
-    setError(null)
-    setIsPosting(true)
+    dispatch({ type: 'errorChanged', error: null })
+    dispatch({ type: 'postingChanged', isPosting: true })
     const supabase = createClient()
     let imagePath: string | null = null
 
@@ -163,24 +205,27 @@ export function BoardFeed({ initialPosts, initialAiPosts, currentUserId, current
         .insert({ user_id: currentUserId, body: trimmedBody || null, image_path: imagePath })
       if (insertError) throw insertError
 
-      setBody('')
+      dispatch({ type: 'bodyChanged', body: '' })
       clearImage()
       await refreshPosts()
     } catch (postError) {
       if (imagePath) {
         await supabase.storage.from(IMAGE_BUCKET).remove([imagePath])
       }
-      setError(postError instanceof Error ? postError.message : 'Could not publish your post.')
+      dispatch({
+        type: 'errorChanged',
+        error: postError instanceof Error ? postError.message : 'Could not publish your post.',
+      })
     } finally {
-      setIsPosting(false)
+      dispatch({ type: 'postingChanged', isPosting: false })
     }
   }
 
   async function handleDelete(post: BoardPost) {
     if (!window.confirm('Delete this post?')) return
 
-    setError(null)
-    setDeletingPostId(post.id)
+    dispatch({ type: 'errorChanged', error: null })
+    dispatch({ type: 'deletingChanged', deletingPostId: post.id })
     const supabase = createClient()
 
     try {
@@ -198,9 +243,12 @@ export function BoardFeed({ initialPosts, initialAiPosts, currentUserId, current
 
       await refreshPosts()
     } catch (deleteError) {
-      setError(deleteError instanceof Error ? deleteError.message : 'Could not delete your post.')
+      dispatch({
+        type: 'errorChanged',
+        error: deleteError instanceof Error ? deleteError.message : 'Could not delete your post.',
+      })
     } finally {
-      setDeletingPostId(null)
+      dispatch({ type: 'deletingChanged', deletingPostId: null })
     }
   }
 
@@ -212,7 +260,8 @@ export function BoardFeed({ initialPosts, initialAiPosts, currentUserId, current
         style={{ background: 'var(--color-panel)', border: '1px solid var(--border-base)' }}>
         <textarea
           value={body}
-          onChange={(event) => setBody(event.target.value)}
+          onChange={(event) => dispatch({ type: 'bodyChanged', body: event.target.value })}
+          aria-label="Message board post"
           maxLength={1000}
           rows={3}
           placeholder="Talk your talk..."

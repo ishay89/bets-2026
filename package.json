@@ -10,7 +10,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "seed": "tsx scripts/seed-wc2026.ts",
-    "gen:types": "supabase gen types typescript --local > lib/supabase/types.ts"
+    "gen:types": "supabase gen types typescript --local > lib/supabase/types.ts",
+    "doctor": "npx react-doctor@latest"
   },
   "dependencies": {
     "@supabase/ssr": "^0.10.3",

@@ -5,7 +5,7 @@ import { appDateTimeLocalToIso } from '@/lib/time'
 import { redirect } from 'next/navigation'
 import { PAGE_SIZE, type AuditRow, type AuditUser } from './types'
 
-async function assertAuditAdmin() {
+async function requireAuth() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
@@ -24,7 +24,7 @@ export async function fetchAuditEvents({
   userId?: string
   offset?: number
 }): Promise<AuditRow[]> {
-  await assertAuditAdmin()
+  await requireAuth()
 
   const admin = createAdminClient()
 
@@ -47,7 +47,7 @@ export async function fetchAuditEvents({
 }
 
 export async function fetchAuditUsers(): Promise<AuditUser[]> {
-  await assertAuditAdmin()
+  await requireAuth()
 
   const admin = createAdminClient()
 
