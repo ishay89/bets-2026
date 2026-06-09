@@ -4,6 +4,7 @@ import Image from 'next/image'
 import { ChangeEvent, FormEvent, useEffect, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { getAvatar } from '@/lib/display'
+import { formatAppDateTime } from '@/lib/time'
 import type { AutomationStrategy } from '@/lib/types'
 
 const IMAGE_BUCKET = 'message-board-images'
@@ -40,14 +41,13 @@ interface Props {
 }
 
 function formatPostTime(createdAt: string): string {
-  return new Intl.DateTimeFormat('en', {
+  return formatAppDateTime(createdAt, {
     month: 'short',
     day: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
     hour12: false,
-    timeZone: 'Asia/Jerusalem',
-  }).format(new Date(createdAt))
+  })
 }
 
 function getImageUrl(path: string): string {
