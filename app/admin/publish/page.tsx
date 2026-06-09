@@ -616,7 +616,7 @@ export default async function PublishPage({
                   </div>
                 </div>
 
-                <form action={published ? saveMatchOdds : publishMatch} className="space-y-3">
+                <form action={saveMatchOdds} className="space-y-3">
                   <input type="hidden" name="match_id" value={match.id} />
                   <input type="hidden" name="date" value={day.date} />
                   <div className="grid grid-cols-3 gap-2">
@@ -636,10 +636,18 @@ export default async function PublishPage({
                       </div>
                     ))}
                   </div>
-                  <button type="submit" disabled={scored} className="w-full py-2 rounded-lg font-bold text-sm disabled:opacity-50"
-                    style={{ background: 'var(--color-amber)', color: 'var(--color-bg)' }}>
-                    {published ? 'Save odds' : 'Save odds & publish'}
-                  </button>
+                  <div className={!published ? 'grid grid-cols-2 gap-2' : ''}>
+                    <button type="submit" disabled={scored} className="w-full py-2 rounded-lg font-bold text-sm disabled:opacity-50"
+                      style={{ background: 'var(--color-amber)', color: 'var(--color-bg)' }}>
+                      Save odds
+                    </button>
+                    {!published && (
+                      <button type="submit" formAction={publishMatch} disabled={scored} className="w-full py-2 rounded-lg font-bold text-sm disabled:opacity-50"
+                        style={{ background: 'var(--color-accent-soft)', color: 'var(--color-accent)', border: '1px solid var(--border-accent)' }}>
+                        Save &amp; publish
+                      </button>
+                    )}
+                  </div>
                 </form>
 
                 <div className="grid grid-cols-2 gap-2">
