@@ -268,13 +268,7 @@ export default async function PredictPage() {
                     🔒 Locked
                   </div>
                 ) : (
-                  <div className="flex flex-col items-end rounded-[10px] px-2.5 py-1.5"
-                    style={{ background: 'var(--color-amber-soft)', border: '1px solid var(--border-warn)' }}>
-                    <div className="text-[9px] font-bold uppercase tracking-wide" style={{ color: 'var(--color-amber)' }}>Locks</div>
-                    <div className="text-[13px] font-bold" style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-amber)' }}>
-                      <LockTimer lockTime={earliestLockTime} />
-                    </div>
-                  </div>
+                  <LockTimer lockTime={earliestLockTime} />
                 ))}
               </div>
 
