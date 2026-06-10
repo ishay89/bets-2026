@@ -5,16 +5,9 @@ import type { Insight } from '@/lib/crowd'
 import type { SaveResult } from '@/lib/prediction-saves'
 import type { PlayerRevealRow } from '@/lib/prediction-reveals'
 import { formatAppTime } from '@/lib/time'
+import { getFlag } from '@/lib/display'
 import { CrowdInsight } from './crowd-insight'
 import { PredictionRevealSheet } from './prediction-reveal-sheet'
-
-const FLAGS: Record<string, string> = {
-  France: '🇫🇷', Spain: '🇪🇸', Brazil: '🇧🇷', England: '🏴󠁧󠁢󠁥󠁮󠁧󠁿',
-  Argentina: '🇦🇷', Netherlands: '🇳🇱', Portugal: '🇵🇹', Germany: '🇩🇪',
-  Italy: '🇮🇹', Belgium: '🇧🇪', Croatia: '🇭🇷', Uruguay: '🇺🇾',
-  Mexico: '🇲🇽', USA: '🇺🇸', Canada: '🇨🇦', Japan: '🇯🇵',
-  'South Korea': '🇰🇷', Morocco: '🇲🇦',
-}
 
 /** A single selectable outcome. `label` is the human text; `pick` is the 1/X/2 slot. */
 export interface BetOption {
@@ -529,7 +522,7 @@ function TeamBlock({ name, selected }: { name: string; selected: boolean }) {
           transform: selected ? 'scale(1.08)' : 'scale(1)',
           transition: 'background 0.15s, border-color 0.15s, box-shadow 0.15s, transform 0.15s',
         }}>
-        <span style={{ fontSize: 24, display: 'block' }}>{FLAGS[name] ?? '🏳️'}</span>
+        <span style={{ fontSize: 24, display: 'block' }}>{getFlag(name)}</span>
       </div>
       <div className="text-center leading-tight"
         style={{

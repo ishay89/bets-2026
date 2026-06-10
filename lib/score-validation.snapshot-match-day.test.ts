@@ -29,7 +29,7 @@ function getPath(row: Row, path: string): unknown {
   return row[leaf]
 }
 
-class FakeQuery implements PromiseLike<{ data: Row[] | null; error: null; count?: number }> {
+class FakeQuery implements PromiseLike<{ data: Row[] | Row | null; error: null; count?: number }> {
   private rows: Row[]
   private singleMode: 'single' | 'maybeSingle' | null = null
   private countMode: 'exact' | null = null
@@ -100,11 +100,11 @@ class FakeQuery implements PromiseLike<{ data: Row[] | null; error: null; count?
     return this
   }
 
-  then<TResult1 = { data: unknown; error: null; count?: number }, TResult2 = never>(
-    onfulfilled?: ((value: { data: unknown; error: null; count?: number }) => TResult1 | PromiseLike<TResult1>) | null,
+  then<TResult1 = { data: Row[] | Row | null; error: null; count?: number }, TResult2 = never>(
+    onfulfilled?: ((value: { data: Row[] | Row | null; error: null; count?: number }) => TResult1 | PromiseLike<TResult1>) | null,
     onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null,
   ): PromiseLike<TResult1 | TResult2> {
-    let result: { data: unknown; error: null; count?: number }
+    let result: { data: Row[] | Row | null; error: null; count?: number }
     if (this.headOnly && this.countMode) {
       result = { data: null, error: null, count: this.rows.length }
     } else if (this.singleMode === 'single') {
