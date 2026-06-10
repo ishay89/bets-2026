@@ -370,6 +370,18 @@ export async function snapshotMatchDay(
     toUpdate.length > 0 ? supabase.from('score_snapshots').upsert(toUpdate) : Promise.resolve(),
     toInsert.length > 0 ? supabase.from('score_snapshots').insert(toInsert) : Promise.resolve(),
   ])
+
+  // Refresh pre-tournament snapshot rows so getSnapshotSum's .or() clause and
+  // is_valid/discrepancy/cumulative_points stay correct after this match day's
+  // points changed. recalculateAllSnapshots does this in its Pass 1/Pass 3 -
+  // without it, the pre-tournament row's cumulative_points (which includes
+  // every match day's points) would be stale, and its is_valid/discrepancy
+  // would no longer reflect the freshly written match-day day_points above.
+  // Must run *after* the match-day rows above are written, since
+  // upsertPreTournamentSnapshot sums all match-day snapshot rows via
+  // getSnapshotSum.
+  const preTournUserIds = (preTournRows ?? []).map(r => (r as { user_id: string }).user_id)
+  await Promise.all(preTournUserIds.map(userId => upsertPreTournamentSnapshot(supabase, userId)))
 }
 
 export async function recalculateAllSnapshots(
