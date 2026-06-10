@@ -7,22 +7,33 @@ import type { User, UserStatus } from '@/lib/types'
 async function toggleAdmin(formData: FormData) {
   'use server'
   await assertAdmin()
-  const supabase = createAdminClient()
   const userId = parseUUID(formData.get('user_id'), 'user_id')
   const isAdmin = formData.get('is_admin') === 'true'
-  await supabase.from('users').update({ is_admin: !isAdmin }).eq('id', userId)
+  const nextIsAdmin = !isAdmin
+
+  // Prevent an admin from demoting themselves, which would lock them out of /admin/*.
+  const { data: { user: currentUser } } = await (await createClient()).auth.getUser()
+  if (currentUser?.id === userId && !nextIsAdmin) return
+
+  const supabase = createAdminClient()
+  await supabase.from('users').update({ is_admin: nextIsAdmin }).eq('id', userId)
   revalidatePath('/admin/players')
 }
 
 async function setStatus(formData: FormData) {
   'use server'
   await assertAdmin()
-  const supabase = createAdminClient()
   const userId = parseUUID(formData.get('user_id'), 'user_id')
   const status = formData.get('status')
   if (status !== 'pending' && status !== 'approved' && status !== 'blocked') {
     throw new Error('Invalid status')
   }
+
+  // Prevent an admin from blocking (and thus self-demoting) themselves.
+  const { data: { user: currentUser } } = await (await createClient()).auth.getUser()
+  if (currentUser?.id === userId && status === 'blocked') return
+
+  const supabase = createAdminClient()
   // Blocking a player also strips any admin rights so they cannot regain access.
   const patch: { status: UserStatus; is_admin?: boolean } = { status }
   if (status === 'blocked') patch.is_admin = false

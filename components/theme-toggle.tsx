@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useState, useSyncExternalStore } from 'react'
 
 const TOGGLE_PANEL_STYLE: React.CSSProperties = {
   position: 'fixed',
@@ -32,12 +32,31 @@ function persistTheme(theme: 'dark' | 'light') {
   try { document.cookie = `theme=${theme}; path=/; max-age=31536000; SameSite=Lax` } catch {}
 }
 
+// No-op subscription: the stored theme only changes via this component's own
+// `toggle()`, which updates `override` directly rather than relying on a
+// storage event.
+function subscribe() {
+  return () => {}
+}
+
+// Matches the server-rendered default (and the inline theme-init script's
+// fallback) so the first client render doesn't mismatch the SSR output.
+function getServerSnapshot(): 'dark' | 'light' {
+  return 'light'
+}
+
 export function ThemeToggle() {
-  const [theme, setTheme] = useState<'dark' | 'light'>(readTheme)
+  // Synced to the real stored preference after hydration via
+  // useSyncExternalStore, avoiding a setState-in-effect.
+  const storedTheme = useSyncExternalStore(subscribe, readTheme, getServerSnapshot)
+  // Optimistic override applied immediately when the user clicks toggle.
+  const [override, setOverride] = useState<'dark' | 'light' | null>(null)
+
+  const theme = override ?? storedTheme
 
   function toggle() {
     const next = theme === 'dark' ? 'light' : 'dark'
-    setTheme(next)
+    setOverride(next)
     document.documentElement.setAttribute('data-theme', next)
     persistTheme(next)
   }
