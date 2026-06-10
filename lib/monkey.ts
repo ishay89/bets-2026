@@ -120,3 +120,53 @@ export function buildAutomatedPikaRows(
     }))
   )
 }
+
+type FuturesCandidate = { name: string; odds: number }
+
+// Strategy selection over a futures candidate list (TEAMS or SCORERS), with the
+// exact semantics of automatedMatchPick: sort by descending odds, stable list
+// order as tie-break; max → first, min → last, mid → floor(n / 2), monkey → random.
+function automatedFuturesChoice(
+  candidates: readonly FuturesCandidate[],
+  strategy: AutomationStrategy,
+): FuturesCandidate {
+  if (strategy === 'monkey') {
+    return candidates[Math.floor(Math.random() * candidates.length)]
+  }
+
+  const sorted = candidates
+    .map((candidate, order) => ({ candidate, order }))
+    .sort((a, b) => b.candidate.odds - a.candidate.odds || a.order - b.order)
+    .map(entry => entry.candidate)
+
+  if (strategy === 'max') return sorted[0]
+  if (strategy === 'min') return sorted[sorted.length - 1]
+  return sorted[Math.floor(sorted.length / 2)]
+}
+
+// Build pre_tournament_picks rows for automated benchmark users — one row per
+// user, winner from `teams` and top scorer from `scorers`, odds snapshotted
+// from the chosen entries. Used by the admin "Generate bot futures" action.
+export function buildAutomatedFuturesRows(
+  users: AutomatedUser[],
+  teams: readonly FuturesCandidate[],
+  scorers: readonly FuturesCandidate[],
+): {
+  user_id: string
+  winner_team: string
+  winner_odds: number
+  top_scorer: string
+  top_scorer_odds: number
+}[] {
+  return users.map(user => {
+    const winner = automatedFuturesChoice(teams, user.automation_strategy)
+    const scorer = automatedFuturesChoice(scorers, user.automation_strategy)
+    return {
+      user_id: user.id,
+      winner_team: winner.name,
+      winner_odds: winner.odds,
+      top_scorer: scorer.name,
+      top_scorer_odds: scorer.odds,
+    }
+  })
+}
