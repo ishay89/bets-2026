@@ -143,6 +143,7 @@ async function scoreItems(
   await snapshotMatchDay(supabase, matchDayId)
 
   revalidatePath('/')
+  revalidatePath('/predict')
   revalidatePath('/leaderboard')
   revalidatePath('/admin/scores')
 }

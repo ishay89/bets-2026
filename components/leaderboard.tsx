@@ -182,11 +182,18 @@ export function Leaderboard({
           const isMe = entry.id === currentUserId
           const av = getAvatar(entry)
           const automationLabel = getAutomationLabel(entry)
-          const isDanger = entries.length >= 2 && rank >= dangerStartRank
-          const fine = rank === sorted.length - 1 ? '+₪200' : rank === sorted.length ? '+₪100' : null
+          const isDanger = entries.length >= 2 && displayRank >= dangerStartRank
+          const fine = displayRank === sorted.length - 1 ? '+₪200' : displayRank === sorted.length ? '+₪100' : null
+          // Show the "danger zone" banner once, right above the first row at
+          // dangerStartRank - even if multiple players are tied at that rank.
+          const prevEntry = rest[i - 1]
+          const prevDisplayRank = prevEntry
+            ? (mode === 'total' && prevEntry.current_rank ? prevEntry.current_rank : i + 3)
+            : null
+          const isFirstAtDangerStart = displayRank === dangerStartRank && prevDisplayRank !== dangerStartRank
           return (
             <div key={entry.id}>
-              {isDanger && rank === dangerStartRank && (
+              {isDanger && isFirstAtDangerStart && (
                 <div
                   className="flex items-center gap-1.5 px-3 py-1.5"
                   style={{ background: 'rgba(239,79,91,0.12)', borderTop: '1px solid rgba(239,79,91,0.3)' }}

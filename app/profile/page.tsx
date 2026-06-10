@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { BottomNav } from '@/components/bottom-nav'
 import { getLeaderboardEntries } from '@/lib/data'
+import { ordinal } from '@/lib/display'
 
 export const metadata = { title: 'Profile | Mondial Bets 2026', description: 'Your profile and stats' }
 
@@ -64,7 +65,7 @@ export default async function ProfilePage() {
                 style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-accent)' }}>
                 {total.toFixed(2)}
               </div>
-              <div className="text-[10px] font-bold uppercase tracking-wide text-muted">pts · {rank > 0 ? `${rank}th` : '—'}</div>
+              <div className="text-[10px] font-bold uppercase tracking-wide text-muted">pts · {rank > 0 ? ordinal(rank) : '—'}</div>
             </div>
           </div>
 
