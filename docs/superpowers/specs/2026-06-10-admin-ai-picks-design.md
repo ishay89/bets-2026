@@ -45,10 +45,11 @@ the picks (e.g. by asking Claude/Codex in a chat) and enters them by hand.
   so an item can lock between render and click).
 - **Target allowlist.** Write actions accept only the two AI user IDs, exported as a
   constant from a new `lib/ai-users.ts`. No other user can be written through this page.
-- **Odds snapshots.** Prediction/answer/futures rows are written with the same odds
-  snapshot columns the existing flows write, so later admin odds edits cannot change
-  already-entered picks' value (consistent with the publish-time bot rows and the human
-  futures flow).
+- **Row shapes match existing flows.** `predictions` / `pikanteria_answers` rows are
+  `{ user_id, <item>_id, pick }`, exactly like the publish-time bot rows — these tables
+  carry no odds columns; scoring reads the item's odds at scoring time. Only
+  `pre_tournament_picks` stores `winner_odds` / `top_scorer_odds` snapshots, and display
+  re-derives current odds by name via `withCurrentFuturesOdds`, same as the human flow.
 - **Audit trail.** Every created/changed Claude/Codex pick writes a
   `user_prediction_audit_events` row via `writeAuditEvent`, attributed to the AI user
   with `metadata: { entered_by_admin: true }`, deduplicated with
@@ -97,12 +98,15 @@ All actions call `assertAdmin()` first and use the service-role client for write
   snapshot; writes the audit event.
 - `saveAiPikanteriaPick(userId, pikanteriaId, pick)` — same shape; additionally rejects
   `X` on two-way questions (`odds_x` null), mirroring the RPC's validation.
-- `saveAiFutures(userId, winnerName?, topScorerName?)` — winner and top scorer are
-  saved independently (either may be omitted, preserving the existing value — same as
-  the human flow's separate winner/scorer actions); validates provided names against
-  `TEAM_NAMES` / `SCORER_NAMES`; rejects when `futures_locked`; upserts
-  `pre_tournament_picks` with odds snapshotted from `TEAMS` / `SCORERS` (same shape as
-  `app/predict/pre-tournament-actions.ts`); writes the audit event.
+- `saveAiFutures(userId, winnerName, topScorerName)` — both values are submitted
+  together from one form (`pre_tournament_picks.winner_team` / `top_scorer` are NOT
+  NULL, so partial rows are impossible); the selects are pre-filled with the AI user's
+  existing pick, so editing just one is still a single-field change. Validates names
+  via `parseTeamName` / `parseScorerName`; rejects when futures are unpublished or
+  locked (same checks as the human flow); upserts `pre_tournament_picks` with odds
+  snapshotted from `TEAMS` / `SCORERS` (same shape as
+  `app/predict/pre-tournament-actions.ts`); writes the audit event, deduplicated with
+  `shouldWriteAuditEvent`.
 - `generateBotFutures()` — rejects when `futures_locked`; loads the four automated
   users and their existing `pre_tournament_picks`; builds rows only for bots **missing**
   a pick (never overwrites — re-clicking must not re-roll Monkey's random pick);
@@ -136,8 +140,7 @@ Following the existing pure-function test pattern:
   member of the list, odds snapshots match the chosen entries, one row per user.
 - `lib/ai-picks.test.ts` — AI user allowlist acceptance/rejection; pick validation
   including X-on-two-way rejection; fill-missing-only filtering for bot futures
-  (existing picks excluded, no overwrites); upsert row shapes include the odds
-  snapshots.
+  (existing picks excluded, no overwrites).
 
 UI and Server Actions are not unit tested (consistent with the rest of the admin
 surface); lock re-checks live in the actions and are exercised manually.
