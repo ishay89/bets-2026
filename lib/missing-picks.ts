@@ -134,9 +134,12 @@ export function computeAllPlayersMissingPicks(params: {
 
   const predictionsByUser = groupByUser(predictions, p => p.match_id)
   const answersByUser = groupByUser(answers, a => a.pikanteria_id)
-  const completedFuturesByUser = new Set(
-    futuresPicks.filter(hasCompletedPreTournamentPick).map(f => f.user_id),
-  )
+  const completedFuturesByUser = new Set<string>()
+  for (const pick of futuresPicks) {
+    if (hasCompletedPreTournamentPick(pick)) {
+      completedFuturesByUser.add(pick.user_id)
+    }
+  }
 
   const openByDay = matchDays.map(day => ({ day, open: openItemsForDay(day) }))
 

@@ -12,8 +12,7 @@ export default async function LeaderboardPage({
 }: {
   searchParams: Promise<{ day?: string }>
 }) {
-  const { day } = await searchParams
-  const supabase = await createClient()
+  const [{ day }, supabase] = await Promise.all([searchParams, createClient()])
   const [{ data: { user } }, liveEntries, scoredDays] = await Promise.all([
     supabase.auth.getUser(),
     getLeaderboardEntries(supabase),

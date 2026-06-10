@@ -1,5 +1,5 @@
 'use client'
-import { useRef, useState, useTransition } from 'react'
+import { useReducer, useRef, useTransition } from 'react'
 import type { Pick } from '@/lib/types'
 import type { Insight } from '@/lib/crowd'
 import type { SaveResult } from '@/lib/prediction-saves'
@@ -71,6 +71,45 @@ const MATCH_SEG_COLOR: Record<Pick, string> = {
   '1': 'var(--color-accent)', X: 'var(--color-dim)', '2': 'var(--color-amber)',
 }
 const PIKA_SEG_COLORS = ['var(--color-amber)', 'var(--color-dim)', 'var(--color-silver)']
+const VERDICT_FONT_STYLE = { fontFamily: 'var(--font-display)', letterSpacing: '0.04em' as const }
+
+type BetCardState = {
+  optimisticPick: Pick | null
+  error: string | null
+  saving: boolean
+  revealRows: PlayerRevealRow[] | null
+  revealLoading: boolean
+  revealError: boolean
+  sheetOpen: boolean
+}
+
+type BetCardAction =
+  | { type: 'selectionStarted'; pick: Pick }
+  | { type: 'selectionRejected'; previous: Pick | null; message: string }
+  | { type: 'selectionFinished' }
+  | { type: 'revealStarted' }
+  | { type: 'revealLoaded'; rows: PlayerRevealRow[] }
+  | { type: 'revealFailed' }
+  | { type: 'sheetClosed' }
+
+function betCardReducer(state: BetCardState, action: BetCardAction): BetCardState {
+  switch (action.type) {
+    case 'selectionStarted':
+      return { ...state, optimisticPick: action.pick, error: null, saving: true }
+    case 'selectionRejected':
+      return { ...state, optimisticPick: action.previous, error: action.message }
+    case 'selectionFinished':
+      return { ...state, saving: false }
+    case 'revealStarted':
+      return { ...state, revealLoading: true, revealError: false }
+    case 'revealLoaded':
+      return { ...state, revealRows: action.rows, sheetOpen: true, revealLoading: false }
+    case 'revealFailed':
+      return { ...state, revealError: true, revealLoading: false }
+    case 'sheetClosed':
+      return { ...state, sheetOpen: false }
+  }
+}
 
 export function BetCard(props: Props) {
   const {
@@ -83,35 +122,31 @@ export function BetCard(props: Props) {
   // Optimistic overlay instead of copying the prop into state. On a successful
   // save, keep the optimistic pick visible until the keyed server refresh
   // remounts the card with the new authoritative prop.
-  const [optimisticPick, setOptimisticPick] = useState<Pick | null>(null)
-  const selected = optimisticPick ?? currentPick
+  const [state, dispatch] = useReducer(betCardReducer, {
+    optimisticPick: null,
+    error: null,
+    saving: false,
+    revealRows: null,
+    revealLoading: false,
+    revealError: false,
+    sheetOpen: false,
+  })
+  const selected = state.optimisticPick ?? currentPick
 
   const hasResult = result !== null
   const isCorrect = hasResult && selected !== null && selected === result
   const isWrong = hasResult && selected !== null && selected !== result
-  const [error, setError] = useState<string | null>(null)
-  const [saving, setSaving] = useState(false)
   const [pending, startTransition] = useTransition()
   const inFlightRef = useRef(false)
 
-  // Player reveal sheet state.
-  const [revealRows, setRevealRows] = useState<PlayerRevealRow[] | null>(null)
-  const [revealLoading, setRevealLoading] = useState(false)
-  const [revealError, setRevealError] = useState(false)
-  const [sheetOpen, setSheetOpen] = useState(false)
-
   async function handleReveal() {
-    if (!onReveal || sheetOpen) return
-    setRevealLoading(true)
-    setRevealError(false)
+    if (!onReveal || state.sheetOpen) return
+    dispatch({ type: 'revealStarted' })
     try {
       const rows = await onReveal(id)
-      setRevealRows(rows)
-      setSheetOpen(true)
+      dispatch({ type: 'revealLoaded', rows })
     } catch {
-      setRevealError(true)
-    } finally {
-      setRevealLoading(false)
+      dispatch({ type: 'revealFailed' })
     }
   }
 
@@ -120,26 +155,26 @@ export function BetCard(props: Props) {
 
   function handleSelect(pick: Pick) {
     if (isLocked || inFlightRef.current || selected === pick) return
-    const previous = optimisticPick
+    const previous = state.optimisticPick
     inFlightRef.current = true
-    setSaving(true)
-    setError(null)
-    setOptimisticPick(pick)
+    dispatch({ type: 'selectionStarted', pick })
     startTransition(async () => {
       try {
         const result = await onSave(id, pick)
         if (!result.ok) {
-          setOptimisticPick(previous)
-          setError(result.message)
+          dispatch({ type: 'selectionRejected', previous, message: result.message })
         }
       } catch {
-        setOptimisticPick(previous)
-        setError(variant === 'pika'
-          ? 'Could not save pikanteria answer. Please try again.'
-          : 'Could not save prediction. Please try again.')
+        dispatch({
+          type: 'selectionRejected',
+          previous,
+          message: variant === 'pika'
+            ? 'Could not save pikanteria answer. Please try again.'
+            : 'Could not save prediction. Please try again.',
+        })
       } finally {
         inFlightRef.current = false
-        setSaving(false)
+        dispatch({ type: 'selectionFinished' })
       }
     })
   }
@@ -196,11 +231,11 @@ export function BetCard(props: Props) {
         result={result}
         theme={theme}
         isLocked={isLocked}
-        disabled={isLocked || pending || saving}
+        disabled={isLocked || pending || state.saving}
         onSelect={handleSelect}
       />
 
-      <ErrorMessage error={error} />
+      <ErrorMessage error={state.error} />
 
       <CrowdSection
         variant={variant}
@@ -212,17 +247,17 @@ export function BetCard(props: Props) {
         selected={selected}
         theme={theme}
         onReveal={onReveal && myUserId ? handleReveal : undefined}
-        revealLoading={revealLoading}
-        revealError={revealError}
+        revealLoading={state.revealLoading}
+        revealError={state.revealError}
       />
 
-      {sheetOpen && revealRows !== null && myUserId && (
+      {state.sheetOpen && state.revealRows !== null && myUserId && (
         <PredictionRevealSheet
           title={variant === 'match' ? `${homeTeam} vs ${awayTeam} · Picks` : (question ?? 'Picks')}
-          rows={revealRows}
+          rows={state.revealRows}
           myUserId={myUserId}
           optionLabels={variant === 'pika' ? Object.fromEntries(options.map(o => [o.pick, o.label])) : undefined}
-          onClose={() => setSheetOpen(false)}
+          onClose={() => dispatch({ type: 'sheetClosed' })}
         />
       )}
     </div>
@@ -235,19 +270,18 @@ function VerdictChip({
   isCorrect: boolean; isWrong: boolean; selectedLabel: string | null; isLocked: boolean
 }) {
   const base = 'text-[12px] px-2 py-0.5 rounded-full font-bold'
-  const font = { fontFamily: 'var(--font-display)', letterSpacing: '0.04em' as const }
   if (isCorrect) {
-    return <span className={base} style={{ color: '#000', background: 'var(--color-accent)', border: '1px solid transparent', ...font }}>✓ Correct</span>
+    return <span className={base} style={{ color: '#000', background: 'var(--color-accent)', border: '1px solid transparent', ...VERDICT_FONT_STYLE }}>✓ Correct</span>
   }
   if (isWrong) {
-    return <span className={base} style={{ color: '#fff', background: 'var(--color-danger)', border: '1px solid var(--border-danger)', ...font }}>✗ Wrong</span>
+    return <span className={base} style={{ color: '#fff', background: 'var(--color-danger)', border: '1px solid var(--border-danger)', ...VERDICT_FONT_STYLE }}>✗ Wrong</span>
   }
   if (selectedLabel) {
-    return <span className={base} style={{ color: 'var(--color-accent)', background: 'var(--color-accent-soft)', border: '1px solid var(--border-accent)', ...font }}>✓ {selectedLabel}</span>
+    return <span className={base} style={{ color: 'var(--color-accent)', background: 'var(--color-accent-soft)', border: '1px solid var(--border-accent)', ...VERDICT_FONT_STYLE }}>✓ {selectedLabel}</span>
   }
   return (
     <span className="text-[12px] px-2 py-0.5 rounded-full"
-      style={{ color: 'var(--color-muted)', background: 'var(--color-elev)', border: '1px solid var(--border-base)', ...font }}>
+      style={{ color: 'var(--color-muted)', background: 'var(--color-elev)', border: '1px solid var(--border-base)', ...VERDICT_FONT_STYLE }}>
       {isLocked ? '🔒 Locked' : 'Pick'}
     </span>
   )
@@ -468,20 +502,12 @@ function CrowdSection({
           type="button"
           onClick={onReveal}
           disabled={revealLoading}
+          className={`w-full rounded-[10px] px-3 py-1.5 text-[12px] font-bold uppercase disabled:cursor-not-allowed ${hasCrowd ? 'mt-2.5' : ''}`}
           style={{
-            width: '100%',
-            marginTop: hasCrowd ? 10 : 0,
-            padding: '6px 12px',
-            borderRadius: 10,
             fontFamily: 'var(--font-display)',
-            fontSize: 12,
-            fontWeight: 700,
-            letterSpacing: '0.06em',
-            textTransform: 'uppercase',
             color: revealError ? 'var(--color-danger)' : theme.accent,
             background: revealError ? 'var(--color-danger-soft)' : theme.accentSoft,
             border: revealError ? '1px solid var(--border-danger)' : `1px solid ${theme.borderAccent}`,
-            cursor: revealLoading ? 'not-allowed' : 'pointer',
             opacity: revealLoading ? 0.6 : 1,
           }}
         >

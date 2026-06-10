@@ -2,6 +2,20 @@ const APP_TIME_ZONE = 'Asia/Jerusalem'
 
 const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/
 const DATE_TIME_WITHOUT_ZONE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,3})?)?$/
+const DEFAULT_APP_DATE_OPTIONS: Intl.DateTimeFormatOptions = { weekday: 'short', month: 'short', day: 'numeric' }
+const DEFAULT_APP_TIME_OPTIONS: Intl.DateTimeFormatOptions = { hour: '2-digit', minute: '2-digit', hour12: false }
+const DEFAULT_APP_DATE_TIME_OPTIONS: Intl.DateTimeFormatOptions = { dateStyle: 'medium', timeStyle: 'short', hour12: false }
+const APP_FORMATTERS = new Map<string, Intl.DateTimeFormat>()
+const TIME_ZONE_PARTS_FORMATTER = new Intl.DateTimeFormat('en-US', {
+  timeZone: APP_TIME_ZONE,
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+  hour: '2-digit',
+  minute: '2-digit',
+  second: '2-digit',
+  hour12: false,
+})
 
 type DateTimeParts = {
   year: number
@@ -13,16 +27,7 @@ type DateTimeParts = {
 }
 
 function timeZoneParts(date: Date): DateTimeParts {
-  const values = new Intl.DateTimeFormat('en-US', {
-    timeZone: APP_TIME_ZONE,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hour12: false,
-  }).formatToParts(date)
+  const values = TIME_ZONE_PARTS_FORMATTER.formatToParts(date)
 
   const parts = Object.fromEntries(values.map((part) => [part.type, part.value]))
   const hour = Number(parts.hour)
@@ -83,6 +88,17 @@ function appDateParts(value: string | Date): DateTimeParts {
   return timeZoneParts(asAppDate(value))
 }
 
+function getAppFormatter(locale: string, options: Intl.DateTimeFormatOptions): Intl.DateTimeFormat {
+  const formatterOptions = { ...options, timeZone: APP_TIME_ZONE }
+  const key = `${locale}:${JSON.stringify(formatterOptions)}`
+  const cached = APP_FORMATTERS.get(key)
+  if (cached) return cached
+
+  const formatter = Intl.DateTimeFormat(locale, formatterOptions)
+  APP_FORMATTERS.set(key, formatter)
+  return formatter
+}
+
 export function appDateKey(now: Date = new Date()): string {
   const parts = appDateParts(now)
   return [
@@ -94,23 +110,23 @@ export function appDateKey(now: Date = new Date()): string {
 
 export function formatAppDate(
   value: string | Date,
-  options: Intl.DateTimeFormatOptions = { weekday: 'short', month: 'short', day: 'numeric' },
+  options: Intl.DateTimeFormatOptions = DEFAULT_APP_DATE_OPTIONS,
 ): string {
-  return new Intl.DateTimeFormat('en-US', { ...options, timeZone: APP_TIME_ZONE }).format(asAppDate(value))
+  return getAppFormatter('en-US', options).format(asAppDate(value))
 }
 
 export function formatAppTime(
   value: string | Date,
-  options: Intl.DateTimeFormatOptions = { hour: '2-digit', minute: '2-digit', hour12: false },
+  options: Intl.DateTimeFormatOptions = DEFAULT_APP_TIME_OPTIONS,
 ): string {
-  return new Intl.DateTimeFormat('en-GB', { ...options, timeZone: APP_TIME_ZONE }).format(asAppDate(value))
+  return getAppFormatter('en-GB', options).format(asAppDate(value))
 }
 
 export function formatAppDateTime(
   value: string | Date,
-  options: Intl.DateTimeFormatOptions = { dateStyle: 'medium', timeStyle: 'short', hour12: false },
+  options: Intl.DateTimeFormatOptions = DEFAULT_APP_DATE_TIME_OPTIONS,
 ): string {
-  return new Intl.DateTimeFormat('en-US', { ...options, timeZone: APP_TIME_ZONE }).format(asAppDate(value))
+  return getAppFormatter('en-US', options).format(asAppDate(value))
 }
 
 export function appDateTimeLocalToIso(value?: string | null): string | undefined {

@@ -25,16 +25,20 @@ type ScoredLeaderboardDayRow = ScoredLeaderboardDay & {
 }
 
 export function selectScoredLeaderboardDays(days: readonly ScoredLeaderboardDayRow[]): ScoredLeaderboardDay[] {
-  return days
-    .filter(day =>
+  const scoredDays: ScoredLeaderboardDay[] = []
+  for (const day of days) {
+    const hasResult =
       (day.matches ?? []).some(item => item.result !== null)
       || (day.pikanteria ?? []).some(item => item.result !== null)
-    )
-    .map(day => ({
+    if (!hasResult) continue
+
+    scoredDays.push({
       id: day.id,
       date: day.date,
       stage: day.stage,
-    }))
+    })
+  }
+  return scoredDays
 }
 
 function rankByTotal(rows: { id: string; total: number }[]): Map<string, number> {

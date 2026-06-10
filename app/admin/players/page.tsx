@@ -132,11 +132,12 @@ export default async function PlayersPage() {
   ])
 
   // Players who have completed both futures picks (winner + top scorer).
-  const futuresDone = new Set(
-    (futuresPicks ?? [])
-      .filter(p => p.winner_team && p.top_scorer)
-      .map(p => p.user_id as string)
-  )
+  const futuresDone = new Set<string>()
+  for (const pick of futuresPicks ?? []) {
+    if (pick.winner_team && pick.top_scorer) {
+      futuresDone.add(pick.user_id as string)
+    }
+  }
 
   const allPlayers = (players ?? []) as User[]
   const realPlayers = allPlayers.filter(p => !p.is_monkey)

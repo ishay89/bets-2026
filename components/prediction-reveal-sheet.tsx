@@ -33,87 +33,36 @@ export function PredictionRevealSheet({ title, rows, myUserId, optionLabels, onC
   const optionKeys = optionLabels ? Object.keys(optionLabels) : []
 
   return (
-    <div
-      style={{
-        position: 'fixed',
-        inset: 0,
-        zIndex: 50,
-        display: 'flex',
-        alignItems: 'flex-end',
-      }}
-    >
+    <div className="prediction-reveal-shell">
       {/* Backdrop */}
-      <div
+      <button
+        type="button"
+        aria-label="Close picks panel"
         onClick={onClose}
-        style={{
-          position: 'absolute',
-          inset: 0,
-          background: 'rgba(0,0,0,0.55)',
-          opacity: visible ? 1 : 0,
-          transition: 'opacity 0.25s ease-out',
-        }}
+        className="prediction-reveal-backdrop"
+        style={{ opacity: visible ? 1 : 0 }}
       />
 
       {/* Sheet */}
       <div
-        style={{
-          position: 'relative',
-          width: '100%',
-          maxHeight: '70vh',
-          overflowY: 'auto',
-          borderRadius: '20px 20px 0 0',
-          background: 'var(--color-panel)',
-          border: '1px solid var(--border-base)',
-          transform: visible ? 'translateY(0)' : 'translateY(100%)',
-          transition: 'transform 0.3s ease-out',
-        }}
+        className="prediction-reveal-panel"
+        style={{ transform: visible ? 'translateY(0)' : 'translateY(100%)' }}
       >
         {/* Drag handle */}
-        <div style={{ display: 'flex', justifyContent: 'center', padding: '10px 0 4px' }}>
-          <div
-            style={{ width: 40, height: 4, borderRadius: 2, background: 'var(--color-dim)', opacity: 0.5 }}
-          />
+        <div className="prediction-reveal-handle-wrap">
+          <div className="prediction-reveal-handle" />
         </div>
 
         {/* Header */}
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            padding: '8px 16px 12px',
-            borderBottom: '1px solid var(--border-subtle)',
-          }}
-        >
-          <span
-            style={{
-              fontFamily: 'var(--font-display)',
-              fontSize: 14,
-              fontWeight: 700,
-              color: 'var(--color-text)',
-              letterSpacing: '0.03em',
-              flex: 1,
-              marginRight: 8,
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap',
-            }}
-          >
+        <div className="prediction-reveal-header">
+          <span className="prediction-reveal-title">
             {title}
           </span>
           <button
             type="button"
+            aria-label="Close picks panel"
             onClick={onClose}
-            style={{
-              fontSize: 20,
-              color: 'var(--color-muted)',
-              background: 'none',
-              border: 'none',
-              cursor: 'pointer',
-              lineHeight: 1,
-              padding: '2px 4px',
-              flexShrink: 0,
-            }}
+            className="prediction-reveal-close"
           >
             ×
           </button>
@@ -121,20 +70,12 @@ export function PredictionRevealSheet({ title, rows, myUserId, optionLabels, onC
 
         {/* Player list */}
         {rows.length === 0 ? (
-          <div
-            style={{
-              padding: '32px 16px',
-              textAlign: 'center',
-              color: 'var(--color-muted)',
-              fontFamily: 'var(--font-sans)',
-              fontSize: 13,
-            }}
-          >
-            <div style={{ fontSize: 28, marginBottom: 8 }}>🗳️</div>
+          <div className="prediction-reveal-empty">
+            <div className="prediction-reveal-empty-icon">🗳️</div>
             No picks recorded yet
           </div>
         ) : (
-          <div style={{ paddingBottom: 8 }}>
+          <div className="prediction-reveal-list">
             {rows.map((row, i) => {
               const isMe = row.userId === myUserId
               const pickLabel = optionLabels ? (optionLabels[row.pick] ?? row.pick) : row.pick
@@ -149,30 +90,15 @@ export function PredictionRevealSheet({ title, rows, myUserId, optionLabels, onC
               return (
                 <div
                   key={row.userId}
+                  className="prediction-reveal-row"
                   style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 10,
-                    padding: '10px 16px',
                     borderBottom: i < rows.length - 1 ? '1px solid var(--border-subtle)' : 'none',
                     background: isMe ? 'var(--color-accent-soft)' : 'transparent',
                     borderLeft: isMe ? '3px solid var(--color-accent)' : '3px solid transparent',
                   }}
                 >
                   {/* Avatar */}
-                  <div
-                    style={{
-                      width: 30,
-                      height: 30,
-                      borderRadius: '50%',
-                      background: 'var(--color-elev)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontSize: 15,
-                      flexShrink: 0,
-                    }}
-                  >
+                  <div className="prediction-reveal-avatar">
                     {getAvatar({
                       display_name: row.displayName,
                       is_monkey: row.isMonkey,
@@ -181,54 +107,24 @@ export function PredictionRevealSheet({ title, rows, myUserId, optionLabels, onC
                   </div>
 
                   {/* Name + rank */}
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div
-                      style={{
-                        fontFamily: 'var(--font-sans)',
-                        fontSize: 13,
-                        fontWeight: 700,
-                        color: 'var(--color-text)',
-                        whiteSpace: 'nowrap',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                      }}
-                    >
+                  <div className="prediction-reveal-main">
+                    <div className="prediction-reveal-name">
                       {row.displayName}
                       {automationLabel && (
-                        <span
-                          style={{
-                            fontSize: 11,
-                            color: 'var(--color-muted)',
-                            fontWeight: 400,
-                            marginLeft: 4,
-                          }}
-                        >
+                        <span className="prediction-reveal-automation">
                           · {automationLabel}
                         </span>
                       )}
                     </div>
-                    <div
-                      style={{
-                        fontFamily: 'var(--font-mono)',
-                        fontSize: 11,
-                        color: 'var(--color-muted)',
-                        marginTop: 1,
-                      }}
-                    >
+                    <div className="prediction-reveal-rank">
                       {row.rank != null ? `#${row.rank}` : '—'}
                     </div>
                   </div>
 
                   {/* Pick label */}
                   <div
-                    style={{
-                      fontFamily: 'var(--font-display)',
-                      fontSize: 13,
-                      fontWeight: 700,
-                      color: pickColor,
-                      letterSpacing: '0.04em',
-                      flexShrink: 0,
-                    }}
+                    className="prediction-reveal-pick"
+                    style={{ color: pickColor }}
                   >
                     {pickLabel}
                   </div>

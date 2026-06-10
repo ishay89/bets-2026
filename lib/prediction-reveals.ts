@@ -16,8 +16,8 @@ export type PlayerRevealRow = {
 export function sortAndRankRevealRows(
   rows: Omit<PlayerRevealRow, 'rank'>[],
 ): PlayerRevealRow[] {
-  return [...rows]
-    .sort((a, b) => b.totalPoints - a.totalPoints)
+  return rows
+    .toSorted((a, b) => b.totalPoints - a.totalPoints)
     .map((row, i) => ({ ...row, rank: i + 1 }))
 }
 
@@ -64,16 +64,18 @@ export async function getMatchPredictionsReveal(
     buildPointsMap(supabase),
   ])
   if (!predData) return []
-  const unranked = (predData as unknown as PredRaw[])
-    .filter(p => p.users.status === 'approved')
-    .map(p => ({
-    userId: p.user_id,
-    displayName: p.users.display_name,
-    isMonkey: p.users.is_monkey,
-    automationStrategy: p.users.automation_strategy,
-    pick: p.pick,
-    totalPoints: pointsMap[p.user_id] ?? 0,
-  }))
+  const unranked: Omit<PlayerRevealRow, 'rank'>[] = []
+  for (const prediction of predData as unknown as PredRaw[]) {
+    if (prediction.users.status !== 'approved') continue
+    unranked.push({
+      userId: prediction.user_id,
+      displayName: prediction.users.display_name,
+      isMonkey: prediction.users.is_monkey,
+      automationStrategy: prediction.users.automation_strategy,
+      pick: prediction.pick,
+      totalPoints: pointsMap[prediction.user_id] ?? 0,
+    })
+  }
   return sortAndRankRevealRows(unranked)
 }
 
@@ -129,15 +131,17 @@ export async function getPikanteriaAnswersReveal(
     buildPointsMap(supabase),
   ])
   if (!answerData) return []
-  const unranked = (answerData as unknown as AnswerRaw[])
-    .filter(a => a.users.status === 'approved')
-    .map(a => ({
-    userId: a.user_id,
-    displayName: a.users.display_name,
-    isMonkey: a.users.is_monkey,
-    automationStrategy: a.users.automation_strategy,
-    pick: a.pick,
-    totalPoints: pointsMap[a.user_id] ?? 0,
-  }))
+  const unranked: Omit<PlayerRevealRow, 'rank'>[] = []
+  for (const answer of answerData as unknown as AnswerRaw[]) {
+    if (answer.users.status !== 'approved') continue
+    unranked.push({
+      userId: answer.user_id,
+      displayName: answer.users.display_name,
+      isMonkey: answer.users.is_monkey,
+      automationStrategy: answer.users.automation_strategy,
+      pick: answer.pick,
+      totalPoints: pointsMap[answer.user_id] ?? 0,
+    })
+  }
   return sortAndRankRevealRows(unranked)
 }
