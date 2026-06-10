@@ -57,7 +57,7 @@ describe('buildAutomatedMatchRows', () => {
 
   it('emits one row per user per match', () => {
     const matches = [{ id: 'm1', odds_home: 1.8, odds_draw: 3.1, odds_away: 2.4 }]
-    const rows = buildAutomatedMatchRows(users, matches, '2026-06-11')
+    const rows = buildAutomatedMatchRows(users, matches)
     expect(rows).toEqual([
       { user_id: 'u-max', match_id: 'm1', pick: 'X' },
       { user_id: 'u-min', match_id: 'm1', pick: '1' },
@@ -65,7 +65,7 @@ describe('buildAutomatedMatchRows', () => {
   })
 
   it('is empty when there are no automated users', () => {
-    expect(buildAutomatedMatchRows([], [{ id: 'm1', odds_home: 2, odds_draw: 2, odds_away: 2 }], '2026-06-11')).toEqual([])
+    expect(buildAutomatedMatchRows([], [{ id: 'm1', odds_home: 2, odds_draw: 2, odds_away: 2 }])).toEqual([])
   })
 })
 
@@ -77,7 +77,7 @@ describe('buildAutomatedPikaRows', () => {
     ]
     // Two-way question: odds_2 (4.5) is the long shot, odds_1 (1.6) the favourite.
     const pikas = [{ id: 'p1', odds_1: 1.6, odds_2: 4.5, odds_x: null }]
-    const rows = buildAutomatedPikaRows(users, pikas, '2026-06-11')
+    const rows = buildAutomatedPikaRows(users, pikas)
     expect(rows).toEqual([
       { user_id: 'u-max', pikanteria_id: 'p1', pick: '2' },
       { user_id: 'u-min', pikanteria_id: 'p1', pick: '1' },

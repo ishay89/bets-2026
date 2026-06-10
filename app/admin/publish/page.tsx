@@ -106,7 +106,6 @@ async function publishPikanteriaWithAutomatedRows(
   supabase: AdminClient,
   pikanteriaId: string,
   odds: { odds_1: number; odds_2: number; odds_x: number | null },
-  date: string,
 ) {
   await setPikanteriaPublishedAt(supabase, pikanteriaId, new Date().toISOString())
 
@@ -118,7 +117,7 @@ async function publishPikanteriaWithAutomatedRows(
     odds_1: odds.odds_1,
     odds_2: odds.odds_2,
     odds_x: odds.odds_x,
-  }], date)
+  }])
   await supabase.from('pikanteria_answers').upsert(rows, { onConflict: 'user_id,pikanteria_id' })
 }
 
@@ -149,7 +148,7 @@ async function publishMatch(formData: FormData) {
   // Automated benchmark picks for this one match.
   const users = await getAutomatedUsers(supabase)
   if (users.length) {
-    const rows = buildAutomatedMatchRows(users, [{ id: matchId, ...odds }], date)
+    const rows = buildAutomatedMatchRows(users, [{ id: matchId, ...odds }])
     await supabase.from('predictions').upsert(rows, { onConflict: 'user_id,match_id' })
   }
 
@@ -301,7 +300,7 @@ async function saveAndPublishPikanteria(formData: FormData) {
   })
   if (error) redirect(publishPath(date, 'options'))
 
-  await publishPikanteriaWithAutomatedRows(supabase, pikanteriaId, outcomes, date)
+  await publishPikanteriaWithAutomatedRows(supabase, pikanteriaId, outcomes)
 
   revalidatePath('/predict')
   revalidatePath('/admin/publish')
@@ -394,7 +393,7 @@ async function createPikanteria(formData: FormData, publishNow: boolean) {
 
   const pikanteriaId = newId as string
   if (publishNow) {
-    await publishPikanteriaWithAutomatedRows(supabase, pikanteriaId, outcomes, date)
+    await publishPikanteriaWithAutomatedRows(supabase, pikanteriaId, outcomes)
   }
 
   revalidatePath('/predict')

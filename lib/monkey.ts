@@ -44,19 +44,9 @@ type PikanteriaOdds = {
   odds_x: number | null
 }
 
-// Seeded hash so monkey picks are reproducible per match per day
-function hashCode(str: string): number {
-  let hash = 0
-  for (let i = 0; i < str.length; i++) {
-    hash = ((hash << 5) - hash) + str.charCodeAt(i)
-    hash |= 0
-  }
-  return hash
-}
-
-function monkeyMatchPick(matchId: string, date: string): Pick {
+function monkeyMatchPick(): Pick {
   const picks = ['1', 'X', '2'] as const
-  return picks[Math.abs(hashCode(`${matchId}-${date}`)) % 3]
+  return picks[Math.floor(Math.random() * picks.length)]
 }
 
 // The outcomes available on a pikanteria, in stable display order. X is only
@@ -70,10 +60,9 @@ function pikanteriaOutcomes(odds: PikanteriaOdds): { pick: Pick; odds: number; o
   return outcomes
 }
 
-// Seeded random pick across the available outcomes (reproducible per day).
-function monkeyPikanteriaPick(picanteriaId: string, date: string, odds: PikanteriaOdds): Pick {
+function monkeyPikanteriaPick(odds: PikanteriaOdds): Pick {
   const outcomes = pikanteriaOutcomes(odds)
-  return outcomes[Math.abs(hashCode(`${picanteriaId}-${date}`)) % outcomes.length].pick
+  return outcomes[Math.floor(Math.random() * outcomes.length)].pick
 }
 
 export function automatedMatchPick(match: MatchOdds, strategy: MarkerStrategy): Pick {
@@ -103,14 +92,13 @@ export type AutomatedUser = { id: string; automation_strategy: AutomationStrateg
 export function buildAutomatedMatchRows(
   users: AutomatedUser[],
   matches: (MatchOdds & { id: string })[],
-  date: string,
 ): { user_id: string; match_id: string; pick: Pick }[] {
   return users.flatMap(user =>
     matches.map(match => ({
       user_id: user.id,
       match_id: match.id,
       pick: user.automation_strategy === 'monkey'
-        ? monkeyMatchPick(match.id, date)
+        ? monkeyMatchPick()
         : automatedMatchPick(match, user.automation_strategy),
     }))
   )
@@ -121,14 +109,13 @@ export function buildAutomatedMatchRows(
 export function buildAutomatedPikaRows(
   users: AutomatedUser[],
   pikas: (PikanteriaOdds & { id: string })[],
-  date: string,
 ): { user_id: string; pikanteria_id: string; pick: Pick }[] {
   return users.flatMap(user =>
     pikas.map(pika => ({
       user_id: user.id,
       pikanteria_id: pika.id,
       pick: user.automation_strategy === 'monkey'
-        ? monkeyPikanteriaPick(pika.id, date, pika)
+        ? monkeyPikanteriaPick(pika)
         : automatedPikanteriaPick(pika, user.automation_strategy),
     }))
   )
