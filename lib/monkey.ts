@@ -30,6 +30,14 @@ export const AUTOMATED_MARKER_USERS: {
 
 type MarkerStrategy = Exclude<AutomationStrategy, 'monkey'>
 
+// Index into a list sorted by descending odds: max → first (longest odds),
+// min → last (shortest odds), mid → the median entry.
+function strategyIndex(strategy: MarkerStrategy, length: number): number {
+  if (strategy === 'max') return 0
+  if (strategy === 'min') return length - 1
+  return Math.floor(length / 2)
+}
+
 type MatchOdds = {
   odds_home: number
   odds_draw: number
@@ -72,17 +80,13 @@ export function automatedMatchPick(match: MatchOdds, strategy: MarkerStrategy): 
     { pick: '2' as const, odds: match.odds_away, order: 2 },
   ].sort((a, b) => b.odds - a.odds || a.order - b.order)
 
-  if (strategy === 'max') return picks[0].pick
-  if (strategy === 'min') return picks[picks.length - 1].pick
-  return picks[Math.floor(picks.length / 2)].pick
+  return picks[strategyIndex(strategy, picks.length)].pick
 }
 
 export function automatedPikanteriaPick(odds: PikanteriaOdds, strategy: MarkerStrategy): Pick {
   const sorted = pikanteriaOutcomes(odds).sort((a, b) => b.odds - a.odds || a.order - b.order)
 
-  if (strategy === 'max') return sorted[0].pick
-  if (strategy === 'min') return sorted[sorted.length - 1].pick
-  return sorted[Math.floor(sorted.length / 2)].pick
+  return sorted[strategyIndex(strategy, sorted.length)].pick
 }
 
 export type AutomatedUser = { id: string; automation_strategy: AutomationStrategy }
@@ -119,4 +123,52 @@ export function buildAutomatedPikaRows(
         : automatedPikanteriaPick(pika, user.automation_strategy),
     }))
   )
+}
+
+type FuturesCandidate = { name: string; odds: number }
+
+// Strategy selection over a futures candidate list (TEAMS or SCORERS), with the
+// exact semantics of automatedMatchPick: sort by descending odds, stable list
+// order as tie-break; max → first, min → last, mid → floor(n / 2), monkey → random.
+function automatedFuturesChoice(
+  candidates: readonly FuturesCandidate[],
+  strategy: AutomationStrategy,
+): FuturesCandidate {
+  if (strategy === 'monkey') {
+    return candidates[Math.floor(Math.random() * candidates.length)]
+  }
+
+  const sorted = candidates
+    .map((candidate, order) => ({ candidate, order }))
+    .sort((a, b) => b.candidate.odds - a.candidate.odds || a.order - b.order)
+    .map(entry => entry.candidate)
+
+  return sorted[strategyIndex(strategy, sorted.length)]
+}
+
+// Build pre_tournament_picks rows for automated benchmark users — one row per
+// user, winner from `teams` and top scorer from `scorers`, odds snapshotted
+// from the chosen entries. Used by the admin "Generate bot futures" action.
+export function buildAutomatedFuturesRows(
+  users: AutomatedUser[],
+  teams: readonly FuturesCandidate[],
+  scorers: readonly FuturesCandidate[],
+): {
+  user_id: string
+  winner_team: string
+  winner_odds: number
+  top_scorer: string
+  top_scorer_odds: number
+}[] {
+  return users.map(user => {
+    const winner = automatedFuturesChoice(teams, user.automation_strategy)
+    const scorer = automatedFuturesChoice(scorers, user.automation_strategy)
+    return {
+      user_id: user.id,
+      winner_team: winner.name,
+      winner_odds: winner.odds,
+      top_scorer: scorer.name,
+      top_scorer_odds: scorer.odds,
+    }
+  })
 }
