@@ -1,5 +1,6 @@
 'use client'
-import { useEffect, useReducer } from 'react'
+import { useEffect, useReducer, useRef } from 'react'
+import { useRouter } from 'next/navigation'
 
 function fmt(ms: number): string {
   if (ms <= 0) return 'LOCKED'
@@ -16,17 +17,29 @@ function msUntil(lockTime: string): number {
 }
 
 export function LockTimer({ lockTime }: { lockTime: string }) {
+  const router = useRouter()
+  const refreshedRef = useRef(false)
   const [remaining, dispatch] = useReducer(
     (_: number, lt: string) => msUntil(lt),
     lockTime,
     msUntil,
   )
 
+  // When the countdown reaches zero, the match is now locked server-side too —
+  // refresh once so the page re-fetches isLocked/crowd data and reveals it.
   useEffect(() => {
+    refreshedRef.current = false
     dispatch(lockTime)
-    const id = setInterval(() => dispatch(lockTime), 1000)
+    const id = setInterval(() => {
+      const ms = msUntil(lockTime)
+      dispatch(lockTime)
+      if (ms <= 0 && !refreshedRef.current) {
+        refreshedRef.current = true
+        router.refresh()
+      }
+    }, 1000)
     return () => clearInterval(id)
-  }, [lockTime])
+  }, [lockTime, router])
 
   const locked = remaining <= 0
   return (
