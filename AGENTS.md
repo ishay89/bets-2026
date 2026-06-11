@@ -67,6 +67,7 @@ npm test -- lib/scoring.test.ts
   - `/admin/tournament` — score tournament winner/top scorer futures
   - `/admin/players` — approve, block, unblock, promote, and demote users
   - `/admin/players/[userId]` — per-user prediction status
+  - `/admin/ai-picks` — enter match/pikanteria/futures picks for the AI users (Claude, Codex) and generate benchmark bot futures
   - `/admin/scores` — score snapshot validation and recalculation
   - `/admin/audit` — admin view of prediction audit events
 

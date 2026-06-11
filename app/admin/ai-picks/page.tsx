@@ -9,8 +9,6 @@ import {
   getPublishedMatchDaysWithAll,
   getUserPredictions,
   getUserPikanteriaAnswers,
-  isFuturesLocked,
-  isFuturesPublished,
   type FullMatchDay,
 } from '@/lib/data'
 import {
@@ -68,7 +66,7 @@ export default async function AiPicksPage({
 
   const aiUser = aiUserBySlug(userSlug)
 
-  const [matchDaysRaw, predictions, answers, { data: futuresPick }, futuresLocked, futuresPublished, botRows] =
+  const [matchDaysRaw, predictions, answers, { data: futuresPick }, { data: futuresSettings }, botRows] =
     await Promise.all([
       getPublishedMatchDaysWithAll(supabase),
       getUserPredictions(supabase, aiUser.id),
@@ -78,14 +76,20 @@ export default async function AiPicksPage({
         .select('winner_team, top_scorer')
         .eq('user_id', aiUser.id)
         .maybeSingle(),
-      isFuturesLocked(supabase),
-      isFuturesPublished(supabase),
+      supabase
+        .from('tournament_settings')
+        .select('futures_locked, futures_published')
+        .eq('id', true)
+        .maybeSingle(),
       supabase
         .from('users')
         .select('id, display_name, pre_tournament_picks(winner_team, top_scorer)')
         .not('automation_strategy', 'is', null)
         .order('display_name'),
     ])
+
+  const futuresLocked = futuresSettings?.futures_locked ?? false
+  const futuresPublished = futuresSettings?.futures_published ?? true
 
   const predictionMap: Record<string, Pick> = Object.fromEntries(
     predictions.map(p => [p.match_id, p.pick as Pick])
