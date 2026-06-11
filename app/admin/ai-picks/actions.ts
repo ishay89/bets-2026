@@ -32,6 +32,15 @@ function finish(slug: string, notice: string): never {
   redirect(aiPicksPath(slug, notice))
 }
 
+function pikanteriaValue(
+  item: { label_1: string; label_2: string; label_x: string | null; odds_1: number; odds_2: number; odds_x: number | null },
+  pick: string,
+) {
+  if (pick === '1') return { pick, label: item.label_1, odds: item.odds_1 }
+  if (pick === '2') return { pick, label: item.label_2, odds: item.odds_2 }
+  return { pick, label: item.label_x, odds: item.odds_x }
+}
+
 export async function saveAiMatchPick(formData: FormData) {
   await assertAdmin()
   const supabase = createAdminClient()
@@ -47,7 +56,14 @@ export async function saveAiMatchPick(formData: FormData) {
     .single()
 
   if (!match || match.published_at == null) redirect(aiPicksPath(aiUser.slug, 'not_found'))
-  if (match.result != null || isMatchLocked(match)) redirect(aiPicksPath(aiUser.slug, 'locked'))
+  if (match.result != null || isMatchLocked(match)) {
+    // Mirror save_match_prediction: persist the lazy time-based lock on the
+    // first save attempt past the deadline so it applies to everyone.
+    if (!match.locked) {
+      await supabase.from('matches').update({ locked: true }).eq('id', matchId).eq('locked', false)
+    }
+    redirect(aiPicksPath(aiUser.slug, 'locked'))
+  }
 
   const { data: existing } = await supabase
     .from('predictions')
@@ -141,8 +157,8 @@ export async function saveAiPikanteriaPick(formData: FormData) {
     action: existing ? 'update' : 'create',
     entity_id: saved.id,
     entity_ref: pikanteriaId,
-    old_value: existing ? { pick: existing.pick } : null,
-    new_value: { pick },
+    old_value: existing ? pikanteriaValue(item, existing.pick) : null,
+    new_value: pikanteriaValue(item, pick),
     metadata: {
       pikanteria_id: item.id,
       match_day_id: item.match_day_id,
