@@ -189,7 +189,7 @@ export default function AuditClient({ initialEvents, users }: { initialEvents: A
           </select>
         </div>
         <div className="flex flex-col gap-1">
-          <label htmlFor="audit-from" className="text-[10px] font-semibold" style={{ color: 'var(--color-muted)' }}>From Jerusalem</label>
+          <label htmlFor="audit-from" className="text-[10px] font-semibold" style={{ color: 'var(--color-muted)' }}>From ET</label>
           <input
             id="audit-from"
             type="datetime-local"
@@ -199,7 +199,7 @@ export default function AuditClient({ initialEvents, users }: { initialEvents: A
           />
         </div>
         <div className="flex flex-col gap-1">
-          <label htmlFor="audit-to" className="text-[10px] font-semibold" style={{ color: 'var(--color-muted)' }}>To Jerusalem</label>
+          <label htmlFor="audit-to" className="text-[10px] font-semibold" style={{ color: 'var(--color-muted)' }}>To ET</label>
           <input
             id="audit-to"
             type="datetime-local"
