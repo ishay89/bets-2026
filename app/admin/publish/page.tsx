@@ -4,8 +4,8 @@ import type { PikanteriaOutcomes } from '@/lib/validation'
 import {
   buildAutomatedMatchRows,
   buildAutomatedPikaRows,
-  type AutomatedUser,
 } from '@/lib/monkey'
+import { getAutomatedUsers } from '@/lib/data'
 import { appDateKey, formatAppTime } from '@/lib/time'
 import { setPikanteriaPublishedAt } from '@/lib/publishing'
 import { revalidatePath } from 'next/cache'
@@ -42,16 +42,6 @@ type DayPika = {
 }
 
 type Day = { id: string; stage: string; date: string }
-
-// Automated benchmark players (those with an automation_strategy).
-async function getAutomatedUsers(supabase: AdminClient): Promise<AutomatedUser[]> {
-  const { data } = await supabase
-    .from('users')
-    .select('id, automation_strategy')
-    .not('automation_strategy', 'is', null)
-    .returns<AutomatedUser[]>()
-  return data ?? []
-}
 
 function publishPath(date: string, notice?: string) {
   const params = new URLSearchParams({ date })

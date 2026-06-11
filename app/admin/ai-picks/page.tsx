@@ -4,6 +4,7 @@ import { isMatchLocked } from '@/lib/lock'
 import { formatAppDate, formatAppDateTime } from '@/lib/time'
 import type { Pick } from '@/lib/types'
 import { AI_USERS, aiUserBySlug } from '@/lib/ai-picks'
+import { stageLabel } from '@/lib/display'
 import { TEAMS, SCORERS } from '@/lib/pre-tournament'
 import {
   getPublishedMatchDaysWithAll,
@@ -17,11 +18,6 @@ import {
   saveAiFutures,
   generateBotFutures,
 } from './actions'
-
-const STAGE_LABELS: Record<string, string> = {
-  group: 'Group Stage', r32: 'Round of 32', r16: 'Round of 16', qf: 'Quarter Finals',
-  sf: 'Semi Finals', '3rd': 'Third Place', final: 'Final',
-}
 
 const NOTICES: Record<string, { text: string; tone: 'ok' | 'warn' }> = {
   saved: { text: '✓ Pick saved', tone: 'ok' },
@@ -199,7 +195,7 @@ export default async function AiPicksPage({
           <div className="flex items-center gap-2 pt-1">
             <span className="text-sm font-bold text-text">{formatAppDate(day.date)}</span>
             <span className="text-[10px] font-bold uppercase tracking-wide" style={{ color: 'var(--color-accent)' }}>
-              {STAGE_LABELS[day.stage] ?? day.stage}
+              {stageLabel(day.stage)}
             </span>
           </div>
 

@@ -9,6 +9,7 @@ import type {
   HistoricalLeaderboardEntry,
 } from './types'
 import type { Database } from './supabase/types'
+import type { AutomatedUser } from './monkey'
 import { buildHistoricalLeaderboardEntries, selectScoredLeaderboardDays } from './historical-leaderboard'
 
 type Db = SupabaseClient<Database>
@@ -105,6 +106,16 @@ export async function getUserPikanteriaAnswers(
     .eq('user_id', userId)
   if (error) throw error
   return (data ?? []) as { pikanteria_id: string; pick: Pick }[]
+}
+
+/** Automated benchmark players (those with an automation_strategy). */
+export async function getAutomatedUsers(supabase: Db): Promise<AutomatedUser[]> {
+  const { data } = await supabase
+    .from('users')
+    .select('id, automation_strategy')
+    .not('automation_strategy', 'is', null)
+    .returns<AutomatedUser[]>()
+  return data ?? []
 }
 
 /**

@@ -30,6 +30,14 @@ export const AUTOMATED_MARKER_USERS: {
 
 type MarkerStrategy = Exclude<AutomationStrategy, 'monkey'>
 
+// Index into a list sorted by descending odds: max → first (longest odds),
+// min → last (shortest odds), mid → the median entry.
+function strategyIndex(strategy: MarkerStrategy, length: number): number {
+  if (strategy === 'max') return 0
+  if (strategy === 'min') return length - 1
+  return Math.floor(length / 2)
+}
+
 type MatchOdds = {
   odds_home: number
   odds_draw: number
@@ -72,17 +80,13 @@ export function automatedMatchPick(match: MatchOdds, strategy: MarkerStrategy): 
     { pick: '2' as const, odds: match.odds_away, order: 2 },
   ].sort((a, b) => b.odds - a.odds || a.order - b.order)
 
-  if (strategy === 'max') return picks[0].pick
-  if (strategy === 'min') return picks[picks.length - 1].pick
-  return picks[Math.floor(picks.length / 2)].pick
+  return picks[strategyIndex(strategy, picks.length)].pick
 }
 
 export function automatedPikanteriaPick(odds: PikanteriaOdds, strategy: MarkerStrategy): Pick {
   const sorted = pikanteriaOutcomes(odds).sort((a, b) => b.odds - a.odds || a.order - b.order)
 
-  if (strategy === 'max') return sorted[0].pick
-  if (strategy === 'min') return sorted[sorted.length - 1].pick
-  return sorted[Math.floor(sorted.length / 2)].pick
+  return sorted[strategyIndex(strategy, sorted.length)].pick
 }
 
 export type AutomatedUser = { id: string; automation_strategy: AutomationStrategy }
@@ -139,9 +143,7 @@ function automatedFuturesChoice(
     .sort((a, b) => b.candidate.odds - a.candidate.odds || a.order - b.order)
     .map(entry => entry.candidate)
 
-  if (strategy === 'max') return sorted[0]
-  if (strategy === 'min') return sorted[sorted.length - 1]
-  return sorted[Math.floor(sorted.length / 2)]
+  return sorted[strategyIndex(strategy, sorted.length)]
 }
 
 // Build pre_tournament_picks rows for automated benchmark users — one row per

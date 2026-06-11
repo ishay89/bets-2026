@@ -3,15 +3,13 @@
 import { createAdminClient, assertAdmin } from '@/lib/supabase/server'
 import { parseUUID, parsePick, parseTeamName, parseScorerName } from '@/lib/validation'
 import { aiUserById, isValidPikanteriaPick, usersMissingFutures, type AiUser } from '@/lib/ai-picks'
-import { buildAutomatedFuturesRows, type AutomatedUser } from '@/lib/monkey'
+import { buildAutomatedFuturesRows } from '@/lib/monkey'
 import { TEAMS, SCORERS } from '@/lib/pre-tournament'
-import { isFuturesLocked, isFuturesPublished } from '@/lib/data'
+import { getAutomatedUsers, isFuturesLocked, isFuturesPublished } from '@/lib/data'
 import { isMatchLocked } from '@/lib/lock'
 import { shouldWriteAuditEvent, writeAuditEvent, type AuditJson } from '@/lib/audit'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
-
-type AdminClient = ReturnType<typeof createAdminClient>
 
 function aiPicksPath(slug: string, notice?: string) {
   const params = new URLSearchParams({ user: slug })
@@ -240,15 +238,6 @@ export async function saveAiFutures(formData: FormData) {
   }
 
   finish(aiUser.slug, shouldAudit ? 'saved' : 'unchanged')
-}
-
-async function getAutomatedUsers(supabase: AdminClient): Promise<AutomatedUser[]> {
-  const { data } = await supabase
-    .from('users')
-    .select('id, automation_strategy')
-    .not('automation_strategy', 'is', null)
-    .returns<AutomatedUser[]>()
-  return data ?? []
 }
 
 export async function generateBotFutures(formData: FormData) {
