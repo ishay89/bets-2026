@@ -209,7 +209,7 @@ export default async function AiPicksPage({
                 <div className="text-muted text-[11px] mt-0.5">
                   {formatAppDateTime(match.kickoff_time, {
                     month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false,
-                  })} Jerusalem
+                  })} ET
                 </div>
               </div>
               <form action={saveAiMatchPick} className="grid grid-cols-3 gap-2">

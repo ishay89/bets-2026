@@ -1,4 +1,4 @@
-const APP_TIME_ZONE = 'Asia/Jerusalem'
+const APP_TIME_ZONE = 'America/New_York'
 
 const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/
 const DATE_TIME_WITHOUT_ZONE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,3})?)?$/
