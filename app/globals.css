@@ -288,3 +288,38 @@ body {
   font-size: 11px;
   color: var(--color-muted);
 }
+
+.prediction-reveal-distribution {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.prediction-reveal-distribution-legend {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.prediction-reveal-distribution-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow: hidden;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--color-muted);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.prediction-reveal-distribution-swatch {
+  flex-shrink: 0;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+}
