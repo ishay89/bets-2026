@@ -35,14 +35,12 @@ export interface AiSocialPost {
 
 interface Props {
   initialPosts: BoardPost[]
-  initialAiPosts: AiSocialPost[]
   currentUserId: string
   currentUserIsAdmin: boolean
 }
 
 type BoardFeedState = {
   posts: BoardPost[]
-  aiPosts: AiSocialPost[]
   body: string
   previewUrl: string | null
   error: string | null
@@ -52,7 +50,6 @@ type BoardFeedState = {
 
 type BoardFeedAction =
   | { type: 'postsLoaded'; posts: BoardPost[] }
-  | { type: 'aiPostsLoaded'; aiPosts: AiSocialPost[] }
   | { type: 'bodyChanged'; body: string }
   | { type: 'previewChanged'; previewUrl: string | null }
   | { type: 'errorChanged'; error: string | null }
@@ -63,8 +60,6 @@ function boardFeedReducer(state: BoardFeedState, action: BoardFeedAction): Board
   switch (action.type) {
     case 'postsLoaded':
       return { ...state, posts: action.posts }
-    case 'aiPostsLoaded':
-      return { ...state, aiPosts: action.aiPosts }
     case 'bodyChanged':
       return { ...state, body: action.body }
     case 'previewChanged':
@@ -92,17 +87,16 @@ function getImageUrl(path: string): string {
   return `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/${IMAGE_BUCKET}/${path}`
 }
 
-export function BoardFeed({ initialPosts, initialAiPosts, currentUserId, currentUserIsAdmin }: Props) {
+export function BoardFeed({ initialPosts, currentUserId, currentUserIsAdmin }: Props) {
   const [state, dispatch] = useReducer(boardFeedReducer, {
     posts: initialPosts,
-    aiPosts: initialAiPosts,
     body: '',
     previewUrl: null,
     error: null,
     isPosting: false,
     deletingPostId: null,
   })
-  const { posts, aiPosts, body, previewUrl, error, isPosting, deletingPostId } = state
+  const { posts, body, previewUrl, error, isPosting, deletingPostId } = state
   const imageRef = useRef<File | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -118,24 +112,11 @@ export function BoardFeed({ initialPosts, initialAiPosts, currentUserId, current
     if (data) dispatch({ type: 'postsLoaded', posts: data })
   }
 
-  async function refreshAiPosts() {
-    const supabase = createClient()
-    const { data } = await supabase
-      .from('ai_social_posts')
-      .select('id, title, body, created_at')
-      .order('created_at', { ascending: false })
-      .limit(50)
-      .returns<AiSocialPost[]>()
-
-    if (data) dispatch({ type: 'aiPostsLoaded', aiPosts: data })
-  }
-
   useEffect(() => {
     const supabase = createClient()
     const channel = supabase
       .channel('message-board-posts')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'message_board_posts' }, refreshPosts)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'ai_social_posts' }, refreshAiPosts)
       .subscribe()
 
     return () => { void channel.unsubscribe() }
@@ -253,7 +234,7 @@ export function BoardFeed({ initialPosts, initialAiPosts, currentUserId, current
   }
 
   return (
-    <div className="grid gap-5 lg:grid-cols-2 lg:items-start">
+    <div className="space-y-4">
       <section className="space-y-4">
         <BoardTitle>User Board</BoardTitle>
       <form onSubmit={handleSubmit} className="rounded-[14px] p-3 space-y-3"
@@ -342,11 +323,6 @@ export function BoardFeed({ initialPosts, initialAiPosts, currentUserId, current
         ))}
       </div>
       </section>
-
-      <section className="space-y-4">
-        <BoardTitle>AI Recaps</BoardTitle>
-        <AiRecapFeed posts={aiPosts} />
-      </section>
     </div>
   )
 }
@@ -361,7 +337,7 @@ function BoardTitle({ children }: {
   )
 }
 
-function AiRecapFeed({ posts }: { posts: AiSocialPost[] }) {
+export function AiRecapFeed({ posts }: { posts: AiSocialPost[] }) {
   return (
     <>
       {posts.length === 0 && (
