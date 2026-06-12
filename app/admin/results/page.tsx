@@ -1,4 +1,4 @@
-import { createClient, createServiceClient, assertAdmin } from '@/lib/supabase/server'
+import { createClient, createAdminClient, assertAdmin } from '@/lib/supabase/server'
 import { getPublishedMatchDaysWithAll } from '@/lib/data'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
@@ -17,7 +17,7 @@ import { parseUUID, parsePick } from '@/lib/validation'
 
 type MatchDayRow = MatchDay & { matches: Match[]; pikanteria: Pikanteria[] }
 
-type ServiceClient = Awaited<ReturnType<typeof createServiceClient>>
+type AdminClient = ReturnType<typeof createAdminClient>
 
 // Shared scoring core: score any subset of a day's matches/pikanteria in one
 // atomic RPC, then refresh the day's snapshot. Reused by the per-item buttons
@@ -25,7 +25,7 @@ type ServiceClient = Awaited<ReturnType<typeof createServiceClient>>
 // for partial scoring — already-scored items keep their points, and unscored
 // items have result IS NULL so they're excluded from the checks.
 async function scoreItems(
-  supabase: ServiceClient,
+  supabase: AdminClient,
   matchDayId: string,
   scoredMatches: { matchId: string; result: Pick }[],
   resolvedPikas: { pikanteriaId: string; result: Pick }[],
@@ -151,7 +151,7 @@ async function scoreItems(
 async function scoreMatch(formData: FormData) {
   'use server'
   await assertAdmin()
-  const supabase = await createServiceClient()
+  const supabase = createAdminClient()
   const matchDayId = parseUUID(formData.get('match_day_id'), 'match_day_id')
   const matchId = parseUUID(formData.get('match_id'), 'match_id')
   const result = parsePick(formData.get(`result_${matchId}`), `match ${matchId}`)
@@ -162,7 +162,7 @@ async function scoreMatch(formData: FormData) {
 async function scorePikanteria(formData: FormData) {
   'use server'
   await assertAdmin()
-  const supabase = await createServiceClient()
+  const supabase = createAdminClient()
   const matchDayId = parseUUID(formData.get('match_day_id'), 'match_day_id')
   const pikanteriaId = parseUUID(formData.get('pikanteria_id'), 'pikanteria_id')
   const result = parsePick(formData.get(`pik_${pikanteriaId}`), `pikanteria ${pikanteriaId}`)
@@ -173,7 +173,7 @@ async function scorePikanteria(formData: FormData) {
 async function resetPikanteria(formData: FormData) {
   'use server'
   await assertAdmin()
-  const supabase = await createServiceClient()
+  const supabase = createAdminClient()
   const matchDayId = parseUUID(formData.get('match_day_id'), 'match_day_id')
   const pikanteriaId = parseUUID(formData.get('pikanteria_id'), 'pikanteria_id')
 
@@ -193,7 +193,7 @@ async function resetPikanteria(formData: FormData) {
 async function resetMatch(formData: FormData) {
   'use server'
   await assertAdmin()
-  const supabase = await createServiceClient()
+  const supabase = createAdminClient()
   const matchDayId = parseUUID(formData.get('match_day_id'), 'match_day_id')
   const matchId = parseUUID(formData.get('match_id'), 'match_id')
 

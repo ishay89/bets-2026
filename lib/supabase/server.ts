@@ -46,6 +46,12 @@ export async function assertAdmin(): Promise<void> {
   if (!profile?.is_admin) redirect('/')
 }
 
+// CAUTION: despite taking the service role key, this client reads the auth
+// session from cookies, and supabase-js sends the session's user JWT as the
+// Authorization header whenever one exists. Requests therefore run as the
+// signed-in user (`authenticated` role, RLS enforced) — NOT as service_role.
+// For true service-role access (RLS bypass, service_role-only RPCs like the
+// scoring functions), use createAdminClient() instead.
 export async function createServiceClient() {
   const cookieStore = await cookies()
   return createServerClient<Database>(
