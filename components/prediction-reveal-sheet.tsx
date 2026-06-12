@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import type { PlayerRevealRow } from '@/lib/prediction-reveals'
+import type { Pick } from '@/lib/types'
 import { getAvatar, getAutomationLabel } from '@/lib/display'
 
 const SEG_COLORS = [
@@ -23,10 +24,12 @@ interface Props {
   myUserId: string
   /** option_id → label map; when present, treats `row.pick` as an option_id. */
   optionLabels?: Record<string, string>
+  /** Winning outcome, if known. When set, each row shows a ✓/✗ verdict against `row.pick`. */
+  result?: Pick | null
   onClose: () => void
 }
 
-export function PredictionRevealSheet({ title, rows, myUserId, optionLabels, onClose }: Props) {
+export function PredictionRevealSheet({ title, rows, myUserId, optionLabels, result, onClose }: Props) {
   const [visible, setVisible] = useState(false)
   useEffect(() => { const t = setTimeout(() => setVisible(true), 0); return () => clearTimeout(t) }, [])
 
@@ -122,12 +125,21 @@ export function PredictionRevealSheet({ title, rows, myUserId, optionLabels, onC
                     </div>
                   </div>
 
-                  {/* Pick label */}
-                  <div
-                    className="prediction-reveal-pick"
-                    style={{ color: pickColor }}
-                  >
-                    {pickLabel}
+                  {/* Pick label, odds, and result verdict */}
+                  <div className="prediction-reveal-pick-wrap">
+                    <div className="flex items-center gap-1">
+                      {result != null && (
+                        <span style={{ fontSize: 12, color: row.pick === result ? 'var(--color-accent)' : 'var(--color-danger)' }}>
+                          {row.pick === result ? '✓' : '✗'}
+                        </span>
+                      )}
+                      <div className="prediction-reveal-pick" style={{ color: pickColor }}>
+                        {pickLabel}
+                      </div>
+                    </div>
+                    {row.odds != null && (
+                      <div className="prediction-reveal-odds">{row.odds.toFixed(2)}</div>
+                    )}
                   </div>
                 </div>
               )
