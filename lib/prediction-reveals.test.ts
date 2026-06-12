@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { sortAndRankRevealRows } from './prediction-reveals'
 
-const base = { isMonkey: false as const, automationStrategy: null, pick: '1' }
+const base = { isMonkey: false as const, automationStrategy: null, avatarEmoji: null, pick: '1' }
 
 describe('sortAndRankRevealRows', () => {
   it('sorts by totalPoints descending and assigns 1-based rank', () => {

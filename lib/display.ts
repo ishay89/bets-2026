@@ -54,16 +54,39 @@ export function getFlag(name: string): string {
 
 const AVATARS = ['🦁','🐯','🦊','🐺','🦅','🐻','🐼','🦝','🦄','🐉','🦋','🌟','🔥','⚡','🎯']
 
-/** Marker / monkey aware avatar. Falls back to a name-derived animal. */
+/**
+ * Emoji a player can choose for their own avatar on the Me tab. Kept here so the
+ * picker UI and any validation share a single source of truth.
+ */
+export const AVATAR_EMOJIS = [
+  '🦁','🐯','🐱','🦊','🐺','🐻','🐼','🐨','🐸','🐵',
+  '🦅','🦆','🦉','🐲','🐉','🦄','🐳','🦈','🐙','🦋',
+  '⚽','🏆','🥇','🎯','🎲','🃏','👑','💎','🚀','🛸',
+  '⚡','🔥','🌟','✨','🌈','💥','☄️','🌊','🍀','🎉',
+  '😎','🤩','🥶','🤖','👽','💀','🤡','👻','🦾','🧠',
+]
+
+/** True when a string is exactly one of the selectable avatar emojis. */
+export function isValidAvatarEmoji(value: unknown): value is string {
+  return typeof value === 'string' && (AVATAR_EMOJIS as string[]).includes(value)
+}
+
+/**
+ * Marker / monkey aware avatar. Honours a player's chosen emoji, otherwise falls
+ * back to a name-derived animal. Automated benchmark users always keep their
+ * fixed symbols — they are not user-editable.
+ */
 export function getAvatar(player: {
   display_name: string
   is_monkey?: boolean | null
   automation_strategy?: AutomationStrategy | null
+  avatar_emoji?: string | null
 }): string {
   if (player.automation_strategy === 'max') return '▲'
   if (player.automation_strategy === 'mid') return '◆'
   if (player.automation_strategy === 'min') return '▼'
   if (player.is_monkey) return '🐒'
+  if (player.avatar_emoji) return player.avatar_emoji
   return AVATARS[player.display_name.charCodeAt(0) % AVATARS.length]
 }
 

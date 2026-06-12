@@ -103,6 +103,7 @@ export function PredictionRevealSheet({ title, rows, myUserId, optionLabels, onC
                       display_name: row.displayName,
                       is_monkey: row.isMonkey,
                       automation_strategy: row.automationStrategy,
+                      avatar_emoji: row.avatarEmoji,
                     })}
                   </div>
 

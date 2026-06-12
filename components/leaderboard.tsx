@@ -18,6 +18,7 @@ function getAvatar(entry: LeaderboardEntry): string {
   if (entry.automation_strategy === 'mid') return '◆'
   if (entry.automation_strategy === 'min') return '▼'
   if (entry.is_monkey) return '🐒'
+  if (entry.avatar_emoji) return entry.avatar_emoji
   return AVATARS[entry.display_name.charCodeAt(0) % AVATARS.length]
 }
 

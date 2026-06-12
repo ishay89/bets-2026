@@ -10,6 +10,7 @@ type HistoricalUser = {
   display_name: string
   is_monkey: boolean
   automation_strategy: AutomationStrategy | null
+  avatar_emoji: string | null
   status: UserStatus
 }
 
@@ -125,6 +126,7 @@ export function buildHistoricalLeaderboardEntries(params: {
         display_name: user.display_name,
         is_monkey: user.is_monkey,
         automation_strategy: user.automation_strategy,
+        avatar_emoji: user.avatar_emoji,
         total_points: total,
         today_points: (selectedDayPoints.get(user.id) ?? 0) + preTournament,
         previous_total_points: previousTotal,
