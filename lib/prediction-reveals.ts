@@ -8,6 +8,7 @@ export type PlayerRevealRow = {
   displayName: string
   isMonkey: boolean
   automationStrategy: AutomationStrategy | null
+  avatarEmoji: string | null
   pick: string
   rank: number
   totalPoints: number
@@ -27,6 +28,7 @@ type UserRaw = {
   display_name: string
   is_monkey: boolean
   automation_strategy: AutomationStrategy | null
+  avatar_emoji: string | null
   status: string
 }
 
@@ -59,7 +61,7 @@ export async function getMatchPredictionsReveal(
   const [{ data: predData }, pointsMap] = await Promise.all([
     supabase
       .from('predictions')
-      .select('pick, user_id, users(display_name, is_monkey, automation_strategy, status)')
+      .select('pick, user_id, users(display_name, is_monkey, automation_strategy, avatar_emoji, status)')
       .eq('match_id', matchId),
     buildPointsMap(supabase),
   ])
@@ -72,6 +74,7 @@ export async function getMatchPredictionsReveal(
       displayName: prediction.users.display_name,
       isMonkey: prediction.users.is_monkey,
       automationStrategy: prediction.users.automation_strategy,
+      avatarEmoji: prediction.users.avatar_emoji,
       pick: prediction.pick,
       totalPoints: pointsMap[prediction.user_id] ?? 0,
     })
@@ -96,7 +99,7 @@ export async function getFuturesReveal(supabase: Db): Promise<FuturesReveal> {
   const [{ data }, pointsMap] = await Promise.all([
     supabase
       .from('pre_tournament_picks')
-      .select('user_id, winner_team, top_scorer, users(display_name, is_monkey, automation_strategy, status)'),
+      .select('user_id, winner_team, top_scorer, users(display_name, is_monkey, automation_strategy, avatar_emoji, status)'),
     buildPointsMap(supabase),
   ])
   if (!data) return { winner: [], scorer: [] }
@@ -106,6 +109,7 @@ export async function getFuturesReveal(supabase: Db): Promise<FuturesReveal> {
     displayName: p.users.display_name,
     isMonkey: p.users.is_monkey,
     automationStrategy: p.users.automation_strategy,
+    avatarEmoji: p.users.avatar_emoji,
     totalPoints: pointsMap[p.user_id] ?? 0,
   })
   return {
@@ -126,7 +130,7 @@ export async function getPikanteriaAnswersReveal(
   const [{ data: answerData }, pointsMap] = await Promise.all([
     supabase
       .from('pikanteria_answers')
-      .select('pick, user_id, users(display_name, is_monkey, automation_strategy, status)')
+      .select('pick, user_id, users(display_name, is_monkey, automation_strategy, avatar_emoji, status)')
       .eq('pikanteria_id', pikanteriaId),
     buildPointsMap(supabase),
   ])
@@ -139,6 +143,7 @@ export async function getPikanteriaAnswersReveal(
       displayName: answer.users.display_name,
       isMonkey: answer.users.is_monkey,
       automationStrategy: answer.users.automation_strategy,
+      avatarEmoji: answer.users.avatar_emoji,
       pick: answer.pick,
       totalPoints: pointsMap[answer.user_id] ?? 0,
     })

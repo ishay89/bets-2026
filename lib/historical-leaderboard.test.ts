@@ -9,10 +9,10 @@ const days: ScoredLeaderboardDay[] = [
 ]
 
 const users = [
-  { id: 'u1', display_name: 'Ada', is_monkey: false, automation_strategy: null, status: 'approved' },
-  { id: 'u2', display_name: 'Ben', is_monkey: false, automation_strategy: null, status: 'approved' },
-  { id: 'u3', display_name: 'Cy', is_monkey: false, automation_strategy: null, status: 'approved' },
-  { id: 'blocked', display_name: 'Blocked', is_monkey: false, automation_strategy: null, status: 'blocked' },
+  { id: 'u1', display_name: 'Ada', is_monkey: false, automation_strategy: null, avatar_emoji: null, status: 'approved' },
+  { id: 'u2', display_name: 'Ben', is_monkey: false, automation_strategy: null, avatar_emoji: null, status: 'approved' },
+  { id: 'u3', display_name: 'Cy', is_monkey: false, automation_strategy: null, avatar_emoji: null, status: 'approved' },
+  { id: 'blocked', display_name: 'Blocked', is_monkey: false, automation_strategy: null, avatar_emoji: null, status: 'blocked' },
 ] as const
 
 describe('buildHistoricalLeaderboardEntries', () => {

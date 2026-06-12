@@ -13,6 +13,7 @@ export interface User {
   is_monkey: boolean
   automation_strategy: AutomationStrategy | null
   status: UserStatus
+  avatar_emoji: string | null
   created_at: string
 }
 
@@ -92,6 +93,7 @@ export interface LeaderboardEntry {
   display_name: string
   is_monkey: boolean
   automation_strategy: AutomationStrategy | null
+  avatar_emoji: string | null
   total_points: number
   today_points: number
   previous_total_points: number | null

@@ -173,7 +173,7 @@ export async function getHistoricalLeaderboardEntries(
   const [{ data: users, error: usersError }, { data: snapshots, error: snapshotsError }] = await Promise.all([
     supabase
       .from('users')
-      .select('id, display_name, is_monkey, automation_strategy, status'),
+      .select('id, display_name, is_monkey, automation_strategy, avatar_emoji, status'),
     supabase
       .from('score_snapshots')
       .select('user_id, match_day_id, day_points'),

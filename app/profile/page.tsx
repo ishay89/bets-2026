@@ -3,11 +3,10 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { BottomNav } from '@/components/bottom-nav'
 import { getLeaderboardEntries } from '@/lib/data'
-import { ordinal } from '@/lib/display'
+import { ordinal, getAvatar } from '@/lib/display'
+import { AvatarEmojiPicker } from '@/components/avatar-emoji-picker'
 
 export const metadata = { title: 'Profile | Mondial Bets 2026', description: 'Your profile and stats' }
-
-const AVATARS = ['🦁','🐯','🦊','🐺','🦅','🐻','🐼','🦝','🦄','🐉','🦋','🌟','🔥','⚡','🎯']
 
 export default async function ProfilePage() {
   const supabase = await createClient()
@@ -16,7 +15,7 @@ export default async function ProfilePage() {
 
   const [{ data: profile }, { data: pick }, { data: predictions }, { data: pikaAnswers }] =
     await Promise.all([
-      supabase.from('users').select('display_name, is_admin').eq('id', user.id).single(),
+      supabase.from('users').select('display_name, is_admin, avatar_emoji').eq('id', user.id).single(),
       supabase.from('pre_tournament_picks').select('*').eq('user_id', user.id).maybeSingle(),
       supabase.from('predictions').select('points').eq('user_id', user.id),
       supabase.from('pikanteria_answers').select('points').eq('user_id', user.id),
@@ -32,7 +31,8 @@ export default async function ProfilePage() {
   const rank = allEntries.findIndex(e => e.id === user.id) + 1
 
   const name = profile?.display_name ?? 'You'
-  const av = AVATARS[name.charCodeAt(0) % AVATARS.length]
+  const savedEmoji = profile?.avatar_emoji ?? null
+  const av = getAvatar({ display_name: name, avatar_emoji: savedEmoji })
 
   const rows = [
     { label: 'Match predictions', value: matchPoints, color: 'var(--color-text)' },
@@ -52,10 +52,7 @@ export default async function ProfilePage() {
         <div className="rounded-[14px] p-4"
           style={{ background: 'var(--color-panel)', border: '1px solid var(--border-base)' }}>
           <div className="flex items-center gap-4">
-            <div className="size-14 rounded-full flex items-center justify-center text-2xl shrink-0"
-              style={{ background: 'var(--color-elev)', border: '2px solid var(--color-accent)' }}>
-              {av}
-            </div>
+            <AvatarEmojiPicker currentAvatar={av} savedEmoji={savedEmoji} />
             <div className="flex-1 min-w-0">
               <div className="font-extrabold text-[18px] tracking-tight text-text truncate">{name}</div>
               <div className="text-[11px] text-sub mt-0.5">{user?.email}</div>

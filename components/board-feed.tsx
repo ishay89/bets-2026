@@ -21,6 +21,7 @@ interface BoardAuthor {
   display_name: string
   is_monkey: boolean
   automation_strategy: AutomationStrategy | null
+  avatar_emoji: string | null
 }
 
 export interface BoardPost {
@@ -155,7 +156,7 @@ export function BoardFeed({ initialPosts, currentUserId, currentUserIsAdmin, gip
     const supabase = createClient()
     const { data } = await supabase
       .from('message_board_posts')
-      .select('id, user_id, body, image_path, media_provider, media_provider_id, media_url, media_preview_url, media_title, media_width, media_height, created_at, users(display_name, is_monkey, automation_strategy)')
+      .select('id, user_id, body, image_path, media_provider, media_provider_id, media_url, media_preview_url, media_title, media_width, media_height, created_at, users(display_name, is_monkey, automation_strategy, avatar_emoji)')
       .order('created_at', { ascending: false })
       .limit(100)
       .returns<BoardPost[]>()
