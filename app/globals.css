@@ -274,3 +274,17 @@ body {
   font-size: 13px;
   font-weight: 700;
 }
+
+.prediction-reveal-pick-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  flex-shrink: 0;
+  gap: 2px;
+}
+
+.prediction-reveal-odds {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-muted);
+}

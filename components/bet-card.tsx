@@ -112,6 +112,9 @@ export function BetCard(props: Props) {
   } = props
   const theme = THEME[variant]
 
+  const oddsByPick: Partial<Record<Pick, number>> = {}
+  for (const o of options) oddsByPick[o.pick] = o.odds
+
   // Optimistic overlay instead of copying the prop into state. On a successful
   // save, keep the optimistic pick visible until the keyed server refresh
   // remounts the card with the new authoritative prop.
@@ -247,9 +250,10 @@ export function BetCard(props: Props) {
       {state.sheetOpen && state.revealRows !== null && myUserId && (
         <PredictionRevealSheet
           title={variant === 'match' ? `${homeTeam} vs ${awayTeam} · Picks` : (question ?? 'Picks')}
-          rows={state.revealRows}
+          rows={state.revealRows.map(row => ({ ...row, odds: oddsByPick[row.pick as Pick] ?? null }))}
           myUserId={myUserId}
           optionLabels={variant === 'pika' ? Object.fromEntries(options.map(o => [o.pick, o.label])) : undefined}
+          result={result}
           onClose={() => dispatch({ type: 'sheetClosed' })}
         />
       )}
