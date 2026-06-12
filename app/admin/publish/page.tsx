@@ -80,6 +80,21 @@ async function ensureMatchIsUnscored(supabase: AdminClient, matchId: string, dat
   }
 }
 
+async function ensureMatchCanUnpublish(supabase: AdminClient, matchId: string, date: string) {
+  const { data: match } = await supabase
+    .from('matches')
+    .select('result, locked')
+    .eq('id', matchId)
+    .single()
+
+  if (match?.result != null) {
+    redirect(publishPath(date, 'scored'))
+  }
+  if (match?.locked) {
+    redirect(publishPath(date, 'locked'))
+  }
+}
+
 async function ensurePikanteriaIsUnscored(supabase: AdminClient, pikanteriaId: string, date: string) {
   const { data: pika } = await supabase
     .from('pikanteria')
@@ -89,6 +104,21 @@ async function ensurePikanteriaIsUnscored(supabase: AdminClient, pikanteriaId: s
 
   if (pika?.result != null) {
     redirect(publishPath(date, 'scored'))
+  }
+}
+
+async function ensurePikanteriaCanUnpublish(supabase: AdminClient, pikanteriaId: string, date: string) {
+  const { data: pika } = await supabase
+    .from('pikanteria')
+    .select('result, locked')
+    .eq('id', pikanteriaId)
+    .single()
+
+  if (pika?.result != null) {
+    redirect(publishPath(date, 'scored'))
+  }
+  if (pika?.locked) {
+    redirect(publishPath(date, 'locked'))
   }
 }
 
@@ -177,7 +207,7 @@ async function unpublishMatch(formData: FormData) {
 
   const matchId = parseUUID(formData.get('match_id'), 'match_id')
   const date = parseNonEmpty(formData.get('date'), 'date')
-  await ensureMatchIsUnscored(supabase, matchId, date)
+  await ensureMatchCanUnpublish(supabase, matchId, date)
 
   await supabase.from('matches').update({ published_at: null }).eq('id', matchId)
 
@@ -304,7 +334,7 @@ async function unpublishPikanteria(formData: FormData) {
 
   const pikanteriaId = parseUUID(formData.get('pikanteria_id'), 'pikanteria_id')
   const date = parseNonEmpty(formData.get('date'), 'date')
-  await ensurePikanteriaIsUnscored(supabase, pikanteriaId, date)
+  await ensurePikanteriaCanUnpublish(supabase, pikanteriaId, date)
 
   await setPikanteriaPublishedAt(supabase, pikanteriaId, null)
 
@@ -540,6 +570,14 @@ function NoticeMessages({ notice }: { notice?: string }) {
           <div className="text-xs text-muted mt-1">Reset its result first if the odds, visibility, or lock state need to change.</div>
         </div>
       )}
+      {notice === 'locked' && (
+        <div className="rounded-xl p-4" style={{ background: 'var(--color-danger-soft)', border: '1px solid var(--border-danger)' }}>
+          <div className="text-sm font-semibold" style={{ color: 'var(--color-danger)' }}>
+            Can&apos;t unpublish a locked item
+          </div>
+          <div className="text-xs text-muted mt-1">Unlock it first if it needs to be hidden from players.</div>
+        </div>
+      )}
       {notice === 'options' && (
         <div className="rounded-xl p-4" style={{ background: 'var(--color-amber-soft)', border: '1px solid var(--border-warn)' }}>
           <div className="text-sm font-semibold" style={{ color: 'var(--color-amber)' }}>
@@ -661,7 +699,7 @@ function MatchCard({ match, date }: { match: DayMatch; date: string }) {
           <form action={unpublishMatch}>
             <input type="hidden" name="match_id" value={match.id} />
             <input type="hidden" name="date" value={date} />
-            <button type="submit" disabled={scored} className="w-full py-2 rounded-lg text-xs font-bold disabled:opacity-50"
+            <button type="submit" disabled={scored || match.locked} className="w-full py-2 rounded-lg text-xs font-bold disabled:opacity-50"
               style={{ background: 'var(--color-danger-soft)', color: 'var(--color-danger)', border: '1px solid var(--border-danger)' }}>
               Unpublish
             </button>
@@ -764,7 +802,7 @@ function PikanteriaCard({ pika, date }: { pika: DayPika; date: string }) {
               <form action={unpublishPikanteria}>
                 <input type="hidden" name="pikanteria_id" value={pika.id} />
                 <input type="hidden" name="date" value={date} />
-                <button type="submit" className="w-full py-2 rounded-lg text-xs font-bold"
+                <button type="submit" disabled={pika.locked} className="w-full py-2 rounded-lg text-xs font-bold disabled:opacity-50"
                   style={{ background: 'var(--color-danger-soft)', color: 'var(--color-danger)', border: '1px solid var(--border-danger)' }}>
                   Unpublish
                 </button>
