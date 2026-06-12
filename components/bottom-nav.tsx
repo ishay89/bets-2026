@@ -2,7 +2,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 
-const tabs = [
+export const bottomNavTabs = [
   {
     href: '/predict',
     // Soccer ball (simplified)
@@ -20,6 +20,12 @@ const tabs = [
     label: 'Social',
     // Message bubble
     d: 'M4 4h16v12H8l-4 4V4zm4 5h8M8 12h5',
+  },
+  {
+    href: '/recaps',
+    label: 'Recaps',
+    // Newspaper
+    d: 'M4 5h13a3 3 0 0 1 3 3v11H7a3 3 0 0 1-3-3V5zm3 0v11a3 3 0 0 1-3 3M9 9h6M9 13h6M9 17h3',
   },
   {
     href: '/history',
@@ -48,7 +54,7 @@ export function BottomNav() {
         paddingBottom: 'env(safe-area-inset-bottom, 8px)',
       }}
     >
-      {tabs.map(({ href, label, d }) => {
+      {bottomNavTabs.map(({ href, label, d }) => {
         const active = pathname === href
         return (
           <Link
