@@ -73,7 +73,17 @@ export function Leaderboard({
 
   const top3 = sorted.slice(0, 3)
   const rest = sorted.slice(3)
-  const dangerStartRank = sorted.length - 1
+
+  // Fines per the rules: the player finishing LAST pays ₪200, second-to-last
+  // pays ₪100. Automated baselines are not eligible for prizes or fines, so
+  // the fines target the bottom two human players.
+  const humans = sorted.filter(e => !isAutomated(e))
+  const fineByEntryId = new Map<string, string>()
+  if (humans.length >= 2) {
+    fineByEntryId.set(humans[humans.length - 1].id, '+₪200')
+    fineByEntryId.set(humans[humans.length - 2].id, '+₪100')
+  }
+  const firstDangerIndex = rest.findIndex(e => fineByEntryId.has(e.id))
 
   const hasToday = entries.some(e => e.today_points > 0)
 
@@ -182,15 +192,10 @@ export function Leaderboard({
           const isMe = entry.id === currentUserId
           const av = getAvatar(entry)
           const automationLabel = getAutomationLabel(entry)
-          const isDanger = entries.length >= 2 && displayRank >= dangerStartRank
-          const fine = displayRank === sorted.length - 1 ? '+₪200' : displayRank === sorted.length ? '+₪100' : null
-          // Show the "danger zone" banner once, right above the first row at
-          // dangerStartRank - even if multiple players are tied at that rank.
-          const prevEntry = rest[i - 1]
-          const prevDisplayRank = prevEntry
-            ? (mode === 'total' && prevEntry.current_rank ? prevEntry.current_rank : i + 3)
-            : null
-          const isFirstAtDangerStart = displayRank === dangerStartRank && prevDisplayRank !== dangerStartRank
+          const isDanger = fineByEntryId.has(entry.id)
+          const fine = fineByEntryId.get(entry.id) ?? null
+          // Show the "danger zone" banner once, right above the first fined row.
+          const isFirstAtDangerStart = i === firstDangerIndex
           return (
             <div key={entry.id}>
               {isDanger && isFirstAtDangerStart && (
