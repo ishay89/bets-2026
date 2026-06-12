@@ -17,11 +17,16 @@ export default async function HistoryPage() {
 
   const matchDays = await getMatchDaysWithUserData(supabase)
 
+  // matchDays arrives newest-first; build the pick list in chronological order
+  // (oldest day first, matches by kickoff) so slice(-15) really is the latest
+  // 15 picks, rendered oldest → newest.
   const allPicks: { outcome: 'W' | 'L'; matchId: string }[] = []
-  for (const day of matchDays.slice(0, 10)) {
-    for (const m of day.matches) {
-      const predMap = new Map(m.predictions.map(p => [p.user_id, p]))
-      const pred = predMap.get(user.id)
+  for (const day of matchDays.slice(0, 10).toReversed()) {
+    const dayMatches = day.matches.toSorted(
+      (a, b) => new Date(a.kickoff_time).getTime() - new Date(b.kickoff_time).getTime()
+    )
+    for (const m of dayMatches) {
+      const pred = m.predictions.find(p => p.user_id === user.id)
       if (pred && m.result !== null) {
         allPicks.push({ outcome: pred.pick === m.result ? 'W' : 'L', matchId: m.id })
       }
