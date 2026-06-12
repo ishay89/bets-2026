@@ -261,9 +261,11 @@ Optional:
 
 ```env
 ADMIN_EMAILS=admin1@example.com,admin2@example.com
+NEXT_PUBLIC_GIPHY_API_KEY=...
 ```
 
 `ADMIN_EMAILS` only affects first-time profile creation in `app/layout.tsx`.
+`NEXT_PUBLIC_GIPHY_API_KEY` enables the GIPHY picker on `/board`; without it, users can still write posts and upload images/GIF files.
 
 ## Development Notes
 

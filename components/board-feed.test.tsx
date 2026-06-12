@@ -18,12 +18,26 @@ describe('BoardFeed', () => {
         initialPosts={[]}
         currentUserId="user-1"
         currentUserIsAdmin={false}
+        giphyApiKey="test-key"
       />,
     )
 
     expect(markup).toContain('User Board')
     expect(markup).not.toContain('AI Recaps')
     expect(markup).not.toContain('Opening line')
+  })
+
+  it('renders the GIPHY picker entrypoint when an API key is configured', () => {
+    const markup = renderToStaticMarkup(
+      <BoardFeed
+        initialPosts={[]}
+        currentUserId="user-1"
+        currentUserIsAdmin={false}
+        giphyApiKey="test-key"
+      />,
+    )
+
+    expect(markup).toContain('Add GIF')
   })
 })
 
