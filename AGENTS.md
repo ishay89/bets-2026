@@ -96,8 +96,8 @@ Never use `user!.id` in Server Components.
 
 For admin Server Components and Server Actions, call `assertAdmin()` from `lib/supabase/server.ts` before privileged reads/writes. Use:
 - `createClient()` for user-session scoped reads/writes
-- `createAdminClient()` for service-role operations that bypass RLS without cookies
-- `createServiceClient()` for service-role operations that still need cookie plumbing in Server Actions
+- `createAdminClient()` for service-role operations that bypass RLS without cookies — required for service_role-only RPCs (scoring, resets)
+- `createServiceClient()` only when cookie plumbing is needed; despite the service key, it sends the signed-in user's JWT, so requests run as `authenticated` with RLS enforced — it is NOT a true service-role client
 
 ## Data Model
 
