@@ -1,22 +1,9 @@
 'use client'
 import { useEffect, useState } from 'react'
-import type { PlayerRevealRow } from '@/lib/prediction-reveals'
+import { computePickDistribution, type PlayerRevealRow } from '@/lib/prediction-reveals'
 import type { Pick } from '@/lib/types'
 import { getAvatar, getAutomationLabel } from '@/lib/display'
-
-const SEG_COLORS = [
-  'var(--color-amber)',
-  'var(--color-accent)',
-  'var(--color-dim)',
-  'var(--color-silver)',
-  'var(--color-sub)',
-]
-
-const MATCH_PICK_COLORS: Record<string, string> = {
-  '1': 'var(--color-accent)',
-  X: 'var(--color-dim)',
-  '2': 'var(--color-amber)',
-}
+import { PickDistributionChart, pickColor } from './pick-distribution-chart'
 
 interface Props {
   title: string
@@ -33,7 +20,11 @@ export function PredictionRevealSheet({ title, rows, myUserId, optionLabels, res
   const [visible, setVisible] = useState(false)
   useEffect(() => { const t = setTimeout(() => setVisible(true), 0); return () => clearTimeout(t) }, [])
 
-  const optionKeys = optionLabels ? Object.keys(optionLabels) : []
+  const optionKeys = optionLabels ? Object.keys(optionLabels) : undefined
+  const segments = computePickDistribution(rows)
+  const colorByPick: Record<string, string> = Object.fromEntries(
+    segments.map((s, i) => [s.pick, pickColor(s.pick, i, optionLabels, optionKeys)]),
+  )
 
   return (
     <div className="prediction-reveal-shell">
@@ -71,6 +62,9 @@ export function PredictionRevealSheet({ title, rows, myUserId, optionLabels, res
           </button>
         </div>
 
+        {/* Pick distribution */}
+        <PickDistributionChart segments={segments} colorByPick={colorByPick} optionLabels={optionLabels} />
+
         {/* Player list */}
         {rows.length === 0 ? (
           <div className="prediction-reveal-empty">
@@ -82,9 +76,7 @@ export function PredictionRevealSheet({ title, rows, myUserId, optionLabels, res
             {rows.map((row, i) => {
               const isMe = row.userId === myUserId
               const pickLabel = optionLabels ? (optionLabels[row.pick] ?? row.pick) : row.pick
-              const pickColor = optionLabels
-                ? SEG_COLORS[optionKeys.indexOf(row.pick) % SEG_COLORS.length]
-                : (MATCH_PICK_COLORS[row.pick] ?? 'var(--color-muted)')
+              const pickColorValue = colorByPick[row.pick]
               const automationLabel = getAutomationLabel({
                 is_monkey: row.isMonkey,
                 automation_strategy: row.automationStrategy,
@@ -133,7 +125,7 @@ export function PredictionRevealSheet({ title, rows, myUserId, optionLabels, res
                           {row.pick === result ? '✓' : '✗'}
                         </span>
                       )}
-                      <div className="prediction-reveal-pick" style={{ color: pickColor }}>
+                      <div className="prediction-reveal-pick" style={{ color: pickColorValue }}>
                         {pickLabel}
                       </div>
                     </div>

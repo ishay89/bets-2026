@@ -25,6 +25,18 @@ export function sortAndRankRevealRows(
     .map((row, i) => ({ ...row, rank: i + 1 }))
 }
 
+export type PickDistributionSegment = { pick: string; count: number; pct: number }
+
+/** Groups reveal rows by `pick`, returning counts and rounded percentages, sorted by count descending. */
+export function computePickDistribution(rows: PlayerRevealRow[]): PickDistributionSegment[] {
+  const counts = new Map<string, number>()
+  for (const row of rows) counts.set(row.pick, (counts.get(row.pick) ?? 0) + 1)
+  const total = rows.length
+  return Array.from(counts.entries())
+    .map(([pick, count]) => ({ pick, count, pct: Math.round((count / total) * 100) }))
+    .sort((a, b) => b.count - a.count)
+}
+
 type Db = SupabaseClient<Database>
 
 type UserRaw = {
