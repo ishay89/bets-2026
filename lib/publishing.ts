@@ -16,6 +16,16 @@ type PublishClient = {
   ): PromiseLike<{ error: SupabaseError }>
 }
 
+type MatchLockClient = {
+  from(table: 'matches'): {
+    update(values: { locked: boolean }): {
+      eq(column: 'match_day_id', value: string): {
+        is(column: 'result', value: null): PromiseLike<{ error: SupabaseError }>
+      }
+    }
+  }
+}
+
 function errorMessage(error: SupabaseError): string {
   return error?.message ?? 'Unknown Supabase error'
 }
@@ -49,4 +59,20 @@ export async function setPikanteriaPublishedAt(
   }
 
   return { matchDayId }
+}
+
+export async function setUnscoredMatchLocksForDay(
+  supabase: MatchLockClient,
+  matchDayId: string,
+  locked: boolean,
+): Promise<void> {
+  const { error } = await supabase
+    .from('matches')
+    .update({ locked })
+    .eq('match_day_id', matchDayId)
+    .is('result', null)
+
+  if (error) {
+    throw new Error(`Failed to update match locks: ${errorMessage(error)}`)
+  }
 }

@@ -7,7 +7,7 @@ import {
 } from '@/lib/monkey'
 import { getAutomatedUsers } from '@/lib/data'
 import { appDateKey, formatAppTime } from '@/lib/time'
-import { setPikanteriaPublishedAt } from '@/lib/publishing'
+import { setPikanteriaPublishedAt, setUnscoredMatchLocksForDay } from '@/lib/publishing'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { PicanteriaBuilder } from '@/components/pikanteria-builder'
@@ -263,6 +263,22 @@ async function toggleMatchLock(formData: FormData) {
   await ensureMatchIsUnscored(supabase, matchId, date)
 
   await supabase.from('matches').update({ locked: !locked }).eq('id', matchId)
+
+  revalidatePath('/predict')
+  revalidatePath('/admin/publish')
+  redirect(publishPath(date))
+}
+
+async function toggleDayMatchLocks(formData: FormData) {
+  'use server'
+  await assertAdmin()
+  const supabase = createAdminClient()
+
+  const matchDayId = parseUUID(formData.get('match_day_id'), 'match_day_id')
+  const date = parseNonEmpty(formData.get('date'), 'date')
+  const locked = formData.get('locked') === 'true'
+
+  await setUnscoredMatchLocksForDay(supabase, matchDayId, !locked)
 
   revalidatePath('/predict')
   revalidatePath('/admin/publish')
@@ -612,16 +628,33 @@ function DaySummary({
   matches: DayMatch[]
   pikanteria: DayPika[]
 }) {
+  const unscoredMatches = matches.filter(match => match.result == null)
+  const canToggleMatchLocks = unscoredMatches.length > 0
+  const allUnscoredMatchesLocked = canToggleMatchLocks && unscoredMatches.every(match => match.locked)
+
   return (
-    <div className="rounded-xl p-3 flex items-center gap-3"
+    <div className="rounded-xl p-3 flex items-center justify-between gap-3"
       style={{ background: 'var(--color-accent-soft)', border: '1px solid var(--border-accent)' }}>
-      <div>
+      <div className="min-w-0">
         <div className="text-sm font-bold text-text">{day.date} - {day.stage}</div>
         <div className="text-xs text-muted">
           {countPublishedItems(matches)}/{matches.length} matches live
           {pikanteria.length > 0 && ` · ${countPublishedItems(pikanteria)}/${pikanteria.length} pikanteria live`}
         </div>
       </div>
+      <form action={toggleDayMatchLocks} className="shrink-0">
+        <input type="hidden" name="match_day_id" value={day.id} />
+        <input type="hidden" name="date" value={day.date} />
+        <input type="hidden" name="locked" value={String(allUnscoredMatchesLocked)} />
+        <button type="submit" disabled={!canToggleMatchLocks} className="px-3 py-2 rounded-lg text-xs font-bold whitespace-nowrap disabled:opacity-50"
+          style={{
+            background: allUnscoredMatchesLocked ? 'var(--color-accent-soft)' : 'var(--color-danger-soft)',
+            color: allUnscoredMatchesLocked ? 'var(--color-accent)' : 'var(--color-danger)',
+            border: `1px solid ${allUnscoredMatchesLocked ? 'var(--border-accent)' : 'var(--border-danger)'}`,
+          }}>
+          {allUnscoredMatchesLocked ? 'Unlock all matches' : 'Lock all matches'}
+        </button>
+      </form>
     </div>
   )
 }
