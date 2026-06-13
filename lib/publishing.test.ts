@@ -1,7 +1,7 @@
 import { describe, expect, test, vi } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { setPikanteriaPublishedAt } from './publishing'
+import { setPikanteriaPublishedAt, setUnscoredMatchLocksForDay } from './publishing'
 
 function pikanteriaUpdateClient(
   updateResult: { data: unknown; error: { message: string } | null },
@@ -15,6 +15,15 @@ function pikanteriaUpdateClient(
   const rpc = vi.fn(async () => syncResult)
 
   return { client: { from, rpc }, from, update, eq, select, single, rpc }
+}
+
+function matchLockClient(result: { error: { message: string } | null } = { error: null }) {
+  const is = vi.fn(async () => result)
+  const eq = vi.fn(() => ({ is }))
+  const update = vi.fn(() => ({ eq }))
+  const from = vi.fn(() => ({ update }))
+
+  return { client: { from }, from, update, eq, is }
 }
 
 describe('pikanteria publishing', () => {
@@ -63,5 +72,34 @@ describe('pikanteria publish visibility migration', () => {
     expect(sql).toContain('grant execute on function public.recompute_match_day_publish(uuid) to service_role')
     expect(sql).toContain('create trigger pikanteria_publish_sync')
     expect(sql).toContain('perform public.recompute_match_day_publish(v_match_day_id)')
+  })
+})
+
+describe('pikanteria canonical match day migration', () => {
+  const sql = readFileSync(
+    join(process.cwd(), 'supabase/migrations/20260613120000_canonical_pikanteria_match_day.sql'),
+    'utf8',
+  )
+
+  test('inserts pikanteria into the match day used by matches for that date', () => {
+    expect(sql).toContain('create or replace function public.insert_pikanteria')
+    expect(sql).toContain('select md.date into v_requested_date')
+    expect(sql).toContain('select m.match_day_id into v_canonical_match_day_id')
+    expect(sql).toContain('join public.match_days md on md.id = m.match_day_id')
+    expect(sql).toContain('md.date = v_requested_date')
+    expect(sql).toContain('values (v_canonical_match_day_id')
+  })
+})
+
+describe('bulk match day locks', () => {
+  test('locks only unscored matches in a match day group', async () => {
+    const mocks = matchLockClient()
+
+    await setUnscoredMatchLocksForDay(mocks.client, 'day-1', true)
+
+    expect(mocks.from).toHaveBeenCalledWith('matches')
+    expect(mocks.update).toHaveBeenCalledWith({ locked: true })
+    expect(mocks.eq).toHaveBeenCalledWith('match_day_id', 'day-1')
+    expect(mocks.is).toHaveBeenCalledWith('result', null)
   })
 })
