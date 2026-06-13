@@ -53,8 +53,52 @@ describe('admin audit player filter', () => {
       'utf8'
     )
 
-    expect(client).toMatch(/import \{ fetchAuditEvents, fetchAuditUsers \} from '\.\/actions'/)
+    expect(client).toMatch(/import \{ fetchAuditBetOptions, fetchAuditEvents, fetchAuditUsers \} from '\.\/actions'/)
     expect(client).toMatch(/users: AuditUser\[\]/)
     expect(client.match(/fetchAuditUsers\(\)/g)?.length ?? 0).toBeGreaterThanOrEqual(2)
+  })
+})
+
+describe('admin audit bet filter', () => {
+  test('filters audit events by event type and entity reference', () => {
+    const actions = readFileSync(
+      join(process.cwd(), 'app/admin/audit/actions.ts'),
+      'utf8'
+    )
+    const fetchEventsAction = actions.slice(
+      actions.indexOf('export async function fetchAuditEvents'),
+      actions.indexOf('export async function fetchAuditUsers')
+    )
+
+    expect(fetchEventsAction).toMatch(/eventType\?: AuditEventType/)
+    expect(fetchEventsAction).toMatch(/entityRef\?: string/)
+    expect(fetchEventsAction).toMatch(/if \(eventType\) query = query\.eq\('event_type', eventType\)/)
+    expect(fetchEventsAction).toMatch(/if \(entityRef\) query = query\.eq\('entity_ref', entityRef\)/)
+  })
+
+  test('loads selectable match pikanteria and futures bet filters', () => {
+    const actions = readFileSync(
+      join(process.cwd(), 'app/admin/audit/actions.ts'),
+      'utf8'
+    )
+    const fetchBetOptionsAction = actions.slice(actions.indexOf('export async function fetchAuditBetOptions'))
+
+    expect(fetchBetOptionsAction).toMatch(/\.from\('matches'\)/)
+    expect(fetchBetOptionsAction).toMatch(/\.from\('pikanteria'\)/)
+    expect(fetchBetOptionsAction).toMatch(/eventType: 'pre_tournament_pick'/)
+    expect(fetchBetOptionsAction).toMatch(/entityRef: 'pre_tournament'/)
+  })
+
+  test('keeps the selected bet filter through search and pagination', () => {
+    const client = readFileSync(
+      join(process.cwd(), 'app/admin/audit/AuditClient.tsx'),
+      'utf8'
+    )
+
+    expect(client).toMatch(/betOptions: AuditBetOption\[\]/)
+    expect(client).toMatch(/eventType: eventType \|\| undefined/)
+    expect(client).toMatch(/entityRef: entityRef \|\| undefined/)
+    expect(client).toMatch(/activeEventType: action\.eventType/)
+    expect(client).toMatch(/activeEntityRef: action\.entityRef/)
   })
 })
