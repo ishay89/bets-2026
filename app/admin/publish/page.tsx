@@ -8,6 +8,7 @@ import {
 import { getAutomatedUsers } from '@/lib/data'
 import { appDateKey, formatAppTime } from '@/lib/time'
 import { setPikanteriaPublishedAt, setUnscoredMatchLocksForDay } from '@/lib/publishing'
+import { getAdminDayMatchLockState, getAdminMatchLockState } from '@/lib/admin-lock-state'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { PicanteriaBuilder } from '@/components/pikanteria-builder'
@@ -83,14 +84,14 @@ async function ensureMatchIsUnscored(supabase: AdminClient, matchId: string, dat
 async function ensureMatchCanUnpublish(supabase: AdminClient, matchId: string, date: string) {
   const { data: match } = await supabase
     .from('matches')
-    .select('result, locked')
+    .select('result, locked, kickoff_time')
     .eq('id', matchId)
     .single()
 
   if (match?.result != null) {
     redirect(publishPath(date, 'scored'))
   }
-  if (match?.locked) {
+  if (match && getAdminMatchLockState(match).locked) {
     redirect(publishPath(date, 'locked'))
   }
 }
@@ -628,9 +629,7 @@ function DaySummary({
   matches: DayMatch[]
   pikanteria: DayPika[]
 }) {
-  const unscoredMatches = matches.filter(match => match.result == null)
-  const canToggleMatchLocks = unscoredMatches.length > 0
-  const allUnscoredMatchesLocked = canToggleMatchLocks && unscoredMatches.every(match => match.locked)
+  const lockState = getAdminDayMatchLockState(matches)
 
   return (
     <div className="rounded-xl p-3 flex items-center justify-between gap-3"
@@ -645,14 +644,14 @@ function DaySummary({
       <form action={toggleDayMatchLocks} className="shrink-0">
         <input type="hidden" name="match_day_id" value={day.id} />
         <input type="hidden" name="date" value={day.date} />
-        <input type="hidden" name="locked" value={String(allUnscoredMatchesLocked)} />
-        <button type="submit" disabled={!canToggleMatchLocks} className="px-3 py-2 rounded-lg text-xs font-bold whitespace-nowrap disabled:opacity-50"
+        <input type="hidden" name="locked" value={String(lockState.toggleInputLockedValue)} />
+        <button type="submit" disabled={!lockState.canToggle} className="px-3 py-2 rounded-lg text-xs font-bold whitespace-nowrap disabled:opacity-50"
           style={{
-            background: allUnscoredMatchesLocked ? 'var(--color-accent-soft)' : 'var(--color-danger-soft)',
-            color: allUnscoredMatchesLocked ? 'var(--color-accent)' : 'var(--color-danger)',
-            border: `1px solid ${allUnscoredMatchesLocked ? 'var(--border-accent)' : 'var(--border-danger)'}`,
+            background: lockState.allLocked ? 'var(--color-accent-soft)' : 'var(--color-danger-soft)',
+            color: lockState.allLocked ? 'var(--color-accent)' : 'var(--color-danger)',
+            border: `1px solid ${lockState.allLocked ? 'var(--border-accent)' : 'var(--border-danger)'}`,
           }}>
-          {allUnscoredMatchesLocked ? 'Unlock all matches' : 'Lock all matches'}
+          {lockState.toggleLabel}
         </button>
       </form>
     </div>
@@ -662,6 +661,7 @@ function DaySummary({
 function MatchCard({ match, date }: { match: DayMatch; date: string }) {
   const published = match.published_at != null
   const scored = match.result != null
+  const lockState = getAdminMatchLockState(match)
   const kickoffLabel = `${formatAppTime(match.kickoff_time)} ET`
 
   return (
@@ -674,7 +674,7 @@ function MatchCard({ match, date }: { match: DayMatch; date: string }) {
         </div>
         <div className="flex items-center gap-2 flex-wrap justify-end">
           <StatusBadge published={published} />
-          <LockBadge locked={match.locked} />
+          <LockBadge locked={lockState.locked} />
           {scored && <ScoredBadge />}
         </div>
       </div>
@@ -717,14 +717,18 @@ function MatchCard({ match, date }: { match: DayMatch; date: string }) {
         <form action={toggleMatchLock}>
           <input type="hidden" name="match_id" value={match.id} />
           <input type="hidden" name="date" value={date} />
-          <input type="hidden" name="locked" value={String(match.locked)} />
-          <button type="submit" disabled={scored} className="w-full py-2 rounded-lg text-xs font-bold disabled:opacity-50"
+          <input type="hidden" name="locked" value={String(lockState.toggleInputLockedValue)} />
+          <button
+            type="submit"
+            disabled={!lockState.canToggle}
+            title={lockState.timeLocked ? 'Locked by kickoff time' : undefined}
+            className="w-full py-2 rounded-lg text-xs font-bold disabled:opacity-50"
             style={{
-              background: match.locked ? 'var(--color-accent-soft)' : 'var(--color-danger-soft)',
-              color: match.locked ? 'var(--color-accent)' : 'var(--color-danger)',
-              border: `1px solid ${match.locked ? 'var(--border-accent)' : 'var(--border-danger)'}`,
+              background: lockState.locked ? 'var(--color-accent-soft)' : 'var(--color-danger-soft)',
+              color: lockState.locked ? 'var(--color-accent)' : 'var(--color-danger)',
+              border: `1px solid ${lockState.locked ? 'var(--border-accent)' : 'var(--border-danger)'}`,
             }}>
-            {match.locked ? 'Unlock' : 'Lock'}
+            {lockState.toggleLabel}
           </button>
         </form>
 
@@ -732,7 +736,7 @@ function MatchCard({ match, date }: { match: DayMatch; date: string }) {
           <form action={unpublishMatch}>
             <input type="hidden" name="match_id" value={match.id} />
             <input type="hidden" name="date" value={date} />
-            <button type="submit" disabled={scored || match.locked} className="w-full py-2 rounded-lg text-xs font-bold disabled:opacity-50"
+            <button type="submit" disabled={!lockState.canUnpublish} className="w-full py-2 rounded-lg text-xs font-bold disabled:opacity-50"
               style={{ background: 'var(--color-danger-soft)', color: 'var(--color-danger)', border: '1px solid var(--border-danger)' }}>
               Unpublish
             </button>
