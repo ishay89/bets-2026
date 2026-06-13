@@ -2,8 +2,8 @@
 
 import React, { useReducer, useTransition } from 'react'
 import { formatAppDateTime } from '@/lib/time'
-import { fetchAuditEvents, fetchAuditUsers } from './actions'
-import { PAGE_SIZE, type AuditRow, type AuditUser, type AuditValue } from './types'
+import { fetchAuditBetOptions, fetchAuditEvents, fetchAuditUsers } from './actions'
+import { PAGE_SIZE, type AuditBetOption, type AuditEventType, type AuditRow, type AuditUser, type AuditValue } from './types'
 
 function asText(value: unknown) {
   return typeof value === 'string' || typeof value === 'number' ? String(value) : ''
@@ -61,21 +61,27 @@ const inputStyle: React.CSSProperties = {
 type AuditState = {
   events: AuditRow[]
   users: AuditUser[]
+  betOptions: AuditBetOption[]
   from: string
   to: string
   userId: string
+  eventType: AuditEventType | ''
+  entityRef: string
   activeFrom: string
   activeTo: string
   activeUserId: string
+  activeEventType: AuditEventType | ''
+  activeEntityRef: string
 }
 
 type AuditAction =
   | { type: 'SET_FROM'; value: string }
   | { type: 'SET_TO'; value: string }
   | { type: 'SET_USER'; value: string }
-  | { type: 'SET_EVENTS'; events: AuditRow[]; users: AuditUser[]; from: string; to: string; userId: string }
-  | { type: 'APPEND_EVENTS'; events: AuditRow[]; users: AuditUser[] }
-  | { type: 'RESET'; events: AuditRow[]; users: AuditUser[] }
+  | { type: 'SET_BET_FILTER'; eventType: AuditEventType | ''; entityRef: string }
+  | { type: 'SET_EVENTS'; events: AuditRow[]; users: AuditUser[]; betOptions: AuditBetOption[]; from: string; to: string; userId: string; eventType: AuditEventType | ''; entityRef: string }
+  | { type: 'APPEND_EVENTS'; events: AuditRow[]; users: AuditUser[]; betOptions: AuditBetOption[] }
+  | { type: 'RESET'; events: AuditRow[]; users: AuditUser[]; betOptions: AuditBetOption[] }
 
 function auditReducer(state: AuditState, action: AuditAction): AuditState {
   switch (action.type) {
@@ -85,29 +91,83 @@ function auditReducer(state: AuditState, action: AuditAction): AuditState {
       return { ...state, to: action.value }
     case 'SET_USER':
       return { ...state, userId: action.value }
+    case 'SET_BET_FILTER':
+      return { ...state, eventType: action.eventType, entityRef: action.entityRef }
     case 'SET_EVENTS':
-      return { ...state, events: action.events, users: action.users, activeFrom: action.from, activeTo: action.to, activeUserId: action.userId }
+      return {
+        ...state,
+        events: action.events,
+        users: action.users,
+        betOptions: action.betOptions,
+        activeFrom: action.from,
+        activeTo: action.to,
+        activeUserId: action.userId,
+        activeEventType: action.eventType,
+        activeEntityRef: action.entityRef,
+      }
     case 'APPEND_EVENTS':
-      return { ...state, events: [...state.events, ...action.events], users: action.users }
+      return { ...state, events: [...state.events, ...action.events], users: action.users, betOptions: action.betOptions }
     case 'RESET':
-      return { ...state, from: '', to: '', userId: '', activeFrom: '', activeTo: '', activeUserId: '', events: action.events, users: action.users }
+      return {
+        ...state,
+        from: '',
+        to: '',
+        userId: '',
+        eventType: '',
+        entityRef: '',
+        activeFrom: '',
+        activeTo: '',
+        activeUserId: '',
+        activeEventType: '',
+        activeEntityRef: '',
+        events: action.events,
+        users: action.users,
+        betOptions: action.betOptions,
+      }
     default:
       return state
   }
 }
 
-export default function AuditClient({ initialEvents, users }: { initialEvents: AuditRow[]; users: AuditUser[] }) {
+export default function AuditClient({
+  initialEvents,
+  users,
+  betOptions,
+}: {
+  initialEvents: AuditRow[]
+  users: AuditUser[]
+  betOptions: AuditBetOption[]
+}) {
   const [state, dispatch] = useReducer(auditReducer, {
     events: initialEvents,
     users,
+    betOptions,
     from: '',
     to: '',
     userId: '',
+    eventType: '',
+    entityRef: '',
     activeFrom: '',
     activeTo: '',
     activeUserId: '',
+    activeEventType: '',
+    activeEntityRef: '',
   })
-  const { events, users: currentUsers, from, to, userId, activeFrom, activeTo, activeUserId } = state
+  const {
+    events,
+    users: currentUsers,
+    betOptions: currentBetOptions,
+    from,
+    to,
+    userId,
+    eventType,
+    entityRef,
+    activeFrom,
+    activeTo,
+    activeUserId,
+    activeEventType,
+    activeEntityRef,
+  } = state
   const [isPending, startTransition] = useTransition()
   const [isLoadingMore, startLoadMore] = useTransition()
 
@@ -115,41 +175,58 @@ export default function AuditClient({ initialEvents, users }: { initialEvents: A
 
   function handleSearch() {
     startTransition(async () => {
-      const [results, nextUsers] = await Promise.all([
+      const [results, nextUsers, nextBetOptions] = await Promise.all([
         fetchAuditEvents({
           from: from || undefined,
           to: to || undefined,
           userId: userId || undefined,
+          eventType: eventType || undefined,
+          entityRef: entityRef || undefined,
           offset: 0,
         }),
         fetchAuditUsers(),
+        fetchAuditBetOptions(),
       ])
-      dispatch({ type: 'SET_EVENTS', events: results, users: nextUsers, from, to, userId })
+      dispatch({
+        type: 'SET_EVENTS',
+        events: results,
+        users: nextUsers,
+        betOptions: nextBetOptions,
+        from,
+        to,
+        userId,
+        eventType,
+        entityRef,
+      })
     })
   }
 
   function handleReset() {
     startTransition(async () => {
-      const [results, nextUsers] = await Promise.all([
+      const [results, nextUsers, nextBetOptions] = await Promise.all([
         fetchAuditEvents({ offset: 0 }),
         fetchAuditUsers(),
+        fetchAuditBetOptions(),
       ])
-      dispatch({ type: 'RESET', events: results, users: nextUsers })
+      dispatch({ type: 'RESET', events: results, users: nextUsers, betOptions: nextBetOptions })
     })
   }
 
   function handleLoadMore() {
     startLoadMore(async () => {
-      const [results, nextUsers] = await Promise.all([
+      const [results, nextUsers, nextBetOptions] = await Promise.all([
         fetchAuditEvents({
           from: activeFrom || undefined,
           to: activeTo || undefined,
           userId: activeUserId || undefined,
+          eventType: activeEventType || undefined,
+          entityRef: activeEntityRef || undefined,
           offset: events.length,
         }),
         fetchAuditUsers(),
+        fetchAuditBetOptions(),
       ])
-      dispatch({ type: 'APPEND_EVENTS', events: results, users: nextUsers })
+      dispatch({ type: 'APPEND_EVENTS', events: results, users: nextUsers, betOptions: nextBetOptions })
     })
   }
 
@@ -170,7 +247,7 @@ export default function AuditClient({ initialEvents, users }: { initialEvents: A
         </div>
       </div>
 
-      {/* User + date/time filter */}
+      {/* User + bet + date/time filter */}
       <div className="rounded-xl p-4 flex flex-wrap items-end gap-3" style={panelStyle}>
         <div className="flex flex-col gap-1">
           <label htmlFor="audit-user" className="text-[10px] font-semibold" style={{ color: 'var(--color-muted)' }}>Player</label>
@@ -186,6 +263,41 @@ export default function AuditClient({ initialEvents, users }: { initialEvents: A
                 {u.display_name}
               </option>
             ))}
+          </select>
+        </div>
+        <div className="flex flex-col gap-1 min-w-[240px]">
+          <label htmlFor="audit-bet" className="text-[10px] font-semibold" style={{ color: 'var(--color-muted)' }}>Bet</label>
+          <select
+            id="audit-bet"
+            value={eventType && entityRef ? `${eventType}:${entityRef}` : ''}
+            onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
+              if (!e.target.value) {
+                dispatch({ type: 'SET_BET_FILTER', eventType: '', entityRef: '' })
+                return
+              }
+              const [nextEventType, nextEntityRef] = e.target.value.split(':')
+              dispatch({
+                type: 'SET_BET_FILTER',
+                eventType: (nextEventType ?? '') as AuditEventType,
+                entityRef: nextEntityRef ?? '',
+              })
+            }}
+            style={inputStyle}
+          >
+            <option value="">All bets</option>
+            {(['Matches', 'Pikanteria', 'Futures'] as const).map((group) => {
+              const options = currentBetOptions.filter((option) => option.group === group)
+              if (options.length === 0) return null
+              return (
+                <optgroup key={group} label={group}>
+                  {options.map((option) => (
+                    <option key={`${option.eventType}:${option.entityRef}`} value={`${option.eventType}:${option.entityRef}`}>
+                      {option.detail ? `${option.label} - ${option.detail}` : option.label}
+                    </option>
+                  ))}
+                </optgroup>
+              )
+            })}
           </select>
         </div>
         <div className="flex flex-col gap-1">
@@ -217,7 +329,7 @@ export default function AuditClient({ initialEvents, users }: { initialEvents: A
         >
           {isPending ? 'Loading...' : 'Search'}
         </button>
-        {(activeFrom || activeTo || activeUserId) && (
+        {(activeFrom || activeTo || activeUserId || activeEventType || activeEntityRef) && (
           <button
             type="button"
             onClick={handleReset}
