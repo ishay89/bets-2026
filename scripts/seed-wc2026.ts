@@ -12,8 +12,9 @@
  *   - Migration 003_add_r32_stage.sql applied in Supabase SQL Editor
  *
  * All kickoff times are stored as Jerusalem-local ISO timestamps (`+03:00`).
- * Match-day dates use the Jerusalem calendar date as the reference.
- * Lock times are 5 minutes before the earliest kickoff of each Jerusalem day.
+ * Match-day groups use the Jerusalem evening-to-morning window: kickoffs from
+ * 18:00 through 09:00 the next morning share the evening's group date.
+ * Lock times are 5 minutes before the earliest kickoff of each group.
  *
  * Odds are pre-tournament estimates; update via /admin/results before each day.
  */
@@ -21,6 +22,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { config } from 'dotenv'
 import { resolve } from 'path'
+import { matchGroupDateKey } from '../lib/time'
 
 config({ path: resolve(process.cwd(), '.env.local') })
 
@@ -44,10 +46,42 @@ interface MatchInput {
 }
 
 interface MatchDayInput {
-  date: string        // Jerusalem calendar date (YYYY-MM-DD)
+  date: string        // Source fixture date (YYYY-MM-DD)
   stage: string
-  lock_time: string   // Jerusalem timestamp, 5 min before earliest kickoff
+  lock_time: string   // Source lock time; inserted rows derive the group lock time
   matches: MatchInput[]
+}
+
+const MATCH_LOCK_OFFSET_MS = 5 * 60 * 1000
+
+function groupByMatchDayWindow(days: MatchDayInput[]): MatchDayInput[] {
+  const grouped = new Map<string, MatchInput[]>()
+
+  for (const day of days) {
+    for (const match of day.matches) {
+      const groupDate = matchGroupDateKey(match.kickoff_time)
+      grouped.set(groupDate, [...(grouped.get(groupDate) ?? []), match])
+    }
+  }
+
+  return [...grouped.entries()]
+    .sort(([dateA], [dateB]) => dateA.localeCompare(dateB))
+    .map(([date, matches]) => {
+      const sortedMatches = matches.toSorted(
+        (a, b) => new Date(a.kickoff_time).getTime() - new Date(b.kickoff_time).getTime(),
+      )
+      const firstKickoff = sortedMatches[0]?.kickoff_time
+      if (!firstKickoff) {
+        throw new Error(`No matches found for group ${date}`)
+      }
+
+      return {
+        date,
+        stage: 'group',
+        lock_time: new Date(new Date(firstKickoff).getTime() - MATCH_LOCK_OFFSET_MS).toISOString(),
+        matches: sortedMatches,
+      }
+    })
 }
 
 // ─── Groups ──────────────────────────────────────────────────────────────────
@@ -287,7 +321,7 @@ async function seed() {
   let totalDays = 0
   let totalMatches = 0
 
-  for (const day of groupStage) {
+  for (const day of groupByMatchDayWindow(groupStage)) {
     // Insert match_day
     const { data: md, error: mdErr } = await supabase
       .from('match_days')

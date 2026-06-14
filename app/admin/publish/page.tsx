@@ -663,7 +663,7 @@ function MatchCard({ match, date }: { match: DayMatch; date: string }) {
   const published = match.published_at != null
   const scored = match.result != null
   const lockState = getAdminMatchLockState(match)
-  const kickoffLabel = `${formatAppTime(match.kickoff_time)} ET`
+  const kickoffLabel = `${formatAppTime(match.kickoff_time)} Jerusalem`
 
   return (
     <div className="rounded-xl p-4 space-y-3"

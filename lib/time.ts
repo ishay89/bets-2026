@@ -1,4 +1,4 @@
-const APP_TIME_ZONE = 'America/New_York'
+const APP_TIME_ZONE = 'Asia/Jerusalem'
 
 const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/
 const DATE_TIME_WITHOUT_ZONE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,3})?)?$/
@@ -88,6 +88,24 @@ function appDateParts(value: string | Date): DateTimeParts {
   return timeZoneParts(asAppDate(value))
 }
 
+function dateKeyFromParts(parts: Pick<DateTimeParts, 'year' | 'month' | 'day'>): string {
+  return [
+    String(parts.year).padStart(4, '0'),
+    String(parts.month).padStart(2, '0'),
+    String(parts.day).padStart(2, '0'),
+  ].join('-')
+}
+
+function previousDateParts(parts: Pick<DateTimeParts, 'year' | 'month' | 'day'>) {
+  const previous = new Date(Date.UTC(parts.year, parts.month - 1, parts.day - 1))
+
+  return {
+    year: previous.getUTCFullYear(),
+    month: previous.getUTCMonth() + 1,
+    day: previous.getUTCDate(),
+  }
+}
+
 function getAppFormatter(locale: string, options: Intl.DateTimeFormatOptions): Intl.DateTimeFormat {
   const formatterOptions = { ...options, timeZone: APP_TIME_ZONE }
   const key = `${locale}:${JSON.stringify(formatterOptions)}`
@@ -101,11 +119,16 @@ function getAppFormatter(locale: string, options: Intl.DateTimeFormatOptions): I
 
 export function appDateKey(now: Date = new Date()): string {
   const parts = appDateParts(now)
-  return [
-    String(parts.year).padStart(4, '0'),
-    String(parts.month).padStart(2, '0'),
-    String(parts.day).padStart(2, '0'),
-  ].join('-')
+  return dateKeyFromParts(parts)
+}
+
+export function matchGroupDateKey(value: string | Date): string {
+  const parts = appDateParts(value)
+  const isNextMorningWindow = parts.hour < 9
+    || (parts.hour === 9 && parts.minute === 0 && parts.second === 0)
+  const groupParts = isNextMorningWindow ? previousDateParts(parts) : parts
+
+  return dateKeyFromParts(groupParts)
 }
 
 export function formatAppDate(
