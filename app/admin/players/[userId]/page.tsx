@@ -147,7 +147,7 @@ export default async function PlayerDetailPage({
                       {formatAppDateTime(match.kickoff_time, {
                         month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
                         hour12: false,
-                      })} ET
+                      })} Jerusalem
                     </div>
                   </div>
                   <StatusBadge submitted={!!pick} label={pick ? `${pick} · ${PICK_LABELS[pick]}` : undefined} />
