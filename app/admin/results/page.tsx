@@ -1,5 +1,6 @@
 import { createClient, createAdminClient, assertAdmin } from '@/lib/supabase/server'
 import { getPublishedMatchDaysWithAll } from '@/lib/data'
+import { orderResultsMatchDays } from '@/lib/admin-results-order'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { snapshotMatchDay } from '@/lib/score-validation'
@@ -226,9 +227,9 @@ export default async function ResultsPage() {
 
   const matchDays = await getPublishedMatchDaysWithAll(supabase)
 
-  const daysWithContent = (matchDays as MatchDayRow[]).filter(d =>
+  const daysWithContent = orderResultsMatchDays((matchDays as MatchDayRow[]).filter(d =>
     d.matches.length > 0 || d.pikanteria.length > 0
-  )
+  ))
 
   if (daysWithContent.length === 0) {
     return (
