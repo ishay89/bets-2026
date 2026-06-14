@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient, createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { BetCard, type BetOption } from '@/components/bet-card'
@@ -23,6 +23,7 @@ import {
   savePikanteriaAnswer,
   type SaveResult,
 } from '@/lib/prediction-saves'
+import { persistDueMatchLocks } from '@/lib/match-lock-persistence'
 import { getMatchPredictionsReveal, getPikanteriaAnswersReveal } from '@/lib/prediction-reveals'
 import { appDateKey, formatAppDate } from '@/lib/time'
 
@@ -131,6 +132,8 @@ export default async function PredictPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
+
+  await persistDueMatchLocks(createAdminClient())
 
   const matchDays = await getPublishedMatchDaysWithAll(supabase)
 

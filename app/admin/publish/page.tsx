@@ -9,6 +9,7 @@ import { getAutomatedUsers } from '@/lib/data'
 import { appDateKey, formatAppTime } from '@/lib/time'
 import { setPikanteriaPublishedAt, setUnscoredMatchLocksForDay } from '@/lib/publishing'
 import { getAdminDayMatchLockState, getAdminMatchLockState } from '@/lib/admin-lock-state'
+import { persistDueMatchLocks } from '@/lib/match-lock-persistence'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { PicanteriaBuilder } from '@/components/pikanteria-builder'
@@ -929,6 +930,8 @@ export default async function PublishPage({
   const selectedDate = date ?? today
 
   const supabase = createAdminClient()
+  await persistDueMatchLocks(supabase)
+
   // Read the lock and publish flags independently so a missing row (or a column
   // that predates a migration) can't break the other control. A combined read
   // that errors would null out both, leaving the Lock button stuck on "Lock".
