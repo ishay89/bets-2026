@@ -16,7 +16,7 @@ export default async function BoardPage() {
   const [{ data: posts, error }, { data: profile, error: profileError }] = await Promise.all([
     supabase
       .from('message_board_posts')
-      .select('id, user_id, body, image_path, media_provider, media_provider_id, media_url, media_preview_url, media_title, media_width, media_height, created_at, users(display_name, is_monkey, automation_strategy, avatar_emoji)')
+      .select('id, user_id, body, image_path, uploaded_media_type, media_provider, media_provider_id, media_url, media_preview_url, media_title, media_width, media_height, created_at, users(display_name, is_monkey, automation_strategy, avatar_emoji)')
       .order('created_at', { ascending: false })
       .limit(100)
       .returns<BoardPost[]>(),

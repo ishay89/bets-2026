@@ -15,7 +15,10 @@ import type { AutomationStrategy } from '@/lib/types'
 
 const IMAGE_BUCKET = 'message-board-images'
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024
+const MAX_VIDEO_BYTES = 50 * 1024 * 1024
 const ACCEPTED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif']
+const ACCEPTED_VIDEO_TYPES = ['video/mp4', 'video/webm', 'video/quicktime']
+const ACCEPTED_UPLOAD_TYPES = [...ACCEPTED_IMAGE_TYPES, ...ACCEPTED_VIDEO_TYPES]
 
 interface BoardAuthor {
   display_name: string
@@ -29,7 +32,8 @@ export interface BoardPost {
   user_id: string
   body: string | null
   image_path: string | null
-  media_provider: 'giphy' | null
+  uploaded_media_type: string | null
+  media_provider: 'giphy' | 'cloudflare_r2' | null
   media_provider_id: string | null
   media_url: string | null
   media_preview_url: string | null
@@ -58,6 +62,7 @@ type BoardFeedState = {
   posts: BoardPost[]
   body: string
   previewUrl: string | null
+  previewMediaType: string | null
   selectedGif: GiphyBoardMedia | null
   gifQuery: string
   gifResults: GiphyBoardMedia[]
@@ -71,7 +76,7 @@ type BoardFeedState = {
 type BoardFeedAction =
   | { type: 'postsLoaded'; posts: BoardPost[] }
   | { type: 'bodyChanged'; body: string }
-  | { type: 'previewChanged'; previewUrl: string | null }
+  | { type: 'previewChanged'; previewUrl: string | null; mediaType: string | null }
   | { type: 'selectedGifChanged'; selectedGif: GiphyBoardMedia | null }
   | { type: 'gifQueryChanged'; gifQuery: string }
   | { type: 'gifResultsLoaded'; gifResults: GiphyBoardMedia[] }
@@ -88,7 +93,7 @@ function boardFeedReducer(state: BoardFeedState, action: BoardFeedAction): Board
     case 'bodyChanged':
       return { ...state, body: action.body }
     case 'previewChanged':
-      return { ...state, previewUrl: action.previewUrl }
+      return { ...state, previewUrl: action.previewUrl, previewMediaType: action.mediaType }
     case 'selectedGifChanged':
       return { ...state, selectedGif: action.selectedGif }
     case 'gifQueryChanged':
@@ -118,8 +123,52 @@ function formatPostTime(createdAt: string): string {
   })
 }
 
-function getImageUrl(path: string): string {
-  return `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/${IMAGE_BUCKET}/${path}`
+function getUploadUrl(path: string): string {
+  const baseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? ''
+  return `${baseUrl}/storage/v1/object/public/${IMAGE_BUCKET}/${path}`
+}
+
+function isVideoMediaType(mediaType: string | null): boolean {
+  return mediaType?.startsWith('video/') ?? false
+}
+
+type R2UploadResponse = {
+  method: 'PUT'
+  uploadUrl: string
+  publicUrl: string
+  key: string
+  headers: {
+    'Content-Type': string
+  }
+}
+
+async function uploadVideoToR2(file: File): Promise<R2UploadResponse> {
+  const signingResponse = await fetch('/api/board/r2-upload', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      fileName: file.name,
+      contentType: file.type,
+      size: file.size,
+    }),
+  })
+
+  const upload = await signingResponse.json() as R2UploadResponse | { error?: string }
+  if (!signingResponse.ok) {
+    throw new Error('error' in upload && upload.error ? upload.error : 'Could not prepare video upload.')
+  }
+
+  const r2Upload = upload as R2UploadResponse
+  const uploadResponse = await fetch(r2Upload.uploadUrl, {
+    method: r2Upload.method,
+    headers: r2Upload.headers,
+    body: file,
+  })
+  if (!uploadResponse.ok) {
+    throw new Error('Could not upload video.')
+  }
+
+  return r2Upload
 }
 
 export function BoardFeed({ initialPosts, currentUserId, currentUserIsAdmin, giphyApiKey }: Props) {
@@ -127,6 +176,7 @@ export function BoardFeed({ initialPosts, currentUserId, currentUserIsAdmin, gip
     posts: initialPosts,
     body: '',
     previewUrl: null,
+    previewMediaType: null,
     selectedGif: null,
     gifQuery: '',
     gifResults: [],
@@ -140,6 +190,7 @@ export function BoardFeed({ initialPosts, currentUserId, currentUserIsAdmin, gip
     posts,
     body,
     previewUrl,
+    previewMediaType,
     selectedGif,
     gifQuery,
     gifResults,
@@ -149,14 +200,14 @@ export function BoardFeed({ initialPosts, currentUserId, currentUserIsAdmin, gip
     isPosting,
     deletingPostId,
   } = state
-  const imageRef = useRef<File | null>(null)
+  const uploadRef = useRef<File | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   async function refreshPosts() {
     const supabase = createClient()
     const { data } = await supabase
       .from('message_board_posts')
-      .select('id, user_id, body, image_path, media_provider, media_provider_id, media_url, media_preview_url, media_title, media_width, media_height, created_at, users(display_name, is_monkey, automation_strategy, avatar_emoji)')
+      .select('id, user_id, body, image_path, uploaded_media_type, media_provider, media_provider_id, media_url, media_preview_url, media_title, media_width, media_height, created_at, users(display_name, is_monkey, automation_strategy, avatar_emoji)')
       .order('created_at', { ascending: false })
       .limit(100)
       .returns<BoardPost[]>()
@@ -180,9 +231,9 @@ export function BoardFeed({ initialPosts, currentUserId, currentUserIsAdmin, gip
     }
   }, [previewUrl])
 
-  function clearImage() {
-    imageRef.current = null
-    dispatch({ type: 'previewChanged', previewUrl: null })
+  function clearUpload() {
+    uploadRef.current = null
+    dispatch({ type: 'previewChanged', previewUrl: null, mediaType: null })
     if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
@@ -225,57 +276,67 @@ export function BoardFeed({ initialPosts, currentUserId, currentUserIsAdmin, gip
   }
 
   function selectGif(gif: GiphyBoardMedia) {
-    clearImage()
+    clearUpload()
     dispatch({ type: 'selectedGifChanged', selectedGif: gif })
     dispatch({ type: 'gifPickerChanged', isGifPickerOpen: false })
   }
 
-  function handleImageChange(event: ChangeEvent<HTMLInputElement>) {
+  function handleUploadChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0] ?? null
     dispatch({ type: 'errorChanged', error: null })
 
     if (!file) {
-      clearImage()
+      clearUpload()
       return
     }
-    if (!ACCEPTED_IMAGE_TYPES.includes(file.type)) {
-      dispatch({ type: 'errorChanged', error: 'Choose a JPG, PNG, WebP, or GIF image.' })
-      clearImage()
+    if (!ACCEPTED_UPLOAD_TYPES.includes(file.type)) {
+      dispatch({ type: 'errorChanged', error: 'Choose a JPG, PNG, WebP, GIF, MP4, WebM, or MOV file.' })
+      clearUpload()
       return
     }
-    if (file.size > MAX_IMAGE_BYTES) {
+    if (ACCEPTED_IMAGE_TYPES.includes(file.type) && file.size > MAX_IMAGE_BYTES) {
       dispatch({ type: 'errorChanged', error: 'Images must be 5 MB or smaller.' })
-      clearImage()
+      clearUpload()
+      return
+    }
+    if (ACCEPTED_VIDEO_TYPES.includes(file.type) && file.size > MAX_VIDEO_BYTES) {
+      dispatch({ type: 'errorChanged', error: 'Videos must be 50 MB or smaller.' })
+      clearUpload()
       return
     }
 
-    imageRef.current = file
+    uploadRef.current = file
     clearGif()
-    dispatch({ type: 'previewChanged', previewUrl: URL.createObjectURL(file) })
+    dispatch({ type: 'previewChanged', previewUrl: URL.createObjectURL(file), mediaType: file.type })
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     const trimmedBody = body.trim()
-    const image = imageRef.current
-    if (!trimmedBody && !image && !selectedGif) {
-      dispatch({ type: 'errorChanged', error: 'Write a message or add an image.' })
+    const upload = uploadRef.current
+    if (!trimmedBody && !upload && !selectedGif) {
+      dispatch({ type: 'errorChanged', error: 'Write a message or add a photo/video.' })
       return
     }
 
     dispatch({ type: 'errorChanged', error: null })
     dispatch({ type: 'postingChanged', isPosting: true })
     const supabase = createClient()
-    let imagePath: string | null = null
+    let uploadPath: string | null = null
+    let r2Upload: R2UploadResponse | null = null
 
     try {
-      if (image) {
-        const extension = image.name.split('.').pop()?.toLowerCase() ?? 'jpg'
-        imagePath = `${currentUserId}/${crypto.randomUUID()}.${extension}`
-        const { error: uploadError } = await supabase.storage
-          .from(IMAGE_BUCKET)
-          .upload(imagePath, image, { contentType: image.type })
-        if (uploadError) throw uploadError
+      if (upload) {
+        if (isVideoMediaType(upload.type)) {
+          r2Upload = await uploadVideoToR2(upload)
+        } else {
+          const extension = upload.name.split('.').pop()?.toLowerCase() ?? 'jpg'
+          uploadPath = `${currentUserId}/${crypto.randomUUID()}.${extension}`
+          const { error: uploadError } = await supabase.storage
+            .from(IMAGE_BUCKET)
+            .upload(uploadPath, upload, { contentType: upload.type })
+          if (uploadError) throw uploadError
+        }
       }
 
       const { error: insertError } = await supabase
@@ -283,10 +344,11 @@ export function BoardFeed({ initialPosts, currentUserId, currentUserIsAdmin, gip
         .insert({
           user_id: currentUserId,
           body: trimmedBody || null,
-          image_path: imagePath,
-          media_provider: selectedGif?.provider ?? null,
-          media_provider_id: selectedGif?.providerId ?? null,
-          media_url: selectedGif?.url ?? null,
+          image_path: uploadPath,
+          uploaded_media_type: upload?.type ?? null,
+          media_provider: r2Upload ? 'cloudflare_r2' : selectedGif?.provider ?? null,
+          media_provider_id: r2Upload?.key ?? selectedGif?.providerId ?? null,
+          media_url: r2Upload?.publicUrl ?? selectedGif?.url ?? null,
           media_preview_url: selectedGif?.previewUrl ?? null,
           media_title: selectedGif?.title ?? null,
           media_width: selectedGif?.width ?? null,
@@ -295,12 +357,12 @@ export function BoardFeed({ initialPosts, currentUserId, currentUserIsAdmin, gip
       if (insertError) throw insertError
 
       dispatch({ type: 'bodyChanged', body: '' })
-      clearImage()
+      clearUpload()
       clearGif()
       await refreshPosts()
     } catch (postError) {
-      if (imagePath) {
-        await supabase.storage.from(IMAGE_BUCKET).remove([imagePath])
+      if (uploadPath) {
+        await supabase.storage.from(IMAGE_BUCKET).remove([uploadPath])
       }
       dispatch({
         type: 'errorChanged',
@@ -361,15 +423,22 @@ export function BoardFeed({ initialPosts, currentUserId, currentUserIsAdmin, gip
 
         {(previewUrl || selectedGif) && (
           <div className="relative overflow-hidden rounded-[10px]" style={{ border: '1px solid var(--border-base)' }}>
-            <Image src={previewUrl ?? selectedGif?.previewUrl ?? ''} alt={selectedGif?.title ?? 'Selected upload preview'} width={900} height={600}
-              unoptimized className="max-h-56 w-full object-contain" style={{ background: 'var(--color-elev)' }} />
+            {previewUrl && isVideoMediaType(previewMediaType) ? (
+              <video src={previewUrl} controls aria-label="Selected video upload preview"
+                className="max-h-56 w-full object-contain" style={{ background: 'var(--color-elev)' }}>
+                <track kind="captions" />
+              </video>
+            ) : (
+              <Image src={previewUrl ?? selectedGif?.previewUrl ?? ''} alt={selectedGif?.title ?? 'Selected upload preview'} width={900} height={600}
+                unoptimized className="max-h-56 w-full object-contain" style={{ background: 'var(--color-elev)' }} />
+            )}
             {selectedGif && (
               <div className="absolute bottom-2 left-2 rounded-full px-2 py-1 text-[10px] font-extrabold text-white"
                 style={{ background: 'rgba(0, 0, 0, 0.65)' }}>
                 via GIPHY
               </div>
             )}
-            <button type="button" onClick={() => { clearImage(); clearGif() }}
+            <button type="button" onClick={() => { clearUpload(); clearGif() }}
               className="absolute right-2 top-2 rounded-full px-2 py-1 text-[11px] font-bold text-white"
               style={{ background: 'rgba(0, 0, 0, 0.65)' }}>
               Remove
@@ -383,9 +452,9 @@ export function BoardFeed({ initialPosts, currentUserId, currentUserIsAdmin, gip
           <div className="flex items-center gap-2">
             <label className="cursor-pointer rounded-lg px-3 py-2 text-[12px] font-bold"
               style={{ color: 'var(--color-sub)', background: 'var(--color-elev)', border: '1px solid var(--border-base)' }}>
-              Add image
-              <input ref={fileInputRef} type="file" accept={ACCEPTED_IMAGE_TYPES.join(',')}
-                onChange={handleImageChange} className="sr-only" />
+              Add photo/video
+              <input ref={fileInputRef} type="file" accept={ACCEPTED_UPLOAD_TYPES.join(',')}
+                onChange={handleUploadChange} className="sr-only" />
             </label>
             {giphyApiKey && (
               <button type="button" onClick={openGifPicker}
@@ -477,9 +546,26 @@ export function BoardFeed({ initialPosts, currentUserId, currentUserIsAdmin, gip
 
             {post.body && <p className="whitespace-pre-wrap break-words px-3 py-3 text-[14px] leading-5 text-sub">{post.body}</p>}
             {post.image_path && (
-              <Image src={getImageUrl(post.image_path)} alt={`Post by ${post.users.display_name}`}
-                width={900} height={700} unoptimized className="max-h-[32rem] w-full object-contain"
-                style={{ background: 'var(--color-elev)' }} />
+              isVideoMediaType(post.uploaded_media_type) ? (
+                <video src={getUploadUrl(post.image_path)} controls preload="metadata"
+                  aria-label={`Video post by ${post.users.display_name}`}
+                  className="max-h-[32rem] w-full object-contain"
+                  style={{ background: 'var(--color-elev)' }}>
+                  <track kind="captions" />
+                </video>
+              ) : (
+                <Image src={getUploadUrl(post.image_path)} alt={`Post by ${post.users.display_name}`}
+                  width={900} height={700} unoptimized className="max-h-[32rem] w-full object-contain"
+                  style={{ background: 'var(--color-elev)' }} />
+              )
+            )}
+            {post.media_provider === 'cloudflare_r2' && post.media_url && (
+              <video src={post.media_url} controls preload="metadata"
+                aria-label={`Video post by ${post.users.display_name}`}
+                className="max-h-[32rem] w-full object-contain"
+                style={{ background: 'var(--color-elev)' }}>
+                <track kind="captions" />
+              </video>
             )}
             {post.media_provider === 'giphy' && post.media_url && (
               <div>
