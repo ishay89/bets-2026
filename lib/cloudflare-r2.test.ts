@@ -37,7 +37,7 @@ describe('Cloudflare R2 board uploads', () => {
     expect(request.method).toBe('PUT')
     expect(request.headers).toEqual({ 'Content-Type': 'video/mp4' })
     expect(request.publicUrl).toBe('https://cdn.example.com/message-board/user-1/upload-1.mp4')
-    expect(request.uploadUrl).toContain('https://bets-media.account-1.r2.cloudflarestorage.com/message-board/user-1/upload-1.mp4')
+    expect(request.uploadUrl).toContain('https://account-1.r2.cloudflarestorage.com/bets-media/message-board/user-1/upload-1.mp4')
     expect(request.uploadUrl).toContain('X-Amz-Algorithm=AWS4-HMAC-SHA256')
     expect(request.uploadUrl).toContain('X-Amz-Expires=300')
     expect(request.uploadUrl).toContain('X-Amz-Signature=')
