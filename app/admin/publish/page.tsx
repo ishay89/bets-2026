@@ -9,6 +9,7 @@ import { getAutomatedUsers } from '@/lib/data'
 import { appDateKey, formatAppTime } from '@/lib/time'
 import { setPikanteriaPublishedAt, setUnscoredMatchLocksForDay } from '@/lib/publishing'
 import { getAdminDayMatchLockState, getAdminMatchLockState } from '@/lib/admin-lock-state'
+import { matchLockMs } from '@/lib/lock'
 import { persistDueMatchLocks } from '@/lib/match-lock-persistence'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
@@ -27,6 +28,7 @@ type DayMatch = {
   result: string | null
   published_at: string | null
   locked: boolean
+  unlock_override: boolean
 }
 
 type DayPika = {
@@ -261,10 +263,33 @@ async function toggleMatchLock(formData: FormData) {
 
   const matchId = parseUUID(formData.get('match_id'), 'match_id')
   const date = parseNonEmpty(formData.get('date'), 'date')
-  const locked = formData.get('locked') === 'true'
-  await ensureMatchIsUnscored(supabase, matchId, date)
+  const currentlyLocked = formData.get('locked') === 'true'
 
-  await supabase.from('matches').update({ locked: !locked }).eq('id', matchId)
+  const { data: match } = await supabase
+    .from('matches')
+    .select('result, kickoff_time')
+    .eq('id', matchId)
+    .single()
+
+  if (!match || match.result != null) {
+    redirect(publishPath(date, 'scored'))
+  }
+
+  if (currentlyLocked) {
+    // Unlock. When we're already inside the time-lock window, record an unlock
+    // override so the match stays open instead of immediately re-locking.
+    const withinWindow = Date.now() >= matchLockMs(match.kickoff_time)
+    await supabase
+      .from('matches')
+      .update({ locked: false, unlock_override: withinWindow })
+      .eq('id', matchId)
+  } else {
+    // Lock. Clear any override so the manual lock takes effect.
+    await supabase
+      .from('matches')
+      .update({ locked: true, unlock_override: false })
+      .eq('id', matchId)
+  }
 
   revalidatePath('/predict')
   revalidatePath('/admin/publish')
@@ -630,7 +655,7 @@ function DaySummary({
   matches: DayMatch[]
   pikanteria: DayPika[]
 }) {
-  const lockState = getAdminDayMatchLockState(matches)
+  const lockState = getAdminDayMatchLockState(matches, pikanteria)
 
   return (
     <div className="rounded-xl p-3 flex items-center justify-between gap-3"
@@ -722,7 +747,13 @@ function MatchCard({ match, date }: { match: DayMatch; date: string }) {
           <button
             type="submit"
             disabled={!lockState.canToggle}
-            title={lockState.timeLocked ? 'Locked by kickoff time' : undefined}
+            title={
+              lockState.overridden
+                ? 'Manually forced open past the kickoff deadline'
+                : lockState.timeLocked
+                  ? 'Past the kickoff deadline — unlocking overrides the time lock'
+                  : undefined
+            }
             className="w-full py-2 rounded-lg text-xs font-bold disabled:opacity-50"
             style={{
               background: lockState.locked ? 'var(--color-accent-soft)' : 'var(--color-danger-soft)',
@@ -955,7 +986,7 @@ export default async function PublishPage({
     const [{ data: matchRows }, { data: pikaRows }] = await Promise.all([
       supabase
         .from('matches')
-        .select('id, home_team, away_team, kickoff_time, odds_home, odds_draw, odds_away, result, published_at, locked')
+        .select('id, home_team, away_team, kickoff_time, odds_home, odds_draw, odds_away, result, published_at, locked, unlock_override')
         .eq('match_day_id', matchDay.id)
         .order('kickoff_time'),
       supabase

@@ -29,6 +29,7 @@ type HistoryMatch = {
   kickoff_time: string
   result: Pick | null
   locked: boolean | null
+  unlock_override: boolean | null
   predictions: PredRow[]
 }
 type PikaAnswerRow = { pick: Pick; points: number | null; user_id: string }
@@ -71,7 +72,7 @@ export async function getMatchDaysWithUserData(supabase: Db): Promise<HistoryMat
     .from('match_days')
     .select(`
       id, date, stage,
-      matches(id, home_team, away_team, kickoff_time, result, locked,
+      matches(id, home_team, away_team, kickoff_time, result, locked, unlock_override,
         predictions(pick, points, user_id)
       ),
       pikanteria(id, question, locked, label_1, label_2, label_x, result,
