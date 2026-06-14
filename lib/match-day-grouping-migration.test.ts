@@ -15,9 +15,17 @@ describe('Jerusalem match-day grouping migration', () => {
     expect(sql).not.toContain('America/New_York')
   })
 
-  test('does not repoint already published or scored matches', () => {
+  test('does not repoint published or scored matches except explicit approved Germany rows', () => {
     expect(sql).toMatch(/update public\.matches[\s\S]+set match_day_id = target_days\.match_day_id/)
-    expect(sql).toMatch(/update public\.matches[\s\S]+where m\.id = mm\.match_id[\s\S]+and m\.published_at is null[\s\S]+and m\.result is null/)
+    expect(sql).toContain('approved_published_match_moves')
+    expect(sql).toContain('7e2a406d-9275-4797-9c90-ae009edb8243')
+    expect(sql).toMatch(/where md\.stage = 'group'[\s\S]+and m\.result is null[\s\S]+and \([\s\S]+m\.published_at is null[\s\S]+or m\.id in/)
+  })
+
+  test('moves the explicitly approved published Germany pikanteria row', () => {
+    expect(sql).toContain('approved_published_pikanteria_moves')
+    expect(sql).toContain('6ba642bb-fa1d-474f-a3fa-40f799559bfb')
+    expect(sql).toMatch(/update public\.pikanteria p[\s\S]+set match_day_id = target_days\.match_day_id/)
   })
 
   test('recomputes affected match-day metadata after regrouping', () => {
