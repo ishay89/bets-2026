@@ -100,8 +100,9 @@ export async function createR2UploadRequest({
   const dateStamp = formatDateStamp(now)
   const amzDate = formatAmzDate(now)
   const credentialScope = `${dateStamp}/${R2_REGION}/${R2_SERVICE}/aws4_request`
-  const host = `${bucketName}.${accountId}.r2.cloudflarestorage.com`
+  const host = `${accountId}.r2.cloudflarestorage.com`
   const encodedKey = encodeObjectKey(key)
+  const canonicalPath = `/${encodePathSegment(bucketName)}/${encodedKey}`
   const signedHeaders = 'content-type;host'
   const queryParams = new URLSearchParams({
     'X-Amz-Algorithm': R2_ALGORITHM,
@@ -116,7 +117,7 @@ export async function createR2UploadRequest({
     .join('&')
   const canonicalRequest = [
     'PUT',
-    `/${encodedKey}`,
+    canonicalPath,
     canonicalQueryString,
     `content-type:${contentType}\n`,
     `host:${host}\n`,
@@ -137,7 +138,7 @@ export async function createR2UploadRequest({
 
   return {
     method: 'PUT',
-    uploadUrl: `https://${host}/${encodedKey}?${queryParams.toString()}`,
+    uploadUrl: `https://${host}${canonicalPath}?${queryParams.toString()}`,
     publicUrl: buildR2PublicUrl({ publicBaseUrl, key }),
     headers: {
       'Content-Type': contentType,

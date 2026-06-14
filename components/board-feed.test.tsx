@@ -73,7 +73,7 @@ describe('BoardFeed', () => {
     )
 
     expect(markup).toContain('Add photo/video')
-    expect(markup).toContain('accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm,video/quicktime"')
+    expect(markup).toContain('accept="image/*,video/*"')
   })
 
   it('renders uploaded videos with playback controls', () => {

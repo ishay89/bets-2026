@@ -5,7 +5,7 @@ import {
 } from '@/lib/cloudflare-r2'
 import { createClient } from '@/lib/supabase/server'
 
-const MAX_VIDEO_BYTES = 50 * 1024 * 1024
+const MAX_VIDEO_BYTES = 100 * 1024 * 1024
 const ACCEPTED_VIDEO_TYPES = ['video/mp4', 'video/webm', 'video/quicktime']
 
 type UploadRequestBody = {
@@ -58,7 +58,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Unsupported video type.' }, { status: 400 })
   }
   if (size <= 0 || size > MAX_VIDEO_BYTES) {
-    return NextResponse.json({ error: 'Videos must be 50 MB or smaller.' }, { status: 400 })
+    return NextResponse.json({ error: 'Videos must be 100 MB or smaller.' }, { status: 400 })
   }
 
   const key = buildR2ObjectKey({

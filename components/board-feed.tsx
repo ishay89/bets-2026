@@ -15,7 +15,8 @@ import type { AutomationStrategy } from '@/lib/types'
 
 const IMAGE_BUCKET = 'message-board-images'
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024
-const MAX_VIDEO_BYTES = 50 * 1024 * 1024
+const MAX_VIDEO_BYTES = 100 * 1024 * 1024
+const UPLOAD_INPUT_ACCEPT = 'image/*,video/*'
 const ACCEPTED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif']
 const ACCEPTED_VIDEO_TYPES = ['video/mp4', 'video/webm', 'video/quicktime']
 const ACCEPTED_UPLOAD_TYPES = [...ACCEPTED_IMAGE_TYPES, ...ACCEPTED_VIDEO_TYPES]
@@ -300,7 +301,7 @@ export function BoardFeed({ initialPosts, currentUserId, currentUserIsAdmin, gip
       return
     }
     if (ACCEPTED_VIDEO_TYPES.includes(file.type) && file.size > MAX_VIDEO_BYTES) {
-      dispatch({ type: 'errorChanged', error: 'Videos must be 50 MB or smaller.' })
+      dispatch({ type: 'errorChanged', error: 'Videos must be 100 MB or smaller.' })
       clearUpload()
       return
     }
@@ -453,7 +454,7 @@ export function BoardFeed({ initialPosts, currentUserId, currentUserIsAdmin, gip
             <label className="cursor-pointer rounded-lg px-3 py-2 text-[12px] font-bold"
               style={{ color: 'var(--color-sub)', background: 'var(--color-elev)', border: '1px solid var(--border-base)' }}>
               Add photo/video
-              <input ref={fileInputRef} type="file" accept={ACCEPTED_UPLOAD_TYPES.join(',')}
+              <input ref={fileInputRef} type="file" accept={UPLOAD_INPUT_ACCEPT}
                 onChange={handleUploadChange} className="sr-only" />
             </label>
             {giphyApiKey && (
