@@ -18,12 +18,9 @@ function pikanteriaUpdateClient(
 }
 
 function matchLockClient(result: { error: { message: string } | null } = { error: null }) {
-  const is = vi.fn(async () => result)
-  const eq = vi.fn(() => ({ is }))
-  const update = vi.fn(() => ({ eq }))
-  const from = vi.fn(() => ({ update }))
+  const rpc = vi.fn(async () => result)
 
-  return { client: { from }, from, update, eq, is }
+  return { client: { rpc }, rpc }
 }
 
 describe('pikanteria publishing', () => {
@@ -92,14 +89,48 @@ describe('pikanteria canonical match day migration', () => {
 })
 
 describe('bulk match day locks', () => {
-  test('locks only unscored matches in a match day group', async () => {
+  test('locks the day matches and pikanteria through the bulk RPC', async () => {
     const mocks = matchLockClient()
 
     await setUnscoredMatchLocksForDay(mocks.client, 'day-1', true)
 
-    expect(mocks.from).toHaveBeenCalledWith('matches')
-    expect(mocks.update).toHaveBeenCalledWith({ locked: true })
-    expect(mocks.eq).toHaveBeenCalledWith('match_day_id', 'day-1')
-    expect(mocks.is).toHaveBeenCalledWith('result', null)
+    expect(mocks.rpc).toHaveBeenCalledWith('set_unscored_match_locks_for_day', {
+      p_match_day_id: 'day-1',
+      p_locked: true,
+    })
+  })
+
+  test('surfaces a Supabase error from the bulk RPC', async () => {
+    const mocks = matchLockClient({ error: { message: 'denied' } })
+
+    await expect(setUnscoredMatchLocksForDay(mocks.client, 'day-1', false)).rejects.toThrow(
+      'Failed to update match locks: denied',
+    )
+  })
+})
+
+describe('admin match unlock override migration', () => {
+  const sql = readFileSync(
+    join(process.cwd(), 'supabase/migrations/20260614200000_admin_match_unlock_override.sql'),
+    'utf8',
+  )
+
+  test('adds the unlock_override column to matches', () => {
+    expect(sql).toContain('add column if not exists unlock_override boolean not null default false')
+  })
+
+  test('keeps the deadline sweep from re-locking overridden matches', () => {
+    expect(sql).toMatch(/where locked = false[\s\S]+and unlock_override = false/)
+  })
+
+  test('lets the save RPC keep an overridden match open', () => {
+    expect(sql).toContain(
+      "(v_now >= v_match.kickoff_time - interval '5 minutes' and not v_match.unlock_override)",
+    )
+  })
+
+  test('bulk RPC also locks the day pikanteria', () => {
+    expect(sql).toContain('create or replace function public.set_unscored_match_locks_for_day')
+    expect(sql).toMatch(/update public\.pikanteria[\s\S]+set locked = p_locked/)
   })
 })

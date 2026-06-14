@@ -45,4 +45,16 @@ describe('isMatchLocked', () => {
     const now = kickoffMs - 60 * 60 * 1000
     expect(isMatchLocked({ kickoff_time: KICKOFF, locked: null }, now)).toBe(false)
   })
+
+  it('stays open past the deadline when an admin unlock override is set', () => {
+    const now = kickoffMs - 4 * 60 * 1000
+    expect(isMatchLocked({ kickoff_time: KICKOFF, unlock_override: true }, now)).toBe(false)
+  })
+
+  it('keeps a manual lock winning over an unlock override', () => {
+    const now = kickoffMs - 60 * 60 * 1000
+    expect(
+      isMatchLocked({ kickoff_time: KICKOFF, locked: true, unlock_override: true }, now),
+    ).toBe(true)
+  })
 })

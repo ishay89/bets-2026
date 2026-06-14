@@ -17,13 +17,10 @@ type PublishClient = {
 }
 
 type MatchLockClient = {
-  from(table: 'matches'): {
-    update(values: { locked: boolean }): {
-      eq(column: 'match_day_id', value: string): {
-        is(column: 'result', value: null): PromiseLike<{ error: SupabaseError }>
-      }
-    }
-  }
+  rpc(
+    fn: 'set_unscored_match_locks_for_day',
+    args: { p_match_day_id: string; p_locked: boolean },
+  ): PromiseLike<{ error: SupabaseError }>
 }
 
 function errorMessage(error: SupabaseError): string {
@@ -66,11 +63,10 @@ export async function setUnscoredMatchLocksForDay(
   matchDayId: string,
   locked: boolean,
 ): Promise<void> {
-  const { error } = await supabase
-    .from('matches')
-    .update({ locked })
-    .eq('match_day_id', matchDayId)
-    .is('result', null)
+  const { error } = await supabase.rpc('set_unscored_match_locks_for_day', {
+    p_match_day_id: matchDayId,
+    p_locked: locked,
+  })
 
   if (error) {
     throw new Error(`Failed to update match locks: ${errorMessage(error)}`)
