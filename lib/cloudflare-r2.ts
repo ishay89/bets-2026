@@ -119,8 +119,9 @@ export async function createR2UploadRequest({
     'PUT',
     canonicalPath,
     canonicalQueryString,
-    `content-type:${contentType}\n`,
-    `host:${host}\n`,
+    `content-type:${contentType}`,
+    `host:${host}`,
+    '',
     signedHeaders,
     'UNSIGNED-PAYLOAD',
   ].join('\n')
