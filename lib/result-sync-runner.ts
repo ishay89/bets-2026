@@ -35,7 +35,7 @@ export interface SyncSummary {
 async function loadOpenMatches(supabase: AdminClient): Promise<OpenMatch[]> {
   const { data, error } = await supabase
     .from('matches')
-    .select('id, match_day_id, home_team, away_team, kickoff_time, result')
+    .select('id, match_day_id, home_team, away_team, kickoff_time, result, external_match_id')
     .not('published_at', 'is', null)
     .is('result', null)
   if (error) throw error

@@ -281,17 +281,20 @@ Match results are pulled from [football-data.org](https://www.football-data.org/
 
 Pieces:
 - `lib/football-data.ts` — thin v4 client (`X-Auth-Token`) plus pure helpers: `normalizeTeamName`, `canonicalTeamKey` (alias map bridging seed vs. provider team names), `fdScoreToPick` (maps the full-time score to 1/X/2), `isScorableFdMatch`.
-- `lib/result-sync.ts` — pure `reconcile(internalMatches, fdMatches)`: matches finished provider games to published-but-unscored fixtures by canonical team pair (home/away order-sensitive) within a kickoff tolerance, returning the matched rows + an `unmatched` list.
+- `lib/result-sync.ts` — pure `reconcile(internalMatches, fdMatches)`: matches finished provider games to published-but-unscored fixtures. It joins on `matches.external_match_id` (the provider's stable match id) when present, and only falls back to canonical team pair + kickoff proximity for rows that aren't id-mapped yet. Returns the matched rows + an `unmatched` list.
+- `scripts/sync-fixtures.ts` (`npm run sync:fixtures`) — one-time backfill: writes `external_match_id` onto existing group matches (matched by team pair + date) and inserts the knockout rounds (R32/R16/QF/SF/3rd/Final) as drafts with placeholder teams and the provider id pre-set. Supports `--dry` (preview, writes nothing) and `--file <path>` (read a saved JSON instead of calling the API). Idempotent.
 - `lib/score-matches.ts` — `autoScoreMatches(adminClient, items)`: the match half of the `/admin/results` scoring flow, grouped per match day. Builds the point payload from current odds + predictions, calls `enter_match_day_results`, locks the scored matches, and refreshes the day snapshot. Per-day failures are collected, not thrown.
 - `lib/result-sync-runner.ts` — `runResultsSync(adminClient)`: loads open matches, fetches finished provider matches, reconciles, auto-scores, and writes an audit row (`status: 'applied'`) per scored match.
 - `app/api/cron/sync-results/route.ts` — cron endpoint, authorized by `CRON_SECRET` (Bearer token or `?secret=`). Scheduled in `vercel.json` (hourly by default).
 - `app/admin/results/actions.ts` — admin `syncResultsAction` ("Sync now" button — forces an auto-score run, same code path as the cron).
 - `supabase/migrations/20260615190000_match_result_suggestions.sql` — `match_result_suggestions` table, used here as an audit trail of auto-entered results (admin-read RLS; only service_role writes).
+- `supabase/migrations/20260615200000_matches_external_id.sql` — adds `matches.external_match_id bigint` (partial-unique) for exact id-based result mapping.
 
 Safety / behaviour:
 - Scoring only touches matches with `result IS NULL`, so each run is idempotent — once scored, a match is `result`-set and locked and won't be re-scored. To re-pull a result, reset the match on `/admin/results` first.
 - Only matches reconcile and score; **pikanteria are never auto-scored** (no provider source) and stay manual.
 - Knockout games decided in extra time or on penalties are scored from the **full-time** scoreline (a 1-1 won on penalties scores as `X`). If your house rules differ, reset and re-enter those by hand. Add `TEAM_ALIASES` entries in `lib/football-data.ts` when provider naming drifts from the seed data.
+- One-time setup: run `npm run sync:fixtures -- --dry` then (if it looks right) `npm run sync:fixtures` to map provider ids and seed the knockout rounds. After that, live scoring is an exact id join.
 - Vercel Hobby plans run crons at most once per day; use the manual "Sync now" button (or an external scheduler hitting `/api/cron/sync-results?secret=...`) for timely updates.
 - Requires env: `FOOTBALL_DATA_API_KEY`, `CRON_SECRET`, optional `FOOTBALL_DATA_COMPETITION` (default `WC`).
 

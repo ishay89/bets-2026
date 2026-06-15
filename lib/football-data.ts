@@ -6,7 +6,7 @@
 // each into a 1 / X / 2 suggestion. The HTTP layer is intentionally thin; all
 // the testable logic lives in the pure helpers below.
 
-import type { Pick } from './types'
+import type { Pick, Stage } from './types'
 
 const FD_BASE = 'https://api.football-data.org/v4'
 
@@ -56,6 +56,7 @@ const TEAM_ALIASES: Record<string, string> = {
   'turkiye': 'turkey',
   'cote d ivoire': 'ivory coast',
   'cabo verde': 'cape verde',
+  'cape verde islands': 'cape verde',
   'bosnia herzegovina': 'bosnia and herzegovina',
   'dr congo': 'congo dr',
   'south korea': 'korea republic',
@@ -131,4 +132,41 @@ export async function fetchFinishedMatches(
 
   const json = (await res.json()) as FdMatchesResponse
   return (json.matches ?? []).filter(isScorableFdMatch)
+}
+
+// ─── Stage mapping ───────────────────────────────────────────────────────────
+
+// Map a football-data.org stage enum to our internal Stage. Returns null for
+// stages we don't model (qualification, etc.).
+export function fdStageToStage(stage: string): Stage | null {
+  switch (stage) {
+    case 'GROUP_STAGE': return 'group'
+    case 'LAST_32': return 'r32'
+    case 'LAST_16': return 'r16'
+    case 'QUARTER_FINALS': return 'qf'
+    case 'SEMI_FINALS': return 'sf'
+    case 'THIRD_PLACE': return '3rd'
+    case 'FINAL': return 'final'
+    default: return null
+  }
+}
+
+// Fetch every match of the competition's current season, regardless of status.
+// Used by the one-time fixtures backfill (id mapping + knockout seeding), where
+// we want scheduled knockout placeholders too, not just finished games.
+export async function fetchAllMatches(config: FootballDataConfig): Promise<FdMatch[]> {
+  const competition = config.competition || 'WC'
+  const url = `${FD_BASE}/competitions/${competition}/matches`
+  const res = await fetch(url, {
+    headers: { 'X-Auth-Token': config.apiKey },
+    cache: 'no-store',
+  })
+  if (!res.ok) {
+    const body = await res.text().catch(() => '')
+    throw new Error(
+      `football-data.org request failed (${res.status} ${res.statusText}): ${body.slice(0, 200)}`,
+    )
+  }
+  const json = (await res.json()) as FdMatchesResponse
+  return json.matches ?? []
 }
