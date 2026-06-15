@@ -57,6 +57,9 @@ export interface Pikanteria {
   odds_x: number | null
   result: Pick | null
   locked: boolean
+  // Inherited from a chosen match of the day: the question locks 5 minutes
+  // before this kickoff. Null only on legacy/unpublished drafts.
+  kickoff_time: string | null
   created_at: string
   published_at: string | null
 }

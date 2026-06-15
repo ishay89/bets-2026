@@ -6,7 +6,7 @@ import { aiUserById, isValidPikanteriaPick, usersMissingFutures, type AiUser } f
 import { buildAutomatedFuturesRows } from '@/lib/monkey'
 import { TEAMS, SCORERS } from '@/lib/pre-tournament'
 import { getAutomatedUsers, isFuturesLocked, isFuturesPublished } from '@/lib/data'
-import { isMatchLocked } from '@/lib/lock'
+import { isMatchLocked, isPikanteriaLocked } from '@/lib/lock'
 import { shouldWriteAuditEvent, writeAuditEvent, type AuditJson } from '@/lib/audit'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
@@ -127,7 +127,7 @@ export async function saveAiPikanteriaPick(formData: FormData) {
     .single()
 
   if (!item || item.published_at == null) redirect(aiPicksPath(aiUser.slug, 'not_found'))
-  if (item.result != null || item.locked) redirect(aiPicksPath(aiUser.slug, 'locked'))
+  if (item.result != null || isPikanteriaLocked(item)) redirect(aiPicksPath(aiUser.slug, 'locked'))
   if (!isValidPikanteriaPick(pick, item.odds_x)) redirect(aiPicksPath(aiUser.slug, 'invalid'))
 
   const { data: existing } = await supabase

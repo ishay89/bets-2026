@@ -8,8 +8,8 @@ import {
 import { getAutomatedUsers } from '@/lib/data'
 import { appDateKey, formatAppTime } from '@/lib/time'
 import { setPikanteriaPublishedAt, setUnscoredMatchLocksForDay } from '@/lib/publishing'
-import { getAdminDayMatchLockState, getAdminMatchLockState } from '@/lib/admin-lock-state'
-import { persistDueMatchLocks } from '@/lib/match-lock-persistence'
+import { getAdminDayMatchLockState, getAdminMatchLockState, getAdminPikanteriaLockState } from '@/lib/admin-lock-state'
+import { persistDueMatchLocks, persistDuePikanteriaLocks } from '@/lib/match-lock-persistence'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { PicanteriaBuilder } from '@/components/pikanteria-builder'
@@ -34,6 +34,7 @@ type DayPika = {
   question: string
   published_at: string | null
   locked: boolean
+  kickoff_time: string | null
   label_1: string
   label_2: string
   label_x: string | null
@@ -122,6 +123,33 @@ async function ensurePikanteriaCanUnpublish(supabase: AdminClient, pikanteriaId:
   if (pika?.locked) {
     redirect(publishPath(date, 'locked'))
   }
+}
+
+// Resolve the kickoff time a pikanteria should inherit from the chosen match of
+// the day. The form submits a match id (or empty for "no lock time"); we read
+// the real kickoff from that match so a client can't spoof an arbitrary time.
+async function resolvePikanteriaKickoff(
+  supabase: AdminClient,
+  value: FormDataEntryValue | null,
+): Promise<string | null> {
+  const raw = typeof value === 'string' ? value.trim() : ''
+  if (!raw) return null
+  const matchId = parseUUID(raw, 'kickoff_match_id')
+  const { data } = await supabase
+    .from('matches')
+    .select('kickoff_time')
+    .eq('id', matchId)
+    .maybeSingle()
+  return (data as { kickoff_time?: string } | null)?.kickoff_time ?? null
+}
+
+async function isPikanteriaPublished(supabase: AdminClient, pikanteriaId: string): Promise<boolean> {
+  const { data } = await supabase
+    .from('pikanteria')
+    .select('published_at')
+    .eq('id', pikanteriaId)
+    .single()
+  return (data as { published_at?: string | null } | null)?.published_at != null
 }
 
 async function publishPikanteriaWithAutomatedRows(
@@ -297,6 +325,12 @@ async function savePikanteria(formData: FormData) {
   await ensurePikanteriaIsUnscored(supabase, pikanteriaId, date)
 
   const { question, outcomes } = parsePikanteriaEditForm(formData, date)
+  const kickoffTime = await resolvePikanteriaKickoff(supabase, formData.get('pik_kickoff_match_id'))
+
+  // A live question must keep a lock time; refuse to strip it on a plain save.
+  if (!kickoffTime && await isPikanteriaPublished(supabase, pikanteriaId)) {
+    redirect(publishPath(date, 'kickoff'))
+  }
 
   const { error } = await supabase.rpc('update_pikanteria', {
     p_pikanteria_id: pikanteriaId,
@@ -307,6 +341,7 @@ async function savePikanteria(formData: FormData) {
     p_odds_2: outcomes.odds_2,
     p_label_x: outcomes.label_x,
     p_odds_x: outcomes.odds_x,
+    p_kickoff_time: kickoffTime,
   })
   if (error) redirect(publishPath(date, 'options'))
 
@@ -325,6 +360,10 @@ async function saveAndPublishPikanteria(formData: FormData) {
   await ensurePikanteriaIsUnscored(supabase, pikanteriaId, date)
 
   const { question, outcomes } = parsePikanteriaEditForm(formData, date)
+  const kickoffTime = await resolvePikanteriaKickoff(supabase, formData.get('pik_kickoff_match_id'))
+
+  // Publishing requires a kickoff/lock time so the question can lock with its game.
+  if (!kickoffTime) redirect(publishPath(date, 'kickoff'))
 
   const { error } = await supabase.rpc('update_pikanteria', {
     p_pikanteria_id: pikanteriaId,
@@ -335,6 +374,7 @@ async function saveAndPublishPikanteria(formData: FormData) {
     p_odds_2: outcomes.odds_2,
     p_label_x: outcomes.label_x,
     p_odds_x: outcomes.odds_x,
+    p_kickoff_time: kickoffTime,
   })
   if (error) redirect(publishPath(date, 'options'))
 
@@ -416,6 +456,10 @@ async function createPikanteria(formData: FormData, publishNow: boolean) {
   if (!q) redirect(publishPath(date))
 
   const outcomes = parseNewPikanteriaOutcomes(formData, date)
+  const kickoffTime = await resolvePikanteriaKickoff(supabase, formData.get('pik_kickoff_match_id'))
+
+  // A kickoff/lock time is mandatory to publish, optional for a draft.
+  if (publishNow && !kickoffTime) redirect(publishPath(date, 'kickoff'))
 
   const { data: newId, error } = await supabase.rpc('insert_pikanteria', {
     p_match_day_id: matchDayId,
@@ -426,6 +470,7 @@ async function createPikanteria(formData: FormData, publishNow: boolean) {
     p_odds_2: outcomes.odds_2,
     p_label_x: outcomes.label_x,
     p_odds_x: outcomes.odds_x,
+    p_kickoff_time: kickoffTime,
   })
   if (error || !newId) redirect(publishPath(date, 'options'))
 
@@ -603,6 +648,16 @@ function NoticeMessages({ notice }: { notice?: string }) {
           </div>
         </div>
       )}
+      {notice === 'kickoff' && (
+        <div className="rounded-xl p-4" style={{ background: 'var(--color-amber-soft)', border: '1px solid var(--border-warn)' }}>
+          <div className="text-sm font-semibold" style={{ color: 'var(--color-amber)' }}>
+            Pick a lock time before publishing this pikanteria
+          </div>
+          <div className="text-xs text-muted mt-1">
+            Attach the question to one of the day&apos;s games so it locks 5 minutes before that kickoff.
+          </div>
+        </div>
+      )}
     </>
   )
 }
@@ -753,9 +808,10 @@ function MatchCard({ match, date }: { match: DayMatch; date: string }) {
   )
 }
 
-function PikanteriaCard({ pika, date }: { pika: DayPika; date: string }) {
+function PikanteriaCard({ pika, date, matches }: { pika: DayPika; date: string; matches: DayMatch[] }) {
   const published = pika.published_at != null
   const scored = pika.result != null
+  const lockState = getAdminPikanteriaLockState(pika)
   const outcomes = [
     { key: '1', label: pika.label_1, odds: pika.odds_1 },
     ...(pika.label_x != null && pika.odds_x != null ? [{ key: 'X', label: pika.label_x, odds: pika.odds_x }] : []),
@@ -766,10 +822,17 @@ function PikanteriaCard({ pika, date }: { pika: DayPika; date: string }) {
     <div className="rounded-xl p-4 space-y-3"
       style={{ background: 'var(--color-panel)', border: '1px solid var(--border-base)' }}>
       <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0 text-sm font-semibold text-text">{pika.question}</div>
+        <div className="min-w-0">
+          <div className="text-sm font-semibold text-text">{pika.question}</div>
+          <div className="text-xs text-muted mt-0.5">
+            {pika.kickoff_time
+              ? `Locks ${formatAppTime(pika.kickoff_time)} Jerusalem`
+              : 'No lock time set'}
+          </div>
+        </div>
         <div className="flex items-center gap-2 flex-wrap justify-end">
           <StatusBadge published={published} />
-          <LockBadge locked={pika.locked} />
+          <LockBadge locked={lockState.locked} />
           {scored && <ScoredBadge />}
         </div>
       </div>
@@ -807,6 +870,7 @@ function PikanteriaCard({ pika, date }: { pika: DayPika; date: string }) {
               label2: pika.label_2, odds2: Number(pika.odds_2).toFixed(2),
               labelX: pika.label_x, oddsX: pika.odds_x == null ? null : Number(pika.odds_x).toFixed(2),
             }} />
+            <KickoffSelect matches={matches} defaultMatchId={pikaKickoffMatchId(matches, pika.kickoff_time)} />
             <div className={published ? '' : 'grid grid-cols-2 gap-2'}>
               <button type="submit" className="w-full py-2 rounded-lg font-bold text-sm"
                 style={{ background: 'var(--color-amber)', color: 'var(--color-bg)' }}>
@@ -825,14 +889,18 @@ function PikanteriaCard({ pika, date }: { pika: DayPika; date: string }) {
             <form action={togglePikanteriaLock}>
               <input type="hidden" name="pikanteria_id" value={pika.id} />
               <input type="hidden" name="date" value={date} />
-              <input type="hidden" name="locked" value={String(pika.locked)} />
-              <button type="submit" className="w-full py-2 rounded-lg text-xs font-bold"
+              <input type="hidden" name="locked" value={String(lockState.toggleInputLockedValue)} />
+              <button
+                type="submit"
+                disabled={!lockState.canToggle}
+                title={lockState.timeLocked ? 'Locked by kickoff time' : undefined}
+                className="w-full py-2 rounded-lg text-xs font-bold disabled:opacity-50"
                 style={{
-                  background: pika.locked ? 'var(--color-accent-soft)' : 'var(--color-danger-soft)',
-                  color: pika.locked ? 'var(--color-accent)' : 'var(--color-danger)',
-                  border: `1px solid ${pika.locked ? 'var(--border-accent)' : 'var(--border-danger)'}`,
+                  background: lockState.locked ? 'var(--color-accent-soft)' : 'var(--color-danger-soft)',
+                  color: lockState.locked ? 'var(--color-accent)' : 'var(--color-danger)',
+                  border: `1px solid ${lockState.locked ? 'var(--border-accent)' : 'var(--border-danger)'}`,
                 }}>
-                {pika.locked ? 'Unlock' : 'Lock'}
+                {lockState.toggleLabel}
               </button>
             </form>
 
@@ -840,7 +908,7 @@ function PikanteriaCard({ pika, date }: { pika: DayPika; date: string }) {
               <form action={unpublishPikanteria}>
                 <input type="hidden" name="pikanteria_id" value={pika.id} />
                 <input type="hidden" name="date" value={date} />
-                <button type="submit" disabled={pika.locked} className="w-full py-2 rounded-lg text-xs font-bold disabled:opacity-50"
+                <button type="submit" disabled={!lockState.canUnpublish} className="w-full py-2 rounded-lg text-xs font-bold disabled:opacity-50"
                   style={{ background: 'var(--color-danger-soft)', color: 'var(--color-danger)', border: '1px solid var(--border-danger)' }}>
                   Unpublish
                 </button>
@@ -862,7 +930,39 @@ function PikanteriaCard({ pika, date }: { pika: DayPika; date: string }) {
   )
 }
 
-function NewPikanteriaForm({ day }: { day: Day }) {
+// Map a pikanteria's stored kickoff back to the match it was attached to, so the
+// edit form can pre-select it. Compared by instant to survive timestamp
+// formatting differences between the two columns.
+function pikaKickoffMatchId(matches: DayMatch[], kickoffTime: string | null): string {
+  if (!kickoffTime) return ''
+  const target = new Date(kickoffTime).getTime()
+  return matches.find(m => new Date(m.kickoff_time).getTime() === target)?.id ?? ''
+}
+
+function KickoffSelect({ matches, defaultMatchId }: { matches: DayMatch[]; defaultMatchId: string }) {
+  return (
+    <div className="space-y-1">
+      <div className="text-muted text-xs">Lock time</div>
+      <select
+        name="pik_kickoff_match_id"
+        aria-label="Lock time (kickoff of match)"
+        defaultValue={defaultMatchId}
+        style={inputBase}
+        className={cls}
+      >
+        <option value="">No lock time — can&apos;t publish</option>
+        {matches.map(m => (
+          <option key={m.id} value={m.id}>
+            {m.home_team} vs {m.away_team} · {formatAppTime(m.kickoff_time)}
+          </option>
+        ))}
+      </select>
+      <p className="text-muted text-xs">Locks 5 min before the selected game&apos;s kickoff.</p>
+    </div>
+  )
+}
+
+function NewPikanteriaForm({ day, matches }: { day: Day; matches: DayMatch[] }) {
   return (
     <>
       <div className="font-bold text-xs uppercase tracking-wider" style={{ color: 'var(--color-muted)' }}>
@@ -878,6 +978,7 @@ function NewPikanteriaForm({ day }: { day: Day }) {
             style={inputBase} className={cls} />
         </div>
         <PicanteriaBuilder />
+        <KickoffSelect matches={matches} defaultMatchId="" />
         <div className="grid grid-cols-2 gap-2">
           <button type="submit" formAction={addDraftPikanteria} className="w-full py-2 rounded-lg font-bold text-sm"
             style={{ background: 'var(--color-bg)', color: 'var(--color-text)', border: '1px solid var(--border-base)' }}>
@@ -913,9 +1014,9 @@ function DayWorkbench({
           Pikanteria
         </div>
       )}
-      {pikanteria.map(pika => <PikanteriaCard key={pika.id} pika={pika} date={day.date} />)}
+      {pikanteria.map(pika => <PikanteriaCard key={pika.id} pika={pika} date={day.date} matches={matches} />)}
 
-      <NewPikanteriaForm day={day} />
+      <NewPikanteriaForm day={day} matches={matches} />
     </div>
   )
 }
@@ -930,7 +1031,10 @@ export default async function PublishPage({
   const selectedDate = date ?? today
 
   const supabase = createAdminClient()
-  await persistDueMatchLocks(supabase)
+  await Promise.all([
+    persistDueMatchLocks(supabase),
+    persistDuePikanteriaLocks(supabase),
+  ])
 
   // Read the lock and publish flags independently so a missing row (or a column
   // that predates a migration) can't break the other control. A combined read
@@ -960,7 +1064,7 @@ export default async function PublishPage({
         .order('kickoff_time'),
       supabase
         .from('pikanteria')
-        .select('id, question, published_at, locked, label_1, label_2, label_x, odds_1, odds_2, odds_x, result')
+        .select('id, question, published_at, locked, kickoff_time, label_1, label_2, label_x, odds_1, odds_2, odds_x, result')
         .eq('match_day_id', matchDay.id)
         .order('created_at'),
     ])

@@ -23,3 +23,20 @@ export function isMatchLocked(
   if (match.locked === true) return true
   return now >= matchLockMs(match.kickoff_time)
 }
+
+/**
+ * Whether a pikanteria question is locked for answers.
+ *
+ * A pikanteria bets on one of the day's games, so it locks 5 minutes before the
+ * kickoff time it was attached to — exactly like a match — or whenever it is
+ * manually locked. A question with no kickoff time only ever locks manually
+ * (such a question cannot be published; see the publish guards).
+ */
+export function isPikanteriaLocked(
+  pika: { kickoff_time?: string | null; locked?: boolean | null },
+  now: number = Date.now(),
+): boolean {
+  if (pika.locked === true) return true
+  if (!pika.kickoff_time) return false
+  return now >= matchLockMs(pika.kickoff_time)
+}
