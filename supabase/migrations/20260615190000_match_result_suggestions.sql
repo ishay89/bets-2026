@@ -1,11 +1,12 @@
--- Automated results sync: staging table for externally-fetched match results.
+-- Automated results sync: audit trail for externally-fetched match results.
 --
 -- The results sync job (Vercel cron + admin "Sync now" button) reads finished
--- World Cup matches from football-data.org and writes one suggestion row per
--- internal match it can confidently map. Suggestions are NEVER scored
--- automatically — an admin reviews each one on /admin/results and clicks to
--- score through the existing enter_match_day_results RPC. This table is purely
--- advisory and is intentionally decoupled from the scoring transaction.
+-- World Cup matches from football-data.org, maps them to internal matches it
+-- can confidently identify, and scores them directly through the existing
+-- enter_match_day_results RPC — no admin approval step. One row is written per
+-- auto-scored match (status 'applied') as an audit trail so an admin can see
+-- why a result was entered. This table is decoupled from the scoring
+-- transaction; it is informational only.
 --
 -- Trust model: only service_role writes here (the sync runner uses
 -- createAdminClient()). Admins may read suggestions; regular players cannot.
