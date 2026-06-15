@@ -139,13 +139,17 @@ export function Leaderboard({
               ? formatTodayMovementPoints(entry.today_points, movementPointsLabel)
               : null
             const av = getAvatar(entry)
+            const isMe = entry.id === currentUserId
+            const profileHref = isMe ? '/history' : `/u/${entry.id}`
             return (
               <div key={entry.id} style={{ width: idx === 0 ? '36%' : '32%', textAlign: 'center' }}>
-                <div
-                  className="mx-auto mb-1.5 flex items-center justify-center rounded-full text-xl"
-                  style={{ width: 42, height: 42, background: 'var(--color-elev)', border: `2px solid ${color}` }}
-                >{av}</div>
-                <div className="font-extrabold text-[13px] text-text truncate">{entry.display_name}</div>
+                <Link href={profileHref} style={{ textDecoration: 'none', color: 'inherit' }}>
+                  <div
+                    className="mx-auto mb-1.5 flex items-center justify-center rounded-full text-xl"
+                    style={{ width: 42, height: 42, background: 'var(--color-elev)', border: `2px solid ${color}` }}
+                  >{av}</div>
+                  <div className="font-extrabold text-[13px] text-text truncate">{entry.display_name}</div>
+                </Link>
                 <div className="font-mono text-[11px] text-sub mb-1" style={{ fontFamily: 'var(--font-mono)' }}>
                   {score(entry).toFixed(2)}
                 </div>
@@ -241,21 +245,27 @@ export function Leaderboard({
                     {rankDelta}
                   </div>
                 )}
-                <div
-                  className="flex items-center justify-center rounded-full text-base shrink-0"
-                  style={{ width: 28, height: 28, background: 'var(--color-elev)', fontSize: 14 }}
-                >{av}</div>
-                <div
-                  className="flex-1 font-bold text-[13px]"
-                  style={{ color: isMe ? 'var(--color-accent)' : 'var(--color-text)' }}
+                <Link
+                  href={isMe ? '/history' : `/u/${entry.id}`}
+                  className="flex flex-1 items-center gap-3 min-w-0 not-italic"
+                  style={{ textDecoration: 'none' }}
                 >
-                  {entry.display_name}
-                  {automationLabel && (
-                    <span className="ml-1 text-[12px] not-italic" style={{ color: 'var(--color-muted)' }}>
-                      · {automationLabel}
-                    </span>
-                  )}
-                </div>
+                  <div
+                    className="flex items-center justify-center rounded-full text-base shrink-0"
+                    style={{ width: 28, height: 28, background: 'var(--color-elev)', fontSize: 14 }}
+                  >{av}</div>
+                  <div
+                    className="flex-1 font-bold text-[13px] truncate"
+                    style={{ color: isMe ? 'var(--color-accent)' : 'var(--color-text)' }}
+                  >
+                    {entry.display_name}
+                    {automationLabel && (
+                      <span className="ml-1 text-[12px] not-italic" style={{ color: 'var(--color-muted)' }}>
+                        · {automationLabel}
+                      </span>
+                    )}
+                  </div>
+                </Link>
                 {!isMe && (
                   <Link
                     href={`/h2h/${entry.id}`}

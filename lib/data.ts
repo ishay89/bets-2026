@@ -143,6 +143,34 @@ export async function isFuturesPublished(supabase: Db): Promise<boolean> {
   return settings?.futures_published ?? true
 }
 
+/**
+ * A single player's futures pick (champion / top scorer) with scored points.
+ * Returns null when the player has not made a futures pick.
+ *
+ * NOTE: pre_tournament_picks is readable by every approved user via RLS,
+ * regardless of the futures lock. Callers showing another player's futures
+ * MUST gate on `isFuturesLocked` themselves so unlocked picks stay hidden.
+ */
+export async function getUserFuturesPick(
+  supabase: Db,
+  userId: string,
+): Promise<{
+  winner_team: string
+  winner_odds: number
+  top_scorer: string
+  top_scorer_odds: number
+  winner_points: number | null
+  top_scorer_points: number | null
+} | null> {
+  const { data, error } = await supabase
+    .from('pre_tournament_picks')
+    .select('winner_team, winner_odds, top_scorer, top_scorer_odds, winner_points, top_scorer_points')
+    .eq('user_id', userId)
+    .maybeSingle()
+  if (error) throw error
+  return data ?? null
+}
+
 export async function getLeaderboardEntries(supabase: Db): Promise<LeaderboardEntry[]> {
   const { data, error } = await supabase
     .from('leaderboard')
