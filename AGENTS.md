@@ -106,7 +106,7 @@ Core tables and views:
 - `users` — player profiles, admin flag, automated marker flag/strategy, and `status` (`pending`, `approved`, `blocked`)
 - `match_days` — tournament dates, stage, aggregate publish/lock metadata
 - `matches` — fixtures, odds, result, per-match lock, per-item `published_at`
-- `pikanteria` — side-bet questions in the match 1/X/2 shape: `label_1`/`odds_1`, `label_2`/`odds_2`, optional `label_x`/`odds_x` (null ⇒ two-way, X hidden), admin-entered `result`, per-question lock, per-item `published_at`
+- `pikanteria` — side-bet questions in the match 1/X/2 shape: `label_1`/`odds_1`, `label_2`/`odds_2`, optional `label_x`/`odds_x` (null ⇒ two-way, X hidden), admin-entered `result`, per-question lock, per-item `published_at`, and a `kickoff_time` inherited from a chosen match of the day so the question locks 5 minutes before that game (a question with no `kickoff_time` cannot be published)
 - `predictions` — player match picks and scored points
 - `pikanteria_answers` — player pikanteria `pick` (`1`/`X`/`2`) and scored points
 - `pre_tournament_picks` — futures picks for winner and top scorer
@@ -183,6 +183,7 @@ Important later migrations:
 - `20260602193151_message_board.sql` — message board table, Storage bucket, and policies
 - `20260602200200_ai_social_posts.sql` — AI recap table
 - `20260602204722_admin_delete_message_board_posts.sql` — admin delete policies for posts/images
+- `20260615153000_pikanteria_kickoff_time.sql` — adds `pikanteria.kickoff_time`, time-based pikanteria locking (`persist_due_pikanteria_locks`, time-aware save RPC / crowd RPC / RLS), and a publish guard requiring a kickoff time; `insert_pikanteria`/`update_pikanteria` gain a `p_kickoff_time` argument
 - `20260604000000_pikanteria_match_model.sql` — **collapses pikanteria into the match 1/X/2 model**: drops `pikanteria_options`, switches `pikanteria_answers.option_id` → `pick`, adds `pikanteria.label_*/odds_*/result`, and rewrites `save_pikanteria_answer`, `enter_match_day_results`, `crowd_pikanteria_picks`, `insert_pikanteria`, `update_pikanteria`, `reset_pikanteria_result`. Destructive (discards existing pikanteria data); safe pre-tournament.
 
 Apply migrations:
@@ -276,7 +277,7 @@ NEXT_PUBLIC_GIPHY_API_KEY=...
 - Preserve RLS expectations: normal users write their own predictions/answers/posts; service-role clients are for admin-only flows.
 - Pikanteria uses the same 1/X/2 model as matches (`label_1`/`odds_1`, `label_2`/`odds_2`, optional `label_x`/`odds_x`, `result`). Author via `insert_pikanteria`/`update_pikanteria`; render with the shared `components/bet-card.tsx`.
 - Publication is per item (`matches.published_at`, `pikanteria.published_at`); `match_days.published_at` is synchronized by database triggers.
-- Locks are also per item (`matches.locked`, `pikanteria.locked`) plus a separate futures lock.
+- Locks are also per item (`matches.locked`, `pikanteria.locked`) plus a separate futures lock. Matches and pikanteria both auto-lock 5 minutes before kickoff (matches use `matches.kickoff_time`, pikanteria use `pikanteria.kickoff_time`); locks are evaluated lazily and persisted via `persist_due_match_locks` / `persist_due_pikanteria_locks`. Use `isMatchLocked` / `isPikanteriaLocked` in app code.
 - If changing leaderboard semantics, update the SQL view migrations and any snapshot validation assumptions together.
 
 ## Common Issues

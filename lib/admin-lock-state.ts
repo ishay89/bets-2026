@@ -1,4 +1,4 @@
-import { isMatchLocked, matchLockMs } from './lock'
+import { isMatchLocked, isPikanteriaLocked, matchLockMs } from './lock'
 
 type AdminMatchLockInput = {
   kickoff_time: string
@@ -11,6 +11,32 @@ export function getAdminMatchLockState(match: AdminMatchLockInput, now: number =
   const timeLocked = now >= matchLockMs(match.kickoff_time)
   const locked = isMatchLocked(match, now)
   const scored = match.result != null
+
+  return {
+    locked,
+    manuallyLocked,
+    timeLocked,
+    canToggle: !scored && !timeLocked,
+    canUnpublish: !scored && !locked,
+    toggleLabel: locked ? 'Unlock' : 'Lock',
+    toggleInputLockedValue: manuallyLocked,
+  }
+}
+
+type AdminPikanteriaLockInput = {
+  kickoff_time: string | null
+  locked: boolean | null
+  result?: string | null
+}
+
+// Pikanteria mirrors matches: it auto-locks 5 minutes before its kickoff time
+// (when one is attached) and can be locked manually. A question with no kickoff
+// time only locks manually.
+export function getAdminPikanteriaLockState(pika: AdminPikanteriaLockInput, now: number = Date.now()) {
+  const manuallyLocked = pika.locked === true
+  const timeLocked = pika.kickoff_time != null && now >= matchLockMs(pika.kickoff_time)
+  const locked = isPikanteriaLocked(pika, now)
+  const scored = pika.result != null
 
   return {
     locked,
