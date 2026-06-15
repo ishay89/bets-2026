@@ -275,6 +275,24 @@ NEXT_PUBLIC_GIPHY_API_KEY=...
 `ADMIN_EMAILS` only affects first-time profile creation in `app/layout.tsx`.
 `NEXT_PUBLIC_GIPHY_API_KEY` enables the GIPHY picker on `/board`; without it, users can still write posts and upload images/GIF files.
 
+## Automated Results Sync
+
+Match results can be pulled from [football-data.org](https://www.football-data.org/) (free tier) instead of being typed in by hand. The sync is **suggest-then-confirm**: it never scores anything automatically. It writes advisory rows that pre-fill the 1/X/2 selection on `/admin/results`, and an admin still clicks to score through the existing `enter_match_day_results` RPC.
+
+Pieces:
+- `lib/football-data.ts` — thin v4 client (`X-Auth-Token`) plus pure helpers: `normalizeTeamName`, `canonicalTeamKey` (alias map bridging seed vs. provider team names), `fdScoreToPick` (maps the full-time score to 1/X/2), `isScorableFdMatch`.
+- `lib/result-sync.ts` — pure `reconcile(internalMatches, fdMatches)`: matches finished provider games to published-but-unscored fixtures by canonical team pair (home/away order-sensitive) within a kickoff tolerance, returning suggestion rows + an `unmatched` list.
+- `lib/result-sync-runner.ts` — impure `runResultsSync(adminClient)`: loads open matches, fetches finished provider matches, reconciles, and upserts into `match_result_suggestions`. Respects dismissals; already-scored matches are filtered out upstream.
+- `app/api/cron/sync-results/route.ts` — cron endpoint, authorized by `CRON_SECRET` (Bearer token or `?secret=`). Scheduled in `vercel.json` (hourly by default).
+- `app/admin/results/actions.ts` — admin `syncResultsAction` ("Sync now" button, same runner as the cron) and `dismissSuggestionAction`.
+- `supabase/migrations/20260615190000_match_result_suggestions.sql` — `match_result_suggestions` staging table (`status`: pending / applied / dismissed). Admin-read RLS; only service_role writes. Scoring a match flips its pending suggestion to `applied`.
+
+Notes:
+- Knockout games decided in extra time or on penalties are mapped from the **full-time** scoreline (so a 1-1 won on penalties suggests `X`); the UI flags non-`REGULAR` durations with a "verify" hint. Always eyeball knockouts before scoring.
+- If the provider's team naming drifts from the seed data, add an entry to `TEAM_ALIASES` in `lib/football-data.ts` (keyed by normalized name).
+- Vercel Hobby plans run crons at most once per day; rely on the manual "Sync now" button for timely updates (or move the schedule to an external scheduler hitting `/api/cron/sync-results?secret=...`).
+- Requires env: `FOOTBALL_DATA_API_KEY`, `CRON_SECRET`, optional `FOOTBALL_DATA_COMPETITION` (default `WC`).
+
 ## Development Notes
 
 - Use `proxy.ts` only for middleware.

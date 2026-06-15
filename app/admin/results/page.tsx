@@ -15,6 +15,16 @@ import {
 } from '@/lib/scoring-writes'
 import type { Pick, Match, Pikanteria, MatchDay } from '@/lib/types'
 import { parseUUID, parsePick } from '@/lib/validation'
+import { syncResultsAction, dismissSuggestionAction } from './actions'
+
+type Suggestion = {
+  match_id: string
+  suggested_result: Pick
+  home_score: number | null
+  away_score: number | null
+  source: string
+  duration: string | null
+}
 
 type MatchDayRow = MatchDay & { matches: Match[]; pikanteria: Pikanteria[] }
 
@@ -140,6 +150,16 @@ async function scoreItems(
     if (lockError) throw lockError
   }
 
+  // Mark any pending auto-sync suggestion for the scored matches as applied, so
+  // it stops surfacing here and won't be resurrected by the next sync.
+  if (scoredMatches.length) {
+    await supabase
+      .from('match_result_suggestions')
+      .update({ status: 'applied' })
+      .in('match_id', scoredMatches.map(m => m.matchId))
+      .eq('status', 'pending')
+  }
+
   // Snapshots are derived/recoverable, so they stay outside the scoring txn.
   await snapshotMatchDay(supabase, matchDayId)
 
@@ -227,6 +247,16 @@ export default async function ResultsPage() {
 
   const matchDays = await getPublishedMatchDaysWithAll(supabase)
 
+  // Pending auto-sync suggestions, keyed by match. RLS lets admins read these.
+  const { data: suggestionRows } = await supabase
+    .from('match_result_suggestions')
+    .select('match_id, suggested_result, home_score, away_score, source, duration')
+    .eq('status', 'pending')
+  const suggestionByMatch = new Map<string, Suggestion>(
+    ((suggestionRows ?? []) as Suggestion[]).map(s => [s.match_id, s]),
+  )
+  const fdConfigured = Boolean(process.env.FOOTBALL_DATA_API_KEY)
+
   const daysWithContent = orderResultsMatchDays((matchDays as MatchDayRow[]).filter(d =>
     d.matches.length > 0 || d.pikanteria.length > 0
   ))
@@ -243,13 +273,23 @@ export default async function ResultsPage() {
 
   return (
     <div className="max-w-2xl mx-auto space-y-10 pb-10">
-      <div>
-        <div className="font-black text-lg" style={{ color: 'var(--color-amber)' }}>
-          ✅ Enter Results
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <div className="font-black text-lg" style={{ color: 'var(--color-amber)' }}>
+            ✅ Enter Results
+          </div>
+          <div className="text-muted text-xs">
+            Score or update individual matches and pikanteria below
+          </div>
         </div>
-        <div className="text-muted text-xs">
-          Score or update individual matches and pikanteria below
-        </div>
+        {fdConfigured && (
+          <form action={syncResultsAction}>
+            <button type="submit" className={`${scoreBtn} py-2`}
+              style={{ background: 'var(--color-panel)', color: 'var(--color-text)', border: '1px solid var(--border-base)' }}>
+              🔄 Sync from football-data.org
+            </button>
+          </form>
+        )}
       </div>
 
       {daysWithContent.map(matchDay => {
@@ -272,7 +312,12 @@ export default async function ResultsPage() {
             </div>
 
             {/* Per-match scoring — each its own form */}
-            {sortedMatches.map(match => (
+            {sortedMatches.map(match => {
+              // An unscored match may carry an auto-sync suggestion: pre-select
+              // the suggested outcome so the admin can confirm with one click.
+              const suggestion = match.result == null ? suggestionByMatch.get(match.id) : undefined
+              const checkedValue = match.result ?? suggestion?.suggested_result ?? null
+              return (
               <form key={match.id} action={scoreMatch} className="rounded-xl p-4 space-y-3"
                 style={{ background: 'var(--color-panel)', border: '1px solid var(--border-base)' }}>
                 <input type="hidden" name="match_day_id" value={matchDay.id} />
@@ -286,6 +331,21 @@ export default async function ResultsPage() {
                     </span>
                   )}
                 </div>
+                {suggestion && (
+                  <div className="flex items-center justify-between gap-2 rounded-lg px-2.5 py-1.5 text-[11px]"
+                    style={{ background: 'var(--color-amber-soft)', border: '1px solid var(--border-warn)', color: 'var(--color-amber)' }}>
+                    <span className="font-semibold">
+                      🤖 Suggested {suggestion.home_score ?? '?'}–{suggestion.away_score ?? '?'} ({suggestion.suggested_result})
+                      <span className="font-normal opacity-80"> · {suggestion.source}
+                        {suggestion.duration && suggestion.duration !== 'REGULAR' ? ` · ${suggestion.duration.toLowerCase().replace('_', ' ')} — verify` : ''}
+                      </span>
+                    </span>
+                    <button type="submit" formAction={dismissSuggestionAction} formNoValidate
+                      className="font-bold underline whitespace-nowrap" style={{ color: 'var(--color-amber)' }}>
+                      Dismiss
+                    </button>
+                  </div>
+                )}
                 <div className="flex gap-2">
                   {[
                     { value: '1', label: `1 — ${match.home_team}` },
@@ -296,14 +356,14 @@ export default async function ResultsPage() {
                       className="flex-1 flex items-center gap-1.5 rounded-lg p-2 cursor-pointer"
                       style={inputStyle}>
                       <input type="radio" name={`result_${match.id}`} value={value} required
-                        defaultChecked={match.result === value} />
+                        defaultChecked={checkedValue === value} />
                       <span className="text-xs text-text font-medium">{label}</span>
                     </label>
                   ))}
                 </div>
                 <div className="flex gap-2">
                   <button type="submit" className={`${scoreBtn} py-2`} style={{ ...scoreBtnStyle, flex: 1 }}>
-                    {match.result ? '✏️ Update result' : '⚡ Score this match'}
+                    {match.result ? '✏️ Update result' : suggestion ? '⚡ Confirm & score' : '⚡ Score this match'}
                   </button>
                   {match.result && (
                     <button
@@ -318,7 +378,8 @@ export default async function ResultsPage() {
                   )}
                 </div>
               </form>
-            ))}
+              )
+            })}
 
             {/* Per-pikanteria scoring — each its own form */}
             {sortedPikas.length > 0 && (
