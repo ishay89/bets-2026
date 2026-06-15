@@ -57,6 +57,7 @@ npm test -- lib/scoring.test.ts
 - `/leaderboard` — full leaderboard
 - `/profile` — user profile and stats
 - `/board` — message board with user posts, image uploads, and AI recap feed
+- `/recaps` — standalone AI match-day recap/commentary feed (reads `ai_social_posts`)
 - `/h2h` — head-to-head player comparison selector
 - `/h2h/[opponentId]` — detailed H2H comparison against one opponent
 - `/admin/*` — admin-only pages, guarded by `assertAdmin()` in layout and in every Server Action
@@ -70,6 +71,7 @@ npm test -- lib/scoring.test.ts
   - `/admin/ai-picks` — enter match/pikanteria/futures picks for the AI users (Claude, Codex) and generate benchmark bot futures
   - `/admin/scores` — score snapshot validation and recalculation
   - `/admin/audit` — admin view of prediction audit events
+  - `/admin/missing-picks` — per-match-day view of which approved players are missing picks
 
 ### Authentication, Approval, and Middleware
 
@@ -219,20 +221,25 @@ The seed script does not publish matches. Use `/admin/publish` to publish indivi
 
 ## Testing
 
-Vitest tests are in `lib/*.test.ts`.
+Vitest tests are in `lib/*.test.ts` and cover the pure helpers (point math, payload builders, validation, lock/time logic, crowd/H2H aggregation, etc.). Run `npm test` for the full list; key areas:
 
-Current test focus:
 - `lib/scoring.test.ts` — point calculations and rounding
 - `lib/scoring-writes.test.ts` — payload builders for atomic scoring RPCs
-- `lib/score-validation.test.ts` — score snapshot validity and payloads
+- `lib/score-validation.test.ts` (+ `score-validation.snapshot-match-day.test.ts`) — score snapshot validity and payloads
 - `lib/prediction-saves.test.ts` — save RPC result normalization
-- `lib/crowd.test.ts` — crowd pick aggregation and insight logic
+- `lib/crowd.test.ts` / `lib/prediction-reveals.test.ts` — crowd aggregation and lock-gated reveal logic
 - `lib/h2h.test.ts` — head-to-head comparison calculations
-- `lib/lock.test.ts` — match lock-time logic
-- `lib/monkey.test.ts` — automated benchmark pick strategy
-- `lib/pre-tournament.test.ts` — futures pick completion helper
+- `lib/lock.test.ts` / `lib/match-lock-persistence.test.ts` / `lib/admin-lock-state.test.ts` — lock-time logic and persistence
+- `lib/time.test.ts` — app date/time formatting
+- `lib/monkey.test.ts` / `lib/ai-picks.test.ts` / `lib/ai-dummy-users.test.ts` — automated/AI pick strategies
+- `lib/pre-tournament.test.ts` / `lib/missing-picks.test.ts` — futures completion and missing-pick detection
 - `lib/team-theme.test.ts` — dynamic team theme token mapping
 - `lib/audit.test.ts` — audit event deduplication
+- `lib/publishing.test.ts` / `lib/admin-results-order.test.ts` — per-item publish and result-ordering logic
+- `lib/leaderboard-movement.test.ts` / `lib/historical-leaderboard.test.ts` — leaderboard ranking and history
+- `lib/security-hardening.test.ts` / `lib/admin-users-rls-bypass.test.ts` — RLS/security expectations
+- `lib/board-media.test.ts` / `lib/cloudflare-r2.test.ts` — board media handling and R2 uploads
+- `lib/match-day-grouping-migration.test.ts` — match-day grouping migration logic
 
 Before finishing code changes, run the narrow relevant tests and then `npm run lint` when practical. For docs-only updates, at minimum inspect the diff.
 
