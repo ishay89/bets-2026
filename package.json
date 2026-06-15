@@ -10,6 +10,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "seed": "tsx scripts/seed-wc2026.ts",
+    "sync:dry": "tsx scripts/sync-results-dry-run.ts",
     "gen:types": "supabase gen types typescript --local > lib/supabase/types.ts",
     "doctor": "npx react-doctor@latest"
   },
