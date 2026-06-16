@@ -20,7 +20,7 @@ const getBoardPosts = unstable_cache(
     return data ?? []
   },
   ['board-posts'],
-  { revalidate: 60, tags: ['board-posts'] },
+  { revalidate: 900, tags: ['board-posts'] },
 )
 
 export const metadata = {
