@@ -7,6 +7,7 @@ import { ThemeToggle } from '@/components/theme-toggle'
 import { createClient } from '@/lib/supabase/server'
 import { getTeamTheme, getTeamThemeCssVariables } from '@/lib/team-theme'
 import { SpeedInsights } from '@vercel/speed-insights/next'
+import { Analytics } from '@vercel/analytics/next'
 
 const barlow = Barlow({
   subsets: ['latin'],
@@ -92,6 +93,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         {children}
         <ThemeToggle />
         <SpeedInsights />
+        <Analytics />
       </body>
     </html>
   )
