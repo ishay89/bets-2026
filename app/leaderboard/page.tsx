@@ -1,10 +1,12 @@
 import { unstable_cache } from 'next/cache'
+import { after } from 'next/server'
 import { createAdminClient, createClient } from '@/lib/supabase/server'
 import { LeaderboardRealtime } from '@/components/leaderboard-realtime'
 import { Leaderboard } from '@/components/leaderboard'
 import { LeaderboardDaySelector } from '@/components/leaderboard-day-selector'
 import { BottomNav } from '@/components/bottom-nav'
 import { getHistoricalLeaderboardEntries, getLeaderboardEntries, getScoredLeaderboardDays } from '@/lib/data'
+import { maybeSyncLiveScores } from '@/lib/live-sync'
 
 const getCachedLeaderboardEntries = unstable_cache(
   () => getLeaderboardEntries(createAdminClient()),
@@ -16,6 +18,23 @@ const getCachedScoredDays = unstable_cache(
   () => getScoredLeaderboardDays(createAdminClient()),
   ['scored-leaderboard-days'],
   { revalidate: 300, tags: ['leaderboard'] },
+)
+
+// Live match count — drives the "X matches live" banner. 60s TTL; flushed
+// sooner by revalidatePath('/leaderboard') in the live-sync background task.
+const getCachedLiveMatchCount = unstable_cache(
+  async (): Promise<number> => {
+    const supabase = createAdminClient()
+    const { count, error } = await supabase
+      .from('matches')
+      .select('*', { count: 'exact', head: true })
+      .in('live_status', ['IN_PLAY', 'PAUSED'])
+      .not('published_at', 'is', null)
+    if (error) throw error
+    return count ?? 0
+  },
+  ['live-match-count'],
+  { revalidate: 60 },
 )
 
 // Historical snapshots are immutable after scoring; cache per day for 30 min.
@@ -38,10 +57,14 @@ export default async function LeaderboardPage({
   searchParams: Promise<{ day?: string }>
 }) {
   const [{ day }, supabase] = await Promise.all([searchParams, createClient()])
-  const [{ data: { user } }, liveEntries, scoredDays] = await Promise.all([
+
+  after(maybeSyncLiveScores)
+
+  const [{ data: { user } }, liveEntries, scoredDays, liveMatchCount] = await Promise.all([
     supabase.auth.getUser(),
     getCachedLeaderboardEntries(),
     getCachedScoredDays(),
+    getCachedLiveMatchCount(),
   ])
   const selectedDay = scoredDays.find(scoredDay => scoredDay.id === day) ?? null
   const entries = selectedDay
@@ -63,6 +86,19 @@ export default async function LeaderboardPage({
           <LeaderboardDaySelector days={scoredDays} selectedDayId={selectedDay?.id ?? null} />
         </div>
       </div>
+
+      {liveMatchCount > 0 && !selectedDay && (
+        <div
+          className="mx-4 mb-1 px-3 py-2 rounded-xl text-[12px] font-semibold"
+          style={{
+            background: 'rgba(220,38,38,0.1)',
+            color: 'var(--color-danger)',
+            border: '1px solid rgba(220,38,38,0.2)',
+          }}
+        >
+          ● {liveMatchCount} {liveMatchCount === 1 ? 'match' : 'matches'} live now · rankings update after final whistle
+        </div>
+      )}
 
       <main className="pb-24">
         {selectedDay ? (

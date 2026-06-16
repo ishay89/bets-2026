@@ -1,8 +1,29 @@
 import { unstable_cache } from 'next/cache'
+import { after } from 'next/server'
 import { redirect } from 'next/navigation'
 import { BoardFeed, type BoardPost } from '@/components/board-feed'
 import { BottomNav } from '@/components/bottom-nav'
 import { createAdminClient, createClient } from '@/lib/supabase/server'
+import { LiveScoreStrip, type LiveMatchRow } from '@/components/live-score-strip'
+import { maybeSyncLiveScores } from '@/lib/live-sync'
+
+// Live matches are the same for all users. 60s TTL keeps data fresh during
+// active matches; revalidatePath('/board') in the live-sync flushes it sooner.
+const getCachedLiveMatches = unstable_cache(
+  async (): Promise<LiveMatchRow[]> => {
+    const supabase = createAdminClient()
+    const { data, error } = await supabase
+      .from('matches')
+      .select('id, home_team, away_team, live_status, live_score_home, live_score_away')
+      .in('live_status', ['IN_PLAY', 'PAUSED'])
+      .not('published_at', 'is', null)
+      .order('kickoff_time', { ascending: true })
+    if (error) throw error
+    return (data ?? []) as LiveMatchRow[]
+  },
+  ['live-matches-board'],
+  { revalidate: 60 },
+)
 
 // Board posts are identical for every authenticated user — cache at the
 // Next.js layer and revalidate in the background every 60 s. The Supabase
@@ -33,13 +54,12 @@ export default async function BoardPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const [posts, { data: profile, error: profileError }] = await Promise.all([
+  after(maybeSyncLiveScores)
+
+  const [posts, { data: profile, error: profileError }, liveMatches] = await Promise.all([
     getBoardPosts(),
-    supabase
-      .from('users')
-      .select('is_admin')
-      .eq('id', user.id)
-      .single(),
+    supabase.from('users').select('is_admin').eq('id', user.id).single(),
+    getCachedLiveMatches(),
   ])
 
   if (profileError) throw profileError
@@ -52,6 +72,8 @@ export default async function BoardPage() {
         </div>
         <div className="text-[22px] font-extrabold text-text tracking-tight">Message Board</div>
       </header>
+
+      <LiveScoreStrip matches={liveMatches} />
 
       <main className="px-4 pb-28">
         <BoardFeed initialPosts={posts} currentUserId={user.id} currentUserIsAdmin={profile.is_admin}

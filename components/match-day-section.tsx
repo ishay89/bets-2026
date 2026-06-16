@@ -127,6 +127,9 @@ export function MatchDaySection({
             })}
             myUserId={userId}
             onReveal={onRevealMatch}
+            liveStatus={match.live_status}
+            liveScoreHome={match.live_score_home}
+            liveScoreAway={match.live_score_away}
           />
         )
       })}
