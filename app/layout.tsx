@@ -6,6 +6,7 @@ import './globals.css'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { createClient } from '@/lib/supabase/server'
 import { getTeamTheme, getTeamThemeCssVariables } from '@/lib/team-theme'
+import { Analytics } from '@vercel/analytics/next'
 
 const barlow = Barlow({
   subsets: ['latin'],
@@ -90,6 +91,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       <body className="bg-bg text-text min-h-screen font-sans">
         {children}
         <ThemeToggle />
+        <Analytics />
       </body>
     </html>
   )
