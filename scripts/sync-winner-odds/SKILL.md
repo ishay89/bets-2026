@@ -1,146 +1,137 @@
 # Skill: Sync Winner.co.il Odds → Mondial Bets DB
 
-Use this skill when asked to "update odds from winner" or "sync winner odds". It covers scraping, matching, and updating.
-
-## What This Does
-
-Reads the current 1X2 (full-time, no extra time) odds table from winner.co.il for the World Cup 2026 group stage, matches each fixture against the `matches` table in Supabase, and updates `odds_home` / `odds_draw` / `odds_away` for any match that is **not yet published** (`published_at IS NULL`). Published matches are never touched. `published_at` itself is never changed — publishing is a separate admin action.
+Use this skill when asked to "sync winner odds", "update odds from winner", or similar.
+Scrapes the current 1X2 table from winner.co.il and writes `odds_home`/`odds_draw`/`odds_away`
+directly to Supabase for any **unpublished** match (`published_at IS NULL`).
+Nothing is committed to the repo — the DB write is the only output.
 
 ---
 
-## Step 1 — Scrape Winner.co.il (safe approach)
+## Step 1 — Scrape winner.co.il (safe approach)
 
 **URL:**
 ```
 https://www.winner.co.il/משחקים/וינר-ליין/כדורגל/בינלאומי/בינלאומי$מונדיאל 2026/‮1X2‬ - תוצאת סיום (ללא הארכות)/כל-היחסים
 ```
 
-**WARNING — anti-bot classifier:** Rapid successive calls to `get_page_text`, `javascript_tool`, or `browser_batch` on this page trip Anthropic's cyber-related safeguards classifier and stall the session. The safe pattern is:
+**WARNING — anti-bot classifier:** Rapid successive `get_page_text` / `javascript_tool` / `browser_batch` calls on this page trip Anthropic's safety classifier. The safe pattern:
 
 1. `navigate` to the URL once
-2. Scroll down slowly (3–4 `scroll` actions, 1–2 seconds apart) to trigger lazy-load of all rows
-3. Take a screenshot after each scroll to confirm rows are appearing
-4. Confirm via screenshot that you've reached the page footer (all rows visible)
-5. Call `get_page_text` **exactly once** at the end to capture all rows in one shot
+2. Scroll down 3–4 times (1–2 s apart) to trigger lazy-load of all rows
+3. Screenshot after each scroll to confirm rows are appearing
+4. Confirm via screenshot that the page footer is visible (all rows loaded)
+5. Call `get_page_text` **exactly once** at the end
 
-Do NOT loop `get_page_text` or `javascript_tool` repeatedly — one call after full scroll is enough since the site lazy-loads on scroll but does not unload rows (no virtualization).
+Do NOT loop `get_page_text` — one call after full scroll captures everything (no row virtualisation).
 
-**What to extract:** The table rows show:
-- Date / kickoff time (Israel local time, UTC+3)
-- Team A name — odds_1
-- Draw odds — odds_X
-- Team B name — odds_2
+**Extract per row:** Date | Kickoff (Israel local, UTC+3) | Team A | odds_A | Draw odds | Team B | odds_B
 
-Winner displays kickoff as `HH:59` (1 minute before actual kickoff). The real kickoff is `HH+1:00` (or round hour). Ignore the :59 when matching — match by team names only.
+Winner shows kickoff as `HH:59` (1 min before actual). Ignore the :59 — match by team names only.
 
 ---
 
-## Step 2 — Build the WINNER_ODDS array
+## Step 2 — Run an inline update script
 
-Translate team names to English (winner shows Hebrew or transliterated names). Format each row as:
+Use `npx tsx` to run the update inline — no file to commit. Load env from `.env.local`.
 
-```ts
-{ teamA: 'France', oddsA: 1.35, oddsDraw: 4.40, teamB: 'Senegal', oddsB: 6.90 },
+```bash
+npx tsx --eval "
+import { createClient } from '@supabase/supabase-js'
+import { config } from 'dotenv'
+import { resolve } from 'path'
+config({ path: resolve(process.cwd(), '.env.local') })
+
+const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
+
+function normalize(name: string): string {
+  return name.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
+}
+
+const ALIASES: Record<string, string> = {
+  'czechia': 'czech republic', 'turkiye': 'turkey',
+  'cote d ivoire': 'ivory coast', 'cabo verde': 'cape verde',
+  'cape verde islands': 'cape verde', 'bosnia herzegovina': 'bosnia and herzegovina',
+  'dr congo': 'congo dr', 'south korea': 'korea republic',
+  'iran': 'ir iran', 'usa': 'united states', 'curacao': 'curacao',
+}
+const canon = (n: string) => { const k = normalize(n); return ALIASES[k] ?? k }
+
+// ── PASTE SCRAPED ODDS HERE ──────────────────────────────────────────────────
+const ODDS = [
+  { teamA: 'France', oddsA: 1.35, oddsDraw: 4.40, teamB: 'Senegal', oddsB: 6.90 },
+  // ... one object per match
+]
+// ─────────────────────────────────────────────────────────────────────────────
+
+const { data: matches } = await supabase.from('matches')
+  .select('id, home_team, away_team, kickoff_time, published_at, odds_home, odds_draw, odds_away')
+
+const map = new Map(matches!.map(m => [\`\${canon(m.home_team)}|\${canon(m.away_team)}\`, m]))
+
+let updated = 0, skipped = 0, notFound = 0
+for (const row of ODDS) {
+  const [ca, cb] = [canon(row.teamA), canon(row.teamB)]
+  let m = map.get(\`\${ca}|\${cb}\`); let rev = false
+  if (!m) { m = map.get(\`\${cb}|\${ca}\`); if (m) rev = true }
+  if (!m) { console.log('NOT FOUND:', row.teamA, 'vs', row.teamB); notFound++; continue }
+  if (m.published_at) { console.log('SKIP (published):', m.home_team, 'vs', m.away_team); skipped++; continue }
+  const oh = rev ? row.oddsB : row.oddsA, oa = rev ? row.oddsA : row.oddsB
+  const { error } = await supabase.from('matches').update({ odds_home: oh, odds_draw: row.oddsDraw, odds_away: oa }).eq('id', m.id)
+  if (error) console.error('FAIL:', m.home_team, 'vs', m.away_team, error)
+  else { console.log(\`UPDATED: \${m.home_team} vs \${m.away_team}  \${m.odds_home}/\${m.odds_draw}/\${m.odds_away} → \${oh}/\${row.oddsDraw}/\${oa}\`); updated++ }
+}
+console.log(\`\nDone: \${updated} updated, \${skipped} skipped (published), \${notFound} not found\`)
+"
 ```
 
-`teamA` = left team on the page (same as `home_team` in DB for all group-stage fixtures).
-`teamB` = right team (same as `away_team`).
-
-Replace the `WINNER_ODDS` array in `scripts/sync-winner-odds/sync.ts` with the fresh data.
+Fill in the `ODDS` array with the data from Step 1, then run the command.
 
 ---
 
 ## Step 3 — Team name matching
 
-The script uses `canonicalTeamKey()` (normalise + alias map) to compare names across sources. Known aliases already in the map:
+`canon()` normalises + aliases so names match across sources. Known aliases:
 
-| Winner name          | DB seed name       | Canonical key          |
-|----------------------|--------------------|------------------------|
-| Czech Republic       | Czechia            | czech republic         |
-| Turkey               | Türkiye            | turkey                 |
-| Ivory Coast          | Côte d'Ivoire      | ivory coast            |
-| Cape Verde           | Cabo Verde         | cape verde             |
-| Bosnia and Herzegovina | Bosnia-Herzegovina | bosnia and herzegovina |
-| DR Congo             | DR Congo           | congo dr               |
-| South Korea          | South Korea        | korea republic         |
-| Iran                 | Iran               | ir iran                |
-| United States        | USA                | united states          |
-| Curaçao              | Curaçao            | curacao                |
+| Winner name              | DB seed name       | Canonical          |
+|--------------------------|--------------------|--------------------|
+| Czech Republic           | Czechia            | czech republic     |
+| Turkey                   | Türkiye            | turkey             |
+| Ivory Coast              | Côte d'Ivoire      | ivory coast        |
+| Cape Verde               | Cabo Verde         | cape verde         |
+| Bosnia and Herzegovina   | Bosnia-Herzegovina | bosnia and herzegovina |
+| DR Congo                 | DR Congo           | congo dr           |
+| South Korea              | South Korea        | korea republic     |
+| Iran                     | Iran               | ir iran            |
+| United States            | USA                | united states      |
+| Curaçao                  | Curaçao            | curacao            |
 
-If a new team name appears that doesn't match, add an entry to `TEAM_ALIASES` in the script (same format as the existing map).
-
----
-
-## Step 4 — Dry run first
-
-```bash
-npm run sync:winner-odds -- --dry
-```
-
-Review the output. `WOULD UPDATE` lines show old → new odds. `SKIP` lines are already-published matches. `NOT FOUND` lines need alias fixes.
+If a new alias is needed, add it to `ALIASES` in the inline script.
 
 ---
 
-## Step 5 — Apply
+## Step 4 — Report
 
-```bash
-npm run sync:winner-odds
-```
+After the script runs, post a report in chat:
 
-Output will confirm each row updated. Only unpublished matches change.
-
----
-
-## Step 6 — Commit and PR
-
-```bash
-git checkout -b fix/winner-odds-<date>
-git add scripts/sync-winner-odds/sync.ts
-git commit -m "data: update winner odds for <date> matchday"
-# then open PR per AGENTS.md git workflow
-```
-
----
-
-## Step 7 — Report
-
-After the script finishes, produce a structured report in chat covering:
-
-1. **Updated matches** — table with: Date | Kickoff (Israel time) | Match | Old odds (home/draw/away) | New odds (home/draw/away)
-2. **Skipped (already published)** — list of match names
-3. **Not found in DB** — list of Winner rows that had no DB match (these need alias fixes)
-4. **Totals** — updated / skipped / not found / total Winner rows
-
-Capture old → new odds from the script output (the script prints `old → new` for each updated row).
-
-Example report format:
-
-```
-## Winner Odds Sync — 2026-06-16
-
-### Updated (20)
-| Date  | Kickoff | Match | Old | New |
-|-------|---------|-------|-----|-----|
+### Updated (`N`)
+| Date | Kickoff (IL) | Match | Old odds | New odds |
+|------|-------------|-------|----------|----------|
 | Jun 17 | 20:00 | Portugal vs DR Congo | 2.00/3.30/3.50 | 1.20/5.50/10.50 |
-...
 
-### Skipped — already published (4)
+### Skipped — already published (`N`)
 - France vs Senegal
-- Iraq vs Norway
-- Argentina vs Algeria
-- Austria vs Jordan
+- ...
 
-### Not found in DB (0)
-—
+### Not found in DB (`N`)
+— (or list any mismatches that need alias fixes)
 
-**Total: 20 updated, 4 skipped, 0 not found out of 24 Winner rows**
-```
+**Total: N updated, N skipped, N not found out of N Winner rows**
 
 ---
 
 ## Notes
 
-- The script is idempotent: re-running with the same data writes the same values.
-- Odds are stored as numeric with 4-decimal precision (per `20260601000000_widen_numeric_precision.sql`).
-- Do not use this script to set `published_at` — use `/admin/publish` in the UI to publish matches (which also creates automated benchmark predictions).
-- If a match shows as `NOT FOUND`, first check if the team is in the DB at all (wrong round / stage) before adding an alias.
+- **Nothing is committed** — only the DB changes.
+- Unpublished matches only. `published_at` is never touched.
+- Odds precision: 4 decimals (per `20260601000000_widen_numeric_precision.sql`).
+- Publishing (setting `published_at` + generating benchmark picks) is a separate admin action via `/admin/publish`.
