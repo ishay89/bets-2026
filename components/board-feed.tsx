@@ -210,7 +210,7 @@ export function BoardFeed({ initialPosts, currentUserId, currentUserIsAdmin, gip
       .from('message_board_posts')
       .select('id, user_id, body, image_path, uploaded_media_type, media_provider, media_provider_id, media_url, media_preview_url, media_title, media_width, media_height, created_at, users(display_name, is_monkey, automation_strategy, avatar_emoji)')
       .order('created_at', { ascending: false })
-      .limit(100)
+      .limit(50)
       .returns<BoardPost[]>()
 
     if (data) dispatch({ type: 'postsLoaded', posts: data })
@@ -523,7 +523,7 @@ export function BoardFeed({ initialPosts, currentUserId, currentUserIsAdmin, gip
       )}
 
       <div className="space-y-3">
-        {posts.map((post) => (
+        {posts.map((post, index) => (
           <article key={post.id} className="rounded-[14px] overflow-hidden"
             style={{ background: 'var(--color-panel)', border: '1px solid var(--border-base)' }}>
             <div className="flex items-center gap-2.5 px-3 pt-3">
@@ -548,7 +548,7 @@ export function BoardFeed({ initialPosts, currentUserId, currentUserIsAdmin, gip
             {post.body && <p className="whitespace-pre-wrap break-words px-3 py-3 text-[14px] leading-5 text-sub">{post.body}</p>}
             {post.image_path && (
               isVideoMediaType(post.uploaded_media_type) ? (
-                <video src={getUploadUrl(post.image_path)} controls preload="metadata"
+                <video src={getUploadUrl(post.image_path)} controls preload={index === 0 ? "metadata" : "none"}
                   aria-label={`Video post by ${post.users.display_name}`}
                   className="max-h-[32rem] w-full object-contain"
                   style={{ background: 'var(--color-elev)' }}>
@@ -556,12 +556,12 @@ export function BoardFeed({ initialPosts, currentUserId, currentUserIsAdmin, gip
                 </video>
               ) : (
                 <Image src={getUploadUrl(post.image_path)} alt={`Post by ${post.users.display_name}`}
-                  width={900} height={700} unoptimized className="max-h-[32rem] w-full object-contain"
+                  width={900} height={700} unoptimized priority={index === 0} className="max-h-[32rem] w-full object-contain"
                   style={{ background: 'var(--color-elev)' }} />
               )
             )}
             {post.media_provider === 'cloudflare_r2' && post.media_url && (
-              <video src={post.media_url} controls preload="metadata"
+              <video src={post.media_url} controls preload={index === 0 ? "metadata" : "none"}
                 aria-label={`Video post by ${post.users.display_name}`}
                 className="max-h-[32rem] w-full object-contain"
                 style={{ background: 'var(--color-elev)' }}>
@@ -572,7 +572,7 @@ export function BoardFeed({ initialPosts, currentUserId, currentUserIsAdmin, gip
               <div>
                 <Image src={post.media_url} alt={post.media_title ?? `GIF posted by ${post.users.display_name}`}
                   width={post.media_width ?? 900} height={post.media_height ?? 700}
-                  unoptimized className="max-h-[32rem] w-full object-contain"
+                  unoptimized priority={index === 0} className="max-h-[32rem] w-full object-contain"
                   style={{ background: 'var(--color-elev)' }} />
                 <div className="px-3 py-2 text-right text-[10px] font-extrabold uppercase tracking-[1px] text-muted">
                   Powered by GIPHY
