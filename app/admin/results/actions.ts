@@ -15,6 +15,9 @@ export async function syncResultsAction() {
   const supabase = createAdminClient()
   await runResultsSync(supabase)
   revalidatePath('/admin/results')
+  revalidatePath('/')
+  revalidatePath('/predict')
+  revalidatePath('/leaderboard')
 }
 
 export async function dismissSuggestionAction(formData: FormData) {

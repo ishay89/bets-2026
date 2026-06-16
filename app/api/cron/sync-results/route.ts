@@ -2,10 +2,11 @@
 //
 // Triggered by Vercel Cron (see vercel.json). Vercel sends the configured
 // CRON_SECRET as a Bearer token; we reject anything else so the endpoint can't
-// be poked anonymously. It only ever writes advisory suggestion rows — no
-// scoring happens here, so even a spurious call is harmless.
+// be poked anonymously. Auto-scores finished matches via enter_match_day_results;
+// pikanteria remain manual.
 
 import { NextResponse } from 'next/server'
+import { revalidatePath } from 'next/cache'
 import { createAdminClient } from '@/lib/supabase/server'
 import { runResultsSync } from '@/lib/result-sync-runner'
 
@@ -30,6 +31,11 @@ export async function GET(req: Request) {
   try {
     const supabase = createAdminClient()
     const summary = await runResultsSync(supabase)
+    if (summary.scored > 0) {
+      revalidatePath('/')
+      revalidatePath('/predict')
+      revalidatePath('/leaderboard')
+    }
     return NextResponse.json(summary)
   } catch (err) {
     const message = err instanceof Error ? err.message : 'unknown error'
