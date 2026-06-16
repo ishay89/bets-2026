@@ -65,5 +65,8 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
+  // Skip API routes: they authenticate themselves (the cron route checks
+  // CRON_SECRET, /api/board/r2-upload checks the Supabase session) and must
+  // return JSON 401s rather than be redirected to the HTML /login page.
+  matcher: ['/((?!api|_next/static|_next/image|favicon.ico).*)'],
 }
