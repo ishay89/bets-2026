@@ -1,5 +1,6 @@
 'use client'
 import { useReducer, useRef, useTransition } from 'react'
+import dynamic from 'next/dynamic'
 import type { Pick } from '@/lib/types'
 import type { Insight } from '@/lib/crowd'
 import type { SaveResult } from '@/lib/prediction-saves'
@@ -7,7 +8,11 @@ import type { PlayerRevealRow } from '@/lib/prediction-reveals'
 import { formatAppTime } from '@/lib/time'
 import { getFlag } from '@/lib/display'
 import { CrowdInsight } from './crowd-insight'
-import { PredictionRevealSheet } from './prediction-reveal-sheet'
+
+const PredictionRevealSheet = dynamic(
+  () => import('./prediction-reveal-sheet').then(m => ({ default: m.PredictionRevealSheet })),
+  { ssr: false },
+)
 
 /** A single selectable outcome. `label` is the human text; `pick` is the 1/X/2 slot. */
 export interface BetOption {
