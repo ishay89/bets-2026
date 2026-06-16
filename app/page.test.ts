@@ -7,9 +7,9 @@ vi.mock('next/navigation', () => ({
 }))
 
 describe('HomePage', () => {
-  it('opens the social board by default', () => {
+  it('redirects to predict by default', () => {
     HomePage()
 
-    expect(redirect).toHaveBeenCalledWith('/board')
+    expect(redirect).toHaveBeenCalledWith('/predict')
   })
 })
