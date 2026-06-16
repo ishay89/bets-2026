@@ -129,6 +129,42 @@ After the script runs, post a report in chat:
 
 ---
 
+## Step 7 — Report
+
+After the script finishes, produce a structured report in chat covering:
+
+1. **Updated matches** — table with: Date | Kickoff (Israel time) | Match | Old odds (home/draw/away) | New odds (home/draw/away)
+2. **Skipped (already published)** — list of match names
+3. **Not found in DB** — list of Winner rows that had no DB match (these need alias fixes)
+4. **Totals** — updated / skipped / not found / total Winner rows
+
+Capture old → new odds from the script output (the script prints `old → new` for each updated row).
+
+Example report format:
+
+```
+## Winner Odds Sync — 2026-06-16
+
+### Updated (20)
+| Date  | Kickoff | Match | Old | New |
+|-------|---------|-------|-----|-----|
+| Jun 17 | 20:00 | Portugal vs DR Congo | 2.00/3.30/3.50 | 1.20/5.50/10.50 |
+...
+
+### Skipped — already published (4)
+- France vs Senegal
+- Iraq vs Norway
+- Argentina vs Algeria
+- Austria vs Jordan
+
+### Not found in DB (0)
+—
+
+**Total: 20 updated, 4 skipped, 0 not found out of 24 Winner rows**
+```
+
+---
+
 ## Notes
 
 - **Nothing is committed** — only the DB changes.

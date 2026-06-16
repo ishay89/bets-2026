@@ -1,12 +1,10 @@
+import { unstable_cache } from 'next/cache'
 import { createAdminClient, createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
-import { BetCard, type BetOption } from '@/components/bet-card'
-import { LockTimer } from '@/components/lock-timer'
 import { BottomNav } from '@/components/bottom-nav'
-import type { Pick, Match, Pikanteria } from '@/lib/types'
-import { isMatchLocked, isPikanteriaLocked, matchLockMs } from '@/lib/lock'
-import { toPct, matchInsight, type CrowdTally } from '@/lib/crowd'
+import type { Pick } from '@/lib/types'
+import type { CrowdTally } from '@/lib/crowd'
 import { parseUUID, parsePick } from '@/lib/validation'
 import { PreTournamentFutures } from '@/components/pre-tournament-futures'
 import { MissingPicksBanner } from '@/components/missing-picks-banner'
@@ -25,33 +23,38 @@ import {
 } from '@/lib/prediction-saves'
 import { persistDueMatchLocks, persistDuePikanteriaLocks } from '@/lib/match-lock-persistence'
 import { getMatchPredictionsReveal, getPikanteriaAnswersReveal } from '@/lib/prediction-reveals'
-import { appDateKey, formatAppDate } from '@/lib/time'
+import { appDateKey } from '@/lib/time'
+import { MatchDaySection } from '@/components/match-day-section'
+import { LazyMatchDayList } from '@/components/lazy-match-day-list'
 
 export const metadata = { title: 'Predict | Mondial Bets 2026' }
 
-const STAGE_LABELS: Record<string, string> = {
-  group: 'Group Stage', r32: 'Round of 32', r16: 'Round of 16', qf: 'Quarter Finals',
-  sf: 'Semi Finals', '3rd': 'Third Place', final: 'Final',
-}
+// Crowd pick aggregates are the same for every user; cache for 60s to reduce
+// RPC calls during busy match days without meaningfully staling the data.
+type CrowdMatchRow = { match_id: string; pick: Pick; cnt: number }
+type CrowdPikRow = { pikanteria_id: string; pick: Pick; cnt: number }
 
-// Match → the three fixed outcomes, in display order.
-function matchOptions(match: Match): BetOption[] {
-  return [
-    { pick: '1', label: match.home_team, odds: match.odds_home },
-    { pick: 'X', label: 'Draw', odds: match.odds_draw },
-    { pick: '2', label: match.away_team, odds: match.odds_away },
-  ]
-}
+const getCachedCrowdMatchPicks = unstable_cache(
+  async (): Promise<CrowdMatchRow[]> => {
+    const supabase = createAdminClient()
+    const { data, error } = await supabase.rpc('crowd_match_picks')
+    if (error) throw error
+    return (data ?? []) as CrowdMatchRow[]
+  },
+  ['crowd-match-picks'],
+  { revalidate: 60, tags: ['crowd-picks'] },
+)
 
-// Pikanteria → its outcomes, hiding X when the question is two-way (odds_x null).
-function pikaOptions(item: Pikanteria): BetOption[] {
-  const opts: BetOption[] = [{ pick: '1', label: item.label_1, odds: item.odds_1 }]
-  if (item.odds_x != null && item.label_x != null) {
-    opts.push({ pick: 'X', label: item.label_x, odds: item.odds_x })
-  }
-  opts.push({ pick: '2', label: item.label_2, odds: item.odds_2 })
-  return opts
-}
+const getCachedCrowdPikPicks = unstable_cache(
+  async (): Promise<CrowdPikRow[]> => {
+    const supabase = createAdminClient()
+    const { data, error } = await supabase.rpc('crowd_pikanteria_picks')
+    if (error) throw error
+    return (data ?? []) as CrowdPikRow[]
+  },
+  ['crowd-pik-picks'],
+  { revalidate: 60, tags: ['crowd-picks'] },
+)
 
 function invalidSaveResult(error: unknown): SaveResult {
   const message = error instanceof Error ? error.message : 'Invalid prediction'
@@ -128,6 +131,8 @@ async function revealPikanteriaAnswers(picanteriaId: string) {
   return getPikanteriaAnswersReveal(supabase, picanteriaId)
 }
 
+const EAGER_DAYS = 5
+
 export default async function PredictPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -146,20 +151,18 @@ export default async function PredictPage() {
   const [
     existingPredictions,
     existingAnswers,
-    { data: crowdMatchRows, error: crowdMatchError },
-    { data: crowdPikRows, error: crowdPikError },
+    crowdMatchRows,
+    crowdPikRows,
     { data: futuresPick, error: futuresPickError },
     { data: tournamentSettings },
   ] = await Promise.all([
     getUserPredictions(supabase, user.id),
     getUserPikanteriaAnswers(supabase, user.id),
-    supabase.rpc('crowd_match_picks'),
-    supabase.rpc('crowd_pikanteria_picks'),
+    getCachedCrowdMatchPicks(),
+    getCachedCrowdPikPicks(),
     supabase.from('pre_tournament_picks').select('*').eq('user_id', user.id).maybeSingle(),
     supabase.from('tournament_settings').select('futures_locked, futures_published').eq('id', true).single(),
   ])
-  if (crowdMatchError) throw crowdMatchError
-  if (crowdPikError) throw crowdPikError
   if (futuresPickError) throw futuresPickError
 
   const hasEntryPick = hasCompletedPreTournamentPick(futuresPick)
@@ -194,18 +197,33 @@ export default async function PredictPage() {
   })
 
   // Aggregate crowd picks (counts only; revealed by the RPCs only after lock).
-  // Both matches and pikanteria are tallied by the 1/X/2 pick now.
   const crowdTally: Record<string, CrowdTally> = {}
-  for (const r of (crowdMatchRows ?? []) as { match_id: string; pick: Pick; cnt: number }[]) {
+  for (const r of crowdMatchRows) {
     const t = (crowdTally[r.match_id] ??= { '1': 0, X: 0, '2': 0, total: 0 })
     t[r.pick] = r.cnt
     t.total += r.cnt
   }
   const crowdPikTally: Record<string, CrowdTally> = {}
-  for (const r of (crowdPikRows ?? []) as { pikanteria_id: string; pick: Pick; cnt: number }[]) {
+  for (const r of crowdPikRows) {
     const t = (crowdPikTally[r.pikanteria_id] ??= { '1': 0, X: 0, '2': 0, total: 0 })
     t[r.pick] = r.cnt
     t.total += r.cnt
+  }
+
+  const eagerDays = sortedDays.slice(0, EAGER_DAYS)
+  const lazyDays = sortedDays.slice(EAGER_DAYS)
+
+  const sharedSectionProps = {
+    today,
+    predictionMap,
+    answerMap,
+    crowdTally,
+    crowdPikTally,
+    userId: user.id,
+    onSavePick: savePick,
+    onSaveAnswer: saveAnswer,
+    onRevealMatch: revealMatchPicks,
+    onRevealPikanteria: revealPikanteriaAnswers,
   }
 
   return (
@@ -234,126 +252,16 @@ export default async function PredictPage() {
           </div>
         )}
 
-        {sortedDays.map((matchDay, idx) => {
-          const isToday = matchDay.date === today
-          const stageLabel = STAGE_LABELS[matchDay.stage] ?? matchDay.stage
-          const pikaItems = matchDay.pikanteria
-          const sortedMatches = matchDay.matches.toSorted(
-            (a, b) => new Date(a.kickoff_time).getTime() - new Date(b.kickoff_time).getTime()
-          )
-          const dateLabel = formatAppDate(matchDay.date)
+        {eagerDays.map((matchDay, idx) => (
+          <MatchDaySection
+            key={matchDay.id}
+            matchDay={matchDay}
+            showTopDivider={idx > 0}
+            {...sharedSectionProps}
+          />
+        ))}
 
-          const allMatchesLocked = sortedMatches.length > 0 && sortedMatches.every(m => isMatchLocked(m))
-
-          // Lock timer points to the earliest match's lock time (kickoff − 5 min).
-          const earliestLockTime = sortedMatches.length > 0
-            ? new Date(Math.min(...sortedMatches.map(m => matchLockMs(m.kickoff_time)))).toISOString()
-            : matchDay.lock_time
-
-          return (
-            <div key={matchDay.id} className="space-y-3">
-              {/* Day header */}
-              <div className="flex items-center justify-between pt-1">
-                <div>
-                  <div className="text-[10px] font-bold uppercase tracking-wide" style={{ color: 'var(--color-accent)' }}>
-                    {stageLabel}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-bold text-text">{dateLabel}</span>
-                    {isToday && (
-                      <span className="text-[9px] font-black px-1.5 py-0.5 rounded-full"
-                        style={{ background: 'var(--color-accent)', color: '#000' }}>
-                        TODAY
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                {sortedMatches.length > 0 && (allMatchesLocked ? (
-                  <div className="text-[10px] font-bold px-2.5 py-1 rounded-full"
-                    style={{ background: 'var(--color-danger-soft)', color: 'var(--color-danger)', border: '1px solid var(--border-danger)' }}>
-                    🔒 Locked
-                  </div>
-                ) : (
-                  <LockTimer lockTime={earliestLockTime} />
-                ))}
-              </div>
-
-              {/* Matches */}
-              {sortedMatches.length > 0 && (
-                <div className="text-[10px] font-bold uppercase tracking-[1.2px]"
-                  style={{ color: 'var(--color-muted)' }}>
-                  Matches
-                </div>
-              )}
-              {sortedMatches.map(match => {
-                const tally = crowdTally[match.id] ?? { '1': 0, X: 0, '2': 0, total: 0 }
-                return (
-                  <BetCard
-                    key={`${match.id}:${predictionMap[match.id] ?? 'none'}`}
-                    id={match.id}
-                    variant="match"
-                    options={matchOptions(match)}
-                    result={match.result}
-                    homeTeam={match.home_team}
-                    awayTeam={match.away_team}
-                    kickoffTime={match.kickoff_time}
-                    stageLabel={stageLabel}
-                    currentPick={predictionMap[match.id] ?? null}
-                    isLocked={isMatchLocked(match)}
-                    onSave={savePick}
-                    crowd={toPct(tally)}
-                    crowdTotal={tally.total}
-                    insight={matchInsight({
-                      tally,
-                      odds: { '1': match.odds_home, X: match.odds_draw, '2': match.odds_away },
-                      myPick: predictionMap[match.id] ?? null,
-                    })}
-                    myUserId={user.id}
-                    onReveal={revealMatchPicks}
-                  />
-                )
-              })}
-
-              {/* Pikanteria */}
-              {pikaItems.length > 0 && (
-                <>
-                  <div className="flex items-center gap-2 pt-2">
-                    <span className="text-lg">🌶️</span>
-                    <span className="text-[10px] font-bold uppercase tracking-[1.2px]"
-                      style={{ color: 'var(--color-amber)' }}>
-                      Pikanteria · {pikaItems.length} side bets
-                    </span>
-                  </div>
-                  {pikaItems.map(item => {
-                    const tally = crowdPikTally[item.id] ?? { '1': 0, X: 0, '2': 0, total: 0 }
-                    return (
-                      <BetCard
-                        key={`${item.id}:${answerMap[item.id] ?? 'none'}`}
-                        id={item.id}
-                        variant="pika"
-                        question={item.question}
-                        options={pikaOptions(item)}
-                        result={item.result}
-                        currentPick={answerMap[item.id] ?? null}
-                        isLocked={isPikanteriaLocked(item)}
-                        onSave={saveAnswer}
-                        crowd={toPct(tally)}
-                        crowdTotal={tally.total}
-                        myUserId={user.id}
-                        onReveal={revealPikanteriaAnswers}
-                      />
-                    )
-                  })}
-                </>
-              )}
-
-              {idx < sortedDays.length - 1 && (
-                <div className="border-t mt-2" style={{ borderColor: 'var(--border-subtle)' }} />
-              )}
-            </div>
-          )
-        })}
+        <LazyMatchDayList days={lazyDays} {...sharedSectionProps} />
 
         {futuresPublished && hasEntryPick && (
           <PreTournamentFutures
