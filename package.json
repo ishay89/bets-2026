@@ -12,6 +12,7 @@
     "seed": "tsx scripts/seed-wc2026.ts",
     "sync:dry": "tsx scripts/sync-results-dry-run.ts",
     "sync:fixtures": "tsx scripts/sync-fixtures.ts",
+    "sync:winner-odds": "tsx scripts/sync-winner-odds/sync.ts",
     "gen:types": "supabase gen types typescript --local > lib/supabase/types.ts",
     "doctor": "npx react-doctor@latest"
   },
