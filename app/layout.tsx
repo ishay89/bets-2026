@@ -68,13 +68,12 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       suppressHydrationWarning
       className={`${barlow.variable} ${oswald.variable} ${ibmPlexMono.variable}`}
     >
-      <head>
-        {/* Prevent flash of wrong theme on load */}
+      <head />
+      <body className="bg-bg text-text min-h-screen font-sans">
+        {/* beforeInteractive scripts must appear inside body in App Router JSX — Next.js hoists to <head> */}
         <Script strategy="beforeInteractive" id="theme-init">
           {`(function(){try{var t=localStorage.getItem('theme')||'light';document.documentElement.setAttribute('data-theme',t);}catch(e){}})();`}
         </Script>
-      </head>
-      <body className="bg-bg text-text min-h-screen font-sans">
         {children}
         <SpeedInsights />
         <Analytics />
