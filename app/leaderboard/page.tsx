@@ -79,7 +79,7 @@ export default async function LeaderboardPage({
           <div className="text-[10px] font-bold uppercase tracking-wide" style={{ color: 'var(--color-accent)' }}>
             {eyebrow}
           </div>
-          <div className="text-[22px] font-extrabold text-text tracking-tight">Leaderboard</div>
+          <div className="font-display text-[22px] font-extrabold text-text tracking-tight">Leaderboard</div>
         </div>
         <div className="flex shrink-0 flex-col items-end gap-2">
           <div className="text-[11px] font-semibold text-sub">{entries.length} players</div>

@@ -28,7 +28,7 @@ export default async function RecapsPage() {
         <div className="text-[10px] font-bold uppercase tracking-wide" style={{ color: 'var(--color-accent)' }}>
           Codex press box
         </div>
-        <div className="text-[22px] font-extrabold text-text tracking-tight">AI Recaps</div>
+        <div className="font-display text-[22px] font-extrabold text-text tracking-tight">AI Recaps</div>
       </header>
 
       <main className="px-4 pb-28">

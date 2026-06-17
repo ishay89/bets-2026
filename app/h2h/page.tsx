@@ -32,7 +32,7 @@ export default async function H2HPickerPage() {
         >
           Head to head
         </div>
-        <div className="text-[22px] font-extrabold text-text tracking-tight">Pick a rival</div>
+        <div className="font-display text-[22px] font-extrabold text-text tracking-tight">Pick a rival</div>
       </div>
 
       <main className="px-4 pb-28 space-y-5">

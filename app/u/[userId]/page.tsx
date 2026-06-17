@@ -162,7 +162,7 @@ export default async function PlayerHistoryPage({
           <div className="text-[10px] font-bold uppercase tracking-wide" style={{ color: 'var(--color-accent)' }}>
             Locked picks · futures &amp; pikanteria
           </div>
-          <div className="text-[22px] font-extrabold text-text tracking-tight truncate">History</div>
+          <div className="font-display text-[22px] font-extrabold text-text tracking-tight truncate">History</div>
         </div>
         <Link
           href="/leaderboard"

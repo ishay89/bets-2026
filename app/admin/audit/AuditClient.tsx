@@ -234,7 +234,7 @@ export default function AuditClient({
     <div className="max-w-5xl mx-auto space-y-4 pb-10">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <div className="font-black text-lg" style={{ color: 'var(--color-amber)' }}>
+          <div className="font-display font-black text-lg" style={{ color: 'var(--color-amber)' }}>
             User Audit
           </div>
           <div className="text-muted text-xs mt-0.5">Latest user prediction commits</div>
@@ -325,7 +325,7 @@ export default function AuditClient({
           onClick={handleSearch}
           disabled={isPending}
           className="px-4 py-1.5 rounded-lg text-[12px] font-bold"
-          style={{ background: 'var(--color-amber)', color: '#000', opacity: isPending ? 0.6 : 1 }}
+          style={{ background: 'var(--color-amber)', color: '#fff', opacity: isPending ? 0.6 : 1 }}
         >
           {isPending ? 'Loading...' : 'Search'}
         </button>

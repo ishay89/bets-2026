@@ -233,7 +233,6 @@ Vitest tests are in `lib/*.test.ts` and cover the pure helpers (point math, payl
 - `lib/time.test.ts` — app date/time formatting
 - `lib/monkey.test.ts` / `lib/ai-picks.test.ts` / `lib/ai-dummy-users.test.ts` — automated/AI pick strategies
 - `lib/pre-tournament.test.ts` / `lib/missing-picks.test.ts` — futures completion and missing-pick detection
-- `lib/team-theme.test.ts` — dynamic team theme token mapping
 - `lib/audit.test.ts` — audit event deduplication
 - `lib/publishing.test.ts` / `lib/admin-results-order.test.ts` — per-item publish and result-ordering logic
 - `lib/leaderboard-movement.test.ts` / `lib/historical-leaderboard.test.ts` — leaderboard ranking and history
@@ -248,8 +247,8 @@ Before finishing code changes, run the narrow relevant tests and then `npm run l
 Global styles live in `app/globals.css`; additional guidance is in `STYLE_GUIDE.md` and `docs/style-guide.md`.
 
 Key rules:
-- Use design tokens (`--color-*`, `--border-*`, `--team-*`) instead of hard-coded colors when possible
-- The active champion pick can alter `--color-accent` and related team variables via `lib/team-theme.ts`
+- Use design tokens (`--color-*`, `--border-*`) instead of hard-coded colors when possible
+- The app has one identical look for every player — there is no per-user or per-team theming
 - Keep mobile betting screens dense, scannable, and operational
 - Main page content usually needs `pb-28` so the bottom nav does not cover controls
 - The floating `ThemeToggle` is in the root layout; bottom navigation is page-specific

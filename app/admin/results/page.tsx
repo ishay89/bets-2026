@@ -240,7 +240,7 @@ const inputStyle = {
 }
 
 const scoreBtn = 'px-3 py-1.5 rounded-lg text-xs font-bold'
-const scoreBtnStyle = { background: 'var(--color-accent)', color: '#000' }
+const scoreBtnStyle = { background: 'var(--color-accent)', color: '#fff' }
 
 export default async function ResultsPage() {
   const supabase = await createClient()
@@ -275,7 +275,7 @@ export default async function ResultsPage() {
     <div className="max-w-2xl mx-auto space-y-10 pb-10">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <div className="font-black text-lg" style={{ color: 'var(--color-amber)' }}>
+          <div className="font-display font-black text-lg" style={{ color: 'var(--color-amber)' }}>
             ✅ Enter Results
           </div>
           <div className="text-muted text-xs">

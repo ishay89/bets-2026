@@ -44,7 +44,7 @@ export default async function ProfilePage() {
   return (
     <div className="min-h-screen bg-bg">
       <div className="px-4 pt-4 pb-3">
-        <div className="text-[22px] font-extrabold text-text tracking-tight">Your stats</div>
+        <div className="font-display text-[22px] font-extrabold text-text tracking-tight">Your stats</div>
       </div>
 
       <main className="px-4 pb-28 space-y-4">

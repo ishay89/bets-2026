@@ -283,7 +283,7 @@ function VerdictChip({
 }) {
   const base = 'text-[12px] px-2 py-0.5 rounded-full font-bold'
   if (isCorrect) {
-    return <span className={base} style={{ color: '#000', background: 'var(--color-accent)', border: '1px solid transparent', ...VERDICT_FONT_STYLE }}>✓ Correct</span>
+    return <span className={base} style={{ color: '#fff', background: 'var(--color-accent)', border: '1px solid transparent', ...VERDICT_FONT_STYLE }}>✓ Correct</span>
   }
   if (isWrong) {
     return <span className={base} style={{ color: '#fff', background: 'var(--color-danger)', border: '1px solid var(--border-danger)', ...VERDICT_FONT_STYLE }}>✗ Wrong</span>
@@ -437,7 +437,7 @@ function PickButtons({
             className="flex flex-col items-center rounded-xl py-3 transition-all duration-150"
             style={{
               background: sel ? theme.accent : 'var(--color-elev)',
-              color: sel ? '#000' : 'var(--color-text)',
+              color: sel ? '#fff' : 'var(--color-text)',
               border: isWinner && !sel
                 ? '1px solid var(--border-accent)'
                 : sel ? '1px solid transparent' : '1px solid var(--border-base)',

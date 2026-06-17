@@ -1078,7 +1078,7 @@ export default async function PublishPage({
   return (
     <div className="max-w-2xl mx-auto space-y-6 pb-10">
       <div>
-        <div className="font-black text-lg" style={{ color: 'var(--color-amber)' }}>Publish &amp; Edit Bets</div>
+        <div className="font-display font-black text-lg" style={{ color: 'var(--color-amber)' }}>Publish &amp; Edit Bets</div>
         <div className="text-muted text-xs">Manage odds, publishing, and locks from one admin screen</div>
       </div>
 

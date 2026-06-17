@@ -220,7 +220,7 @@ function RivalryHeader() {
         >
           Head to head
         </div>
-        <div className="text-[22px] font-extrabold text-text tracking-tight">Rivalry</div>
+        <div className="font-display text-[22px] font-extrabold text-text tracking-tight">Rivalry</div>
       </div>
       <Link
         href="/h2h"

@@ -42,7 +42,7 @@ export default async function HistoryPage() {
           <div className="text-[10px] font-bold uppercase tracking-wide" style={{ color: 'var(--color-accent)' }}>
             Your bets so far
           </div>
-          <div className="text-[22px] font-extrabold text-text tracking-tight">History</div>
+          <div className="font-display text-[22px] font-extrabold text-text tracking-tight">History</div>
         </div>
       </div>
 

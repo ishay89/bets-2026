@@ -234,7 +234,7 @@ export default async function PredictPage() {
   return (
     <div className="min-h-screen bg-bg">
       <div className="px-4 pt-4 pb-2">
-        <div className="text-[22px] font-extrabold text-text tracking-tight leading-tight">Today&apos;s picks</div>
+        <div className="font-display text-[22px] font-extrabold text-text tracking-tight leading-tight">Today&apos;s picks</div>
       </div>
 
       <main className="px-4 pb-28 space-y-6 mt-2">
