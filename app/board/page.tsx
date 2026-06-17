@@ -70,7 +70,7 @@ export default async function BoardPage() {
         <div className="text-[10px] font-bold uppercase tracking-wide" style={{ color: 'var(--color-accent)' }}>
           Match-day chatter
         </div>
-        <div className="text-[22px] font-extrabold text-text tracking-tight">Message Board</div>
+        <div className="font-display text-[22px] font-extrabold text-text tracking-tight">Message Board</div>
       </header>
 
       <LiveScoreStrip matches={liveMatches} />

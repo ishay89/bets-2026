@@ -2,16 +2,11 @@
 import { useState, useSyncExternalStore } from 'react'
 
 const TOGGLE_PANEL_STYLE: React.CSSProperties = {
-  position: 'fixed',
-  bottom: 76,
-  right: 16,
-  zIndex: 30,
   width: 40,
   height: 40,
   borderRadius: '50%',
-  background: 'var(--color-panel)',
+  background: 'var(--color-elev)',
   border: '1px solid var(--border-base)',
-  boxShadow: 'var(--shadow-card)',
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',

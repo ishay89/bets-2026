@@ -85,7 +85,7 @@ export default async function PlayerDetailPage({
         <Link href="/admin/players" className="text-muted hover:text-amber transition-colors text-xs">
           ← Players
         </Link>
-        <div className="font-black text-lg mt-1" style={{ color: 'var(--color-amber)' }}>
+        <div className="font-display font-black text-lg mt-1" style={{ color: 'var(--color-amber)' }}>
           {user.display_name}
         </div>
         <div className="text-muted text-[11px]">{user.email}</div>

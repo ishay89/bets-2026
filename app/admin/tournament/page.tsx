@@ -57,7 +57,7 @@ export default function TournamentEndPage() {
   return (
     <div className="max-w-lg mx-auto space-y-6 pb-10">
       <div>
-        <div className="font-black text-lg" style={{ color: 'var(--color-amber)' }}>🏆 Score Tournament End</div>
+        <div className="font-display font-black text-lg" style={{ color: 'var(--color-amber)' }}>🏆 Score Tournament End</div>
         <div className="text-muted text-xs">
           Enter the final results to compute pre-tournament bonuses for all players
         </div>

@@ -45,7 +45,7 @@ const vsLinkStyle: React.CSSProperties = {
   textDecoration: 'none',
 }
 
-const podiumColors = { gold: '#f5c441', silver: '#aab4cd', bronze: '#d18a4d' }
+const podiumColors = { gold: '#f5b301', silver: '#9aa5b1', bronze: '#cd7f32' }
 const podiumOrder = [
   { idx: 1, color: podiumColors.silver, height: 92 },
   { idx: 0, color: podiumColors.gold, height: 118 },
@@ -111,7 +111,7 @@ export function Leaderboard({
               type="button"
               onClick={() => setMode(m)}
               className="relative z-10 px-5 py-1.5 rounded-full text-[11px] font-bold tracking-wide transition-colors duration-150"
-              style={{ color: mode === m ? '#000' : 'var(--color-muted)', minWidth: 72 }}
+              style={{ color: mode === m ? '#fff' : 'var(--color-muted)', minWidth: 72 }}
             >
               {m === 'total' ? 'Total' : todayModeLabel}
             </button>
@@ -177,7 +177,7 @@ export function Leaderboard({
                 )}
                 <div
                   className="flex items-start justify-center pt-2 rounded-t-lg font-black text-[18px]"
-                  style={{ height, background: `linear-gradient(180deg, ${color}, ${color}40)`, color: '#000' }}
+                  style={{ height, background: `linear-gradient(180deg, ${color}, ${color}40)`, color: '#fff' }}
                 >{displayRank}</div>
               </div>
             )
@@ -206,7 +206,7 @@ export function Leaderboard({
               {isDanger && isFirstAtDangerStart && (
                 <div
                   className="flex items-center gap-1.5 px-3 py-1.5"
-                  style={{ background: 'rgba(239,79,91,0.12)', borderTop: '1px solid rgba(239,79,91,0.3)' }}
+                  style={{ background: 'var(--color-danger-soft)', borderTop: '1px solid var(--border-danger)' }}
                 >
                   <span className="text-[11px]">⚠️</span>
                   <span
@@ -220,10 +220,10 @@ export function Leaderboard({
                 style={{
                   padding: '10px 12px',
                   background: isDanger
-                    ? 'rgba(239,79,91,0.06)'
+                    ? 'var(--color-danger-soft)'
                     : isMe ? 'var(--color-accent-soft)' : 'transparent',
                   borderBottom: '1px solid var(--border-base)',
-                  borderLeft: isMe ? '2px solid var(--color-accent)' : isDanger ? '2px solid rgba(239,79,91,0.4)' : '2px solid transparent',
+                  borderLeft: isMe ? '2px solid var(--color-accent)' : isDanger ? '2px solid var(--color-danger)' : '2px solid transparent',
                   opacity: isAutomated(entry) ? 0.6 : 1,
                   fontStyle: isAutomated(entry) ? 'italic' : 'normal',
                 }}

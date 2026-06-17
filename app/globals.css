@@ -6,90 +6,90 @@
   --font-display: 'Oswald', 'Barlow', system-ui, sans-serif;
   --font-mono:    'IBM Plex Mono', ui-monospace, 'JetBrains Mono', monospace;
 
-  /* ── Dark theme (stadium night) — Tailwind utility defaults ─ */
-  --color-bg:      #05080f;
-  --color-panel:   #0b1120;
-  --color-panel2:  #0f1830;
-  --color-elev:    #152038;
-  --color-elev2:   #1c2c4a;
+  /* ── Clean Pitch (light, default) — Tailwind utility defaults ─ */
+  --color-bg:      #e9ece7;
+  --color-panel:   #ffffff;
+  --color-panel2:  #f6f8f5;
+  --color-elev:    #eef1ec;
+  --color-elev2:   #e3e8e1;
 
-  --color-text:  #edf2ff;
-  --color-sub:   #8899cc;
-  --color-muted: #4d5f8c;
-  --color-dim:   #2a3a5e;
+  --color-text:  #15231b;
+  --color-sub:   #7c8c80;
+  --color-muted: #a3b0a8;
+  --color-dim:   #c2ccc4;
 
-  --color-accent:      #00d97e;
-  --color-accent-soft: #001f12;
-  --color-accent-line: #00462a;
+  --color-accent:      #0f9d58;
+  --color-accent-soft: #e1f3ea;
+  --color-accent-line: #bfe6d2;
 
-  --color-amber:      #f5a623;
-  --color-amber-soft: #1e1000;
+  --color-amber:      #ef7d22;
+  --color-amber-soft: #fdeee2;
 
-  --color-danger:      #ef4f5b;
-  --color-danger-soft: #1e0609;
+  --color-danger:      #e0444f;
+  --color-danger-soft: #fbe1e3;
+
+  --color-gold:   #9c7209;
+  --color-silver: #677583;
+  --color-bronze: #8a4a26;
+
+  /* Legacy aliases */
+  --color-surface: #ffffff;
+  --color-warn:    #ef7d22;
+}
+
+/* ── Night Pitch (dark companion) ─────────────────────────── */
+[data-theme="dark"] {
+  --color-bg:      #0d1611;
+  --color-panel:   #15231b;
+  --color-panel2:  #1a2a20;
+  --color-elev:    #213328;
+  --color-elev2:   #2a4234;
+
+  --color-text:  #eef6f0;
+  --color-sub:   #9fb3a6;
+  --color-muted: #6e8278;
+  --color-dim:   #44564a;
+
+  --color-accent:      #18cf78;
+  --color-accent-soft: #112e21;
+  --color-accent-line: #1f4a35;
+
+  --color-amber:      #f5933f;
+  --color-amber-soft: #2b1c0d;
+
+  --color-danger:      #ff6b74;
+  --color-danger-soft: #2a1216;
 
   --color-gold:   #f5c441;
   --color-silver: #aab4cd;
   --color-bronze: #d18a4d;
 
-  /* Legacy aliases */
-  --color-surface: #0b1120;
-  --color-warn:    #f5a623;
-}
-
-/* ── Light theme (pitch day) ───────────────────────────── */
-[data-theme="light"] {
-  --color-bg:      #eef4e5;
-  --color-panel:   #ffffff;
-  --color-panel2:  #f4f9ed;
-  --color-elev:    #e5f0d6;
-  --color-elev2:   #d6e8c2;
-
-  --color-text:  #0a1428;
-  --color-sub:   #283f5e;
-  --color-muted: #6a7d9a;
-  --color-dim:   #b5c8d8;
-
-  --color-accent:      #00905a;
-  --color-accent-soft: #dff5ec;
-  --color-accent-line: #b0e5cf;
-
-  --color-amber:      #b87000;
-  --color-amber-soft: #fef3dc;
-
-  --color-danger:      #c0303a;
-  --color-danger-soft: #ffe6e8;
-
-  --color-gold:   #a07800;
-  --color-silver: #607098;
-  --color-bronze: #7a4020;
-
-  --color-surface: #ffffff;
-  --color-warn:    #b87000;
+  --color-surface: #15231b;
+  --color-warn:    #f5933f;
 }
 
 /* ── Shared border & shadow tokens (not Tailwind utilities) ── */
 :root,
-[data-theme="dark"] {
-  --border-base:   rgba(255, 255, 255, 0.07);
-  --border-subtle: rgba(255, 255, 255, 0.04);
-  --border-accent: rgba(0, 217, 126, 0.30);
-  --border-danger: rgba(239, 79, 91, 0.25);
-  --border-warn:   rgba(245, 166, 35, 0.28);
-  --nav-bg:        rgba(5, 8, 15, 0.90);
-  --shadow-card:   0 2px 20px rgba(0, 0, 0, 0.50);
-  --hero-glow:     radial-gradient(circle at 72% 50%, rgba(0, 217, 126, 0.20) 0%, transparent 64%);
+[data-theme="light"] {
+  --border-base:   #e8ede7;
+  --border-subtle: #eef1ec;
+  --border-accent: rgba(15, 157, 88, 0.32);
+  --border-danger: rgba(224, 68, 79, 0.28);
+  --border-warn:   rgba(239, 125, 34, 0.30);
+  --nav-bg:        rgba(243, 246, 241, 0.92);
+  --shadow-card:   0 4px 24px rgba(20, 40, 30, 0.06);
+  --hero-glow:     radial-gradient(circle at 72% 50%, rgba(15, 157, 88, 0.18) 0%, transparent 64%);
 }
 
-[data-theme="light"] {
-  --border-base:   rgba(0, 0, 0, 0.08);
-  --border-subtle: rgba(0, 0, 0, 0.05);
-  --border-accent: rgba(0, 144, 90, 0.28);
-  --border-danger: rgba(192, 48, 58, 0.22);
-  --border-warn:   rgba(184, 112, 0, 0.26);
-  --nav-bg:        rgba(238, 244, 229, 0.92);
-  --shadow-card:   0 2px 12px rgba(0, 0, 0, 0.08);
-  --hero-glow:     radial-gradient(circle at 72% 50%, rgba(0, 144, 90, 0.16) 0%, transparent 64%);
+[data-theme="dark"] {
+  --border-base:   rgba(255, 255, 255, 0.08);
+  --border-subtle: rgba(255, 255, 255, 0.05);
+  --border-accent: rgba(24, 207, 120, 0.32);
+  --border-danger: rgba(255, 107, 116, 0.28);
+  --border-warn:   rgba(245, 147, 63, 0.30);
+  --nav-bg:        rgba(13, 22, 17, 0.90);
+  --shadow-card:   0 2px 20px rgba(0, 0, 0, 0.50);
+  --hero-glow:     radial-gradient(circle at 72% 50%, rgba(24, 207, 120, 0.22) 0%, transparent 64%);
 }
 
 body {
@@ -99,26 +99,22 @@ body {
   background-attachment: fixed;
 }
 
-[data-team] .team-theme-chip {
-  background: linear-gradient(135deg, var(--team-primary), var(--team-secondary));
-}
-
 /* ── Pitch stripe utility (for hero / card sections) ─────── */
 .pitch-stripes {
   background-image: repeating-linear-gradient(
     180deg,
-    rgba(0, 200, 100, 0.035) 0px,
-    rgba(0, 200, 100, 0.035) 22px,
+    rgba(15, 157, 88, 0.05) 0px,
+    rgba(15, 157, 88, 0.05) 22px,
     transparent 22px,
     transparent 44px
   );
 }
 
-[data-theme="light"] .pitch-stripes {
+[data-theme="dark"] .pitch-stripes {
   background-image: repeating-linear-gradient(
     180deg,
-    rgba(0, 150, 70, 0.05) 0px,
-    rgba(0, 150, 70, 0.05) 22px,
+    rgba(24, 207, 120, 0.035) 0px,
+    rgba(24, 207, 120, 0.035) 22px,
     transparent 22px,
     transparent 44px
   );

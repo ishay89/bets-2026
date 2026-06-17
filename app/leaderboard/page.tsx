@@ -79,7 +79,7 @@ export default async function LeaderboardPage({
           <div className="text-[10px] font-bold uppercase tracking-wide" style={{ color: 'var(--color-accent)' }}>
             {eyebrow}
           </div>
-          <div className="text-[22px] font-extrabold text-text tracking-tight">Leaderboard</div>
+          <div className="font-display text-[22px] font-extrabold text-text tracking-tight">Leaderboard</div>
         </div>
         <div className="flex shrink-0 flex-col items-end gap-2">
           <div className="text-[11px] font-semibold text-sub">{entries.length} players</div>
@@ -91,9 +91,9 @@ export default async function LeaderboardPage({
         <div
           className="mx-4 mb-1 px-3 py-2 rounded-xl text-[12px] font-semibold"
           style={{
-            background: 'rgba(220,38,38,0.1)',
+            background: 'var(--color-danger-soft)',
             color: 'var(--color-danger)',
-            border: '1px solid rgba(220,38,38,0.2)',
+            border: '1px solid var(--border-danger)',
           }}
         >
           ● {liveMatchCount} {liveMatchCount === 1 ? 'match' : 'matches'} live now · rankings update after final whistle

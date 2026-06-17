@@ -5,6 +5,7 @@ import { BottomNav } from '@/components/bottom-nav'
 import { getLeaderboardEntries } from '@/lib/data'
 import { ordinal, getAvatar } from '@/lib/display'
 import { AvatarEmojiPicker } from '@/components/avatar-emoji-picker'
+import { ThemeToggle } from '@/components/theme-toggle'
 
 export const metadata = { title: 'Profile | Mondial Bets 2026', description: 'Your profile and stats' }
 
@@ -44,7 +45,7 @@ export default async function ProfilePage() {
   return (
     <div className="min-h-screen bg-bg">
       <div className="px-4 pt-4 pb-3">
-        <div className="text-[22px] font-extrabold text-text tracking-tight">Your stats</div>
+        <div className="font-display text-[22px] font-extrabold text-text tracking-tight">Your stats</div>
       </div>
 
       <main className="px-4 pb-28 space-y-4">
@@ -154,6 +155,13 @@ export default async function ProfilePage() {
             </div>
           </>
         )}
+
+        {/* Appearance */}
+        <div className="flex items-center justify-between rounded-[14px] px-4 py-3"
+          style={{ background: 'var(--color-panel)', border: '1px solid var(--border-base)' }}>
+          <span className="text-[13px] font-bold text-text">Appearance</span>
+          <ThemeToggle />
+        </div>
 
         {/* Admin link */}
         {profile?.is_admin && (

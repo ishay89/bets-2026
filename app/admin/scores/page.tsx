@@ -113,7 +113,7 @@ export default async function ScoresPage() {
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div>
-          <div className="font-black text-lg" style={{ color: 'var(--color-amber)' }}>
+          <div className="font-display font-black text-lg" style={{ color: 'var(--color-amber)' }}>
             📊 Score Snapshots
           </div>
           <div className="text-muted text-xs mt-0.5">
@@ -130,7 +130,7 @@ export default async function ScoresPage() {
           <form action={revalidateAll}>
             <button type="submit"
               className="px-4 py-2 rounded-lg font-bold text-xs"
-              style={{ background: 'var(--color-accent)', color: '#000' }}>
+              style={{ background: 'var(--color-accent)', color: '#fff' }}>
               ↺ Revalidate All
             </button>
           </form>

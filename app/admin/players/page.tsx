@@ -161,7 +161,7 @@ export default async function PlayersPage() {
   return (
     <div className="max-w-lg mx-auto space-y-4 pb-10">
       <div>
-        <div className="font-black text-lg" style={{ color: 'var(--color-amber)' }}>
+        <div className="font-display font-black text-lg" style={{ color: 'var(--color-amber)' }}>
           👥 Manage Players
         </div>
         <div className="text-muted text-xs">

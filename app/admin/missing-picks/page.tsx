@@ -66,7 +66,7 @@ export default async function MissingPicksPage() {
         <Link href="/admin" className="text-muted hover:text-amber transition-colors text-xs">
           ← Admin
         </Link>
-        <div className="font-black text-lg mt-1" style={{ color: 'var(--color-amber)' }}>
+        <div className="font-display font-black text-lg mt-1" style={{ color: 'var(--color-amber)' }}>
           🔔 Missing Picks
         </div>
         <div className="text-muted text-xs">Who still needs to submit before bets lock</div>

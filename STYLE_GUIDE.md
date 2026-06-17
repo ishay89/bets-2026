@@ -1,17 +1,17 @@
 # Mondial Bets 2026 — Style Guide
 
-**Aesthetic direction**: "Stadium Night / Pitch Day" — a premium soccer-betting app that feels like it belongs inside a FIFA World Cup stadium. Dark mode = stadium under floodlights. Light mode = sun-bleached match day at the pitch.
+**Aesthetic direction**: "Clean Pitch" — a light, airy, sporty-editorial design. Crisp white cards float on a soft pitch-green tinted background, with deep pitch-green accents, confident Oswald headlines, and mono numerals for odds and scores. Every player sees the exact same look — there is no per-user or per-team theming.
 
 ---
 
 ## Themes
 
-Two themes are supported: `dark` (default) and `light`. The active theme is stored in `localStorage` and applied as `data-theme` on `<html>`.
+Two themes are supported: `light` (Clean Pitch, default) and `dark` (Night Pitch, a companion palette for low-light viewing). The active theme is stored in `localStorage`/a `theme` cookie and applied as `data-theme` on `<html>`.
 
 Switch with the floating `<ThemeToggle />` button (bottom-right, above the nav bar).
 
 ### Initializing correctly (SSR-safe)
-A `<script>` in `<head>` reads `localStorage.theme` before React hydrates, preventing flash-of-wrong-theme. The default (no localStorage entry) is `dark`.
+A `<script>` in `<head>` reads `localStorage.theme` before React hydrates, preventing flash-of-wrong-theme. The default (no localStorage entry) is `light`.
 
 ---
 
@@ -21,56 +21,56 @@ All colors are CSS custom properties defined in `app/globals.css`. Use `var(--to
 
 ### Backgrounds
 
-| Token | Dark | Light | Usage |
+| Token | Light (default) | Dark | Usage |
 |---|---|---|---|
-| `--color-bg` | `#05080f` | `#eef4e5` | Page background |
-| `--color-panel` | `#0b1120` | `#ffffff` | Cards, sheets |
-| `--color-panel2` | `#0f1830` | `#f4f9ed` | Nested panels |
-| `--color-elev` | `#152038` | `#e5f0d6` | Raised elements, button fill |
-| `--color-elev2` | `#1c2c4a` | `#d6e8c2` | Double-elevated |
+| `--color-bg` | `#e9ece7` | `#0d1611` | Page background |
+| `--color-panel` | `#ffffff` | `#15231b` | Cards, sheets |
+| `--color-panel2` | `#f6f8f5` | `#1a2a20` | Nested panels |
+| `--color-elev` | `#eef1ec` | `#213328` | Raised elements, button fill |
+| `--color-elev2` | `#e3e8e1` | `#2a4234` | Double-elevated |
 
 ### Text
 
-| Token | Dark | Light | Usage |
+| Token | Light (default) | Dark | Usage |
 |---|---|---|---|
-| `--color-text` | `#edf2ff` | `#0a1428` | Primary text |
-| `--color-sub` | `#8899cc` | `#283f5e` | Secondary text, labels |
-| `--color-muted` | `#4d5f8c` | `#6a7d9a` | Placeholder, hints |
-| `--color-dim` | `#2a3a5e` | `#b5c8d8` | Dividers, VS label |
+| `--color-text` | `#15231b` | `#eef6f0` | Primary text |
+| `--color-sub` | `#7c8c80` | `#9fb3a6` | Secondary text, labels |
+| `--color-muted` | `#a3b0a8` | `#6e8278` | Placeholder, hints |
+| `--color-dim` | `#c2ccc4` | `#44564a` | Dividers, VS label |
 
 ### Accent colors
 
-| Token | Dark | Light | Usage |
+| Token | Light (default) | Dark | Usage |
 |---|---|---|---|
-| `--color-accent` | `#00d97e` | `#00905a` | Primary CTA, active state, selected pick |
-| `--color-accent-soft` | `#001f12` | `#dff5ec` | Accent background tint |
-| `--color-accent-line` | `#00462a` | `#b0e5cf` | (deprecated — use `--border-accent`) |
-| `--color-amber` | `#f5a623` | `#b87000` | Pikanteria, warnings, lock timer |
-| `--color-amber-soft` | `#1e1000` | `#fef3dc` | Amber tint background |
-| `--color-danger` | `#ef4f5b` | `#c0303a` | Errors, danger zone |
-| `--color-danger-soft` | `#1e0609` | `#ffe6e8` | Danger tint background |
+| `--color-accent` | `#0f9d58` | `#18cf78` | Primary CTA, active state, selected pick |
+| `--color-accent-soft` | `#e1f3ea` | `#112e21` | Accent background tint |
+| `--color-accent-line` | `#bfe6d2` | `#1f4a35` | (deprecated — use `--border-accent`) |
+| `--color-amber` | `#ef7d22` | `#f5933f` | Pikanteria, warnings, lock timer |
+| `--color-amber-soft` | `#fdeee2` | `#2b1c0d` | Amber tint background |
+| `--color-danger` | `#e0444f` | `#ff6b74` | Errors, danger zone |
+| `--color-danger-soft` | `#fbe1e3` | `#2a1216` | Danger tint background |
 
-### Rank colors
+### Rank colors (text use — for podium fills see Components below)
 
-| Token | Value | Usage |
-|---|---|---|
-| `--color-gold` | `#f5c441` / `#a07800` | 1st place |
-| `--color-silver` | `#aab4cd` / `#607098` | 2nd place |
-| `--color-bronze` | `#d18a4d` / `#7a4020` | 3rd place |
+| Token | Light | Dark | Usage |
+|---|---|---|---|
+| `--color-gold` | `#9c7209` | `#f5c441` | 1st place |
+| `--color-silver` | `#677583` | `#aab4cd` | 2nd place |
+| `--color-bronze` | `#8a4a26` | `#d18a4d` | 3rd place |
 
 ---
 
 ## Border Tokens
 
-Never hardcode `rgba(255,255,255,0.07)` — use the border token instead. These are defined outside `@theme` so they work per-theme.
+Never hardcode border colors — use the border token instead. These are defined outside `@theme` so they work per-theme.
 
-| Token | Dark | Light | Usage |
+| Token | Light | Dark | Usage |
 |---|---|---|---|
-| `--border-base` | `rgba(255,255,255,0.07)` | `rgba(0,0,0,0.08)` | Default card / panel border |
-| `--border-subtle` | `rgba(255,255,255,0.04)` | `rgba(0,0,0,0.05)` | Dividers, row separators |
-| `--border-accent` | `rgba(0,217,126,0.30)` | `rgba(0,144,90,0.28)` | Active / selected state border |
-| `--border-danger` | `rgba(239,79,91,0.25)` | `rgba(192,48,58,0.22)` | Danger zone border |
-| `--border-warn` | `rgba(245,166,35,0.28)` | `rgba(184,112,0,0.26)` | Pikanteria / warning border |
+| `--border-base` | `#e8ede7` | `rgba(255,255,255,0.08)` | Default card / panel border |
+| `--border-subtle` | `#eef1ec` | `rgba(255,255,255,0.05)` | Dividers, row separators |
+| `--border-accent` | `rgba(15,157,88,0.32)` | `rgba(24,207,120,0.32)` | Active / selected state border |
+| `--border-danger` | `rgba(224,68,79,0.28)` | `rgba(255,107,116,0.28)` | Danger zone border |
+| `--border-warn` | `rgba(239,125,34,0.30)` | `rgba(245,147,63,0.30)` | Pikanteria / warning border |
 
 ### Usage pattern
 ```tsx
@@ -103,6 +103,7 @@ Three font families, each with a specific role:
 
 ### Conventions
 
+- Page titles: `font-display` (use the `.font-display` class or `fontFamily: 'var(--font-display)'`), `22px`, `font-extrabold`, `tracking-tight`
 - Section headers: `font-display`, `9–11px`, `letterSpacing: '0.16–0.20em'`, `textTransform: 'uppercase'`, `color: --color-muted`
 - Card titles / match names: `font-display`, `11–14px`, `letterSpacing: '0.08em'`, `textTransform: 'uppercase'`
 - Body / descriptions: `font-sans`, `12–14px`, `fontWeight: 600`
@@ -131,11 +132,12 @@ Add `className="pitch-stripes"` to hero / featured cards for the subtle grass-st
 ```tsx
 style={{
   background: 'var(--color-accent)',
-  color: '#000',
+  color: '#fff',
   transform: 'scale(1.03)',
-  boxShadow: '0 4px 16px rgba(0,217,126,0.35)',
+  boxShadow: '0 4px 16px rgba(15,157,88,0.35)',
 }}
 ```
+Text on a solid accent/amber/danger fill is always white (`#fff`); text on a soft tint (`*-soft` background) uses the matching solid token color (e.g. `color: var(--color-accent)` on `var(--color-accent-soft)`).
 
 ### Amber (Pikanteria) cards
 Use `--border-warn` as border and `--color-amber-soft` for the header tint.
@@ -152,6 +154,9 @@ style={{
   borderLeft: '3px solid var(--color-accent)',
 }}
 ```
+
+### Podium medal fills (leaderboard)
+The podium uses fixed, theme-independent medal colors (decorative, not text): gold `#f5b301`, silver `#9aa5b1`, bronze `#cd7f32`.
 
 ---
 
@@ -179,9 +184,16 @@ Defined in `app/globals.css`:
 
 Icons are inline SVG with `width/height="22"` (nav) or `18–24` (in-card). Stroke-based, `strokeWidth="1.7"`, `strokeLinecap="round"`, `strokeLinejoin="round"`, no fill.
 
-The `SoccerBallLogo` in the home page header is an inline SVG soccer ball on a `--color-accent` circle background.
+The `SoccerBallLogo` / login-page ball mark renders an inline SVG soccer ball on a `--color-accent` circle background; the ball's classic black pentagon/seam lines are illustrative (depicting an actual soccer ball), not a text-contrast choice, and stay black in both themes.
 
 ---
 
 ## Tone
+
 This is a **friends betting game** — keep copy punchy and direct. Use Oswald ALL CAPS for section labels. Avoid corporate hedging. Lean into the sport: "Make Picks", "Locked", "Danger Zone", "Pikanteria".
+
+---
+
+## No per-user theming
+
+Every player sees the identical Clean Pitch (or Night Pitch, if they toggle dark mode) styling — the app's look never changes based on a player's tournament-winner pick or any other personal data. There is no `lib/team-theme.ts`, no `data-team` attribute, and no `--team-*` CSS variables; do not reintroduce per-user/per-team color overrides.

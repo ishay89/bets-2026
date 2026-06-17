@@ -62,7 +62,7 @@ interface Props {
 const THEME: Record<Variant, { accent: string; accentSoft: string; borderAccent: string; shadow: string }> = {
   match: {
     accent: 'var(--color-accent)', accentSoft: 'var(--color-accent-soft)',
-    borderAccent: 'var(--border-accent)', shadow: '0 4px 16px rgba(0,217,126,0.35)',
+    borderAccent: 'var(--border-accent)', shadow: '0 4px 16px color-mix(in srgb, var(--color-accent) 35%, transparent)',
   },
   pika: {
     accent: 'var(--color-amber)', accentSoft: 'var(--color-amber-soft)',
@@ -196,12 +196,12 @@ export function BetCard(props: Props) {
             ? 'color-mix(in srgb, var(--color-danger) 14%, var(--color-panel))'
             : 'var(--color-panel)',
         border: isCorrect
-          ? '2px solid rgba(0,217,126,0.65)'
+          ? '2px solid color-mix(in srgb, var(--color-accent) 65%, transparent)'
           : isWrong
             ? '1px solid var(--border-danger)'
             : variant === 'pika' ? '1px solid var(--border-warn)' : '1px solid var(--border-base)',
         boxShadow: isCorrect
-          ? '0 4px 32px rgba(0,217,126,0.55)'
+          ? '0 4px 32px color-mix(in srgb, var(--color-accent) 55%, transparent)'
           : isWrong
             ? '0 4px 24px rgba(220,38,38,0.22)'
             : 'var(--shadow-card)',
@@ -283,7 +283,7 @@ function VerdictChip({
 }) {
   const base = 'text-[12px] px-2 py-0.5 rounded-full font-bold'
   if (isCorrect) {
-    return <span className={base} style={{ color: '#000', background: 'var(--color-accent)', border: '1px solid transparent', ...VERDICT_FONT_STYLE }}>✓ Correct</span>
+    return <span className={base} style={{ color: '#fff', background: 'var(--color-accent)', border: '1px solid transparent', ...VERDICT_FONT_STYLE }}>✓ Correct</span>
   }
   if (isWrong) {
     return <span className={base} style={{ color: '#fff', background: 'var(--color-danger)', border: '1px solid var(--border-danger)', ...VERDICT_FONT_STYLE }}>✗ Wrong</span>
@@ -437,7 +437,7 @@ function PickButtons({
             className="flex flex-col items-center rounded-xl py-3 transition-all duration-150"
             style={{
               background: sel ? theme.accent : 'var(--color-elev)',
-              color: sel ? '#000' : 'var(--color-text)',
+              color: sel ? '#fff' : 'var(--color-text)',
               border: isWinner && !sel
                 ? '1px solid var(--border-accent)'
                 : sel ? '1px solid transparent' : '1px solid var(--border-base)',
@@ -566,7 +566,7 @@ function TeamBlock({ name, selected }: { name: string; selected: boolean }) {
         style={{
           background: selected ? 'var(--color-accent-soft)' : 'var(--color-elev)',
           border: selected ? '2px solid var(--border-accent)' : '2px solid var(--border-base)',
-          boxShadow: selected ? '0 0 12px rgba(0,217,126,0.25)' : 'none',
+          boxShadow: selected ? '0 0 12px color-mix(in srgb, var(--color-accent) 25%, transparent)' : 'none',
           transform: selected ? 'scale(1.08)' : 'scale(1)',
           transition: 'background 0.15s, border-color 0.15s, box-shadow 0.15s, transform 0.15s',
         }}>

@@ -112,7 +112,7 @@ export function PreTournamentFutures({
                   <div className="text-[11px] font-black uppercase tracking-wide mb-1" style={{ color: 'var(--color-gold)' }}>
                     🏆 Winner
                   </div>
-                  <div className="text-[22px] font-extrabold tracking-tight text-text">{pick.winner_team}</div>
+                  <div className="font-display text-[22px] font-extrabold tracking-tight text-text">{pick.winner_team}</div>
                   <div className="text-[11px] text-sub mt-1">
                     Win: <strong style={{ color: 'var(--color-gold)', fontFamily: 'var(--font-mono)' }}>
                       {(pick.winner_odds * 1.5).toFixed(2)} pts
@@ -134,7 +134,7 @@ export function PreTournamentFutures({
                 </select>
                 <button type="submit"
                   className="w-full py-2 rounded-lg font-black text-sm"
-                  style={{ background: 'var(--color-accent)', color: '#000' }}>
+                  style={{ background: 'var(--color-accent)', color: '#fff' }}>
                   Update Champion ✓
                 </button>
               </form>
@@ -181,7 +181,7 @@ export function PreTournamentFutures({
                 </select>
                 <button type="submit"
                   className="w-full py-2 rounded-lg font-black text-sm"
-                  style={{ background: 'var(--color-accent)', color: '#000' }}>
+                  style={{ background: 'var(--color-accent)', color: '#fff' }}>
                   Update Scorer ✓
                 </button>
               </form>
@@ -239,7 +239,7 @@ export function PreTournamentFutures({
 
           <button type="submit"
             className="w-full py-3 rounded-lg font-black text-sm"
-            style={{ background: 'var(--color-accent)', color: '#000' }}>
+            style={{ background: 'var(--color-accent)', color: '#fff' }}>
             Save Picks ✓
           </button>
         </form>

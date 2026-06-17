@@ -78,7 +78,7 @@ export function MatchDaySection({
             <span className="text-sm font-bold text-text">{dateLabel}</span>
             {isToday && (
               <span className="text-[9px] font-black px-1.5 py-0.5 rounded-full"
-                style={{ background: 'var(--color-accent)', color: '#000' }}>
+                style={{ background: 'var(--color-accent)', color: '#fff' }}>
                 TODAY
               </span>
             )}
