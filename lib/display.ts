@@ -32,24 +32,54 @@ export function ordinal(n: number): string {
   }
 }
 
-const FLAGS: Record<string, string> = {
+// ISO 3166-1 alpha-2 codes for flagcdn.com flag images.
+// Covers all WC 2026 participants plus common name variants from football-data.org.
+const FLAG_CODES: Record<string, string> = {
+  Algeria: 'dz', Argentina: 'ar', Australia: 'au', Austria: 'at',
+  Belgium: 'be', 'Bosnia-Herzegovina': 'ba', Brazil: 'br',
+  'Cabo Verde': 'cv', 'Cape Verde Islands': 'cv',
+  Canada: 'ca', Colombia: 'co', Croatia: 'hr', Curaçao: 'cw',
+  Czechia: 'cz', 'DR Congo': 'cd', 'Congo DR': 'cd',
+  Ecuador: 'ec', Egypt: 'eg', England: 'gb-eng',
+  France: 'fr', Germany: 'de', Ghana: 'gh', Haiti: 'ht',
+  Iran: 'ir', Iraq: 'iq', Italy: 'it', 'Ivory Coast': 'ci', "Côte d'Ivoire": 'ci',
+  Japan: 'jp', Jordan: 'jo', Mexico: 'mx', Morocco: 'ma',
+  Netherlands: 'nl', 'New Zealand': 'nz', Norway: 'no',
+  Panama: 'pa', Paraguay: 'py', Portugal: 'pt', Qatar: 'qa',
+  'Saudi Arabia': 'sa', Scotland: 'gb-sct', Senegal: 'sn',
+  'South Africa': 'za', 'South Korea': 'kr', Spain: 'es',
+  Sweden: 'se', Switzerland: 'ch', Tunisia: 'tn',
+  Turkey: 'tr', Türkiye: 'tr',
+  Uruguay: 'uy', USA: 'us', 'United States': 'us',
+  Uzbekistan: 'uz',
+}
+
+/** Returns a flagcdn.com image URL (40px wide) for the given team name, or null if unknown. */
+export function getFlagUrl(name: string): string | null {
+  const code = FLAG_CODES[name]
+  return code ? `https://flagcdn.com/w40/${code}.png` : null
+}
+
+const EMOJI_FLAGS: Record<string, string> = {
   France: '🇫🇷', Spain: '🇪🇸', Brazil: '🇧🇷', England: '🏴󠁧󠁢󠁥󠁮󠁧󠁿',
   Argentina: '🇦🇷', Netherlands: '🇳🇱', Portugal: '🇵🇹', Germany: '🇩🇪',
   Italy: '🇮🇹', Belgium: '🇧🇪', Croatia: '🇭🇷', Uruguay: '🇺🇾',
   Mexico: '🇲🇽', USA: '🇺🇸', Canada: '🇨🇦', Japan: '🇯🇵',
   'South Korea': '🇰🇷', Morocco: '🇲🇦',
   Algeria: '🇩🇿', Australia: '🇦🇺', Austria: '🇦🇹', 'Bosnia-Herzegovina': '🇧🇦',
-  'Cabo Verde': '🇨🇻', Colombia: '🇨🇴', "Côte d'Ivoire": '🇨🇮', Curaçao: '🇨🇼',
-  Czechia: '🇨🇿', 'DR Congo': '🇨🇩', Ecuador: '🇪🇨', Egypt: '🇪🇬',
+  'Cabo Verde': '🇨🇻', 'Cape Verde Islands': '🇨🇻', Colombia: '🇨🇴',
+  "Côte d'Ivoire": '🇨🇮', 'Ivory Coast': '🇨🇮', Curaçao: '🇨🇼',
+  Czechia: '🇨🇿', 'DR Congo': '🇨🇩', 'Congo DR': '🇨🇩', Ecuador: '🇪🇨', Egypt: '🇪🇬',
   Ghana: '🇬🇭', Haiti: '🇭🇹', Iran: '🇮🇷', Iraq: '🇮🇶',
   Jordan: '🇯🇴', 'New Zealand': '🇳🇿', Norway: '🇳🇴', Panama: '🇵🇦',
   Paraguay: '🇵🇾', Qatar: '🇶🇦', 'Saudi Arabia': '🇸🇦', Scotland: '🏴󠁧󠁢󠁳󠁣󠁴󠁿',
   Senegal: '🇸🇳', 'South Africa': '🇿🇦', Sweden: '🇸🇪', Switzerland: '🇨🇭',
-  Tunisia: '🇹🇳', Türkiye: '🇹🇷', Uzbekistan: '🇺🇿',
+  Tunisia: '🇹🇳', Türkiye: '🇹🇷', Turkey: '🇹🇷', 'United States': '🇺🇸', Uzbekistan: '🇺🇿',
 }
 
+/** Returns an emoji flag for use in text contexts (h2h, profile pages). */
 export function getFlag(name: string): string {
-  return FLAGS[name] ?? '🏳️'
+  return EMOJI_FLAGS[name] ?? '🏳️'
 }
 
 const AVATARS = ['🦁','🐯','🦊','🐺','🦅','🐻','🐼','🦝','🦄','🐉','🦋','🌟','🔥','⚡','🎯']

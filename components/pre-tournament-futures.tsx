@@ -8,18 +8,7 @@ import {
 } from '@/app/predict/pre-tournament-actions'
 import type { FuturesReveal } from '@/lib/prediction-reveals'
 import { PredictionRevealSheet } from '@/components/prediction-reveal-sheet'
-
-const FLAGS: Record<string, string> = {
-  France: '🇫🇷', Spain: '🇪🇸', England: '🏴󠁧󠁢󠁥󠁮󠁧󠁿', Argentina: '🇦🇷',
-  Brazil: '🇧🇷', Portugal: '🇵🇹', Germany: '🇩🇪', Netherlands: '🇳🇱',
-  Norway: '🇳🇴', Belgium: '🇧🇪', Colombia: '🇨🇴', Japan: '🇯🇵',
-  Morocco: '🇲🇦', Uruguay: '🇺🇾', USA: '🇺🇸', Switzerland: '🇨🇭',
-  Mexico: '🇲🇽', Croatia: '🇭🇷', Turkey: '🇹🇷', Ecuador: '🇪🇨',
-  Senegal: '🇸🇳', Sweden: '🇸🇪', Austria: '🇦🇹', Paraguay: '🇵🇾',
-  Canada: '🇨🇦', 'Bosnia & Herzegovina': '🇧🇦', Scotland: '🏴󠁧󠁢󠁳󠁣󠁴󠁿',
-  'Ivory Coast': '🇨🇮', Egypt: '🇪🇬', 'Czech Republic': '🇨🇿',
-  Algeria: '🇩🇿', Ghana: '🇬🇭', 'South Korea': '🇰🇷',
-}
+import { getFlagUrl, getFlag } from '@/lib/display'
 
 type FuturesPick = {
   winner_team: string
@@ -104,9 +93,14 @@ export function PreTournamentFutures({
               style={{ color: 'var(--color-muted)' }}>Your champion · 1.5× bonus</div>
             <div className="superstar-panel p-[18px]">
               <div className="relative flex items-center gap-4">
-                <div className="size-14 rounded-full flex items-center justify-center text-3xl"
-                  style={{ background: 'var(--color-elev)', border: '1px solid var(--border-base)' }}>
-                  {FLAGS[pick.winner_team] ?? '🏆'}
+                <div className="size-14 rounded-full flex items-center justify-center overflow-hidden"
+                  style={{ background: 'var(--color-elev)', border: '1px solid var(--border-base)', flexShrink: 0 }}>
+                  {getFlagUrl(pick.winner_team) ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={getFlagUrl(pick.winner_team)!} alt={pick.winner_team} style={{ width: 42, height: 28, objectFit: 'cover' }} />
+                  ) : (
+                    <span style={{ fontSize: 28 }}>🏆</span>
+                  )}
                 </div>
                 <div className="flex-1">
                   <div className="text-[11px] font-black uppercase tracking-wide mb-1" style={{ color: 'var(--color-gold)' }}>
@@ -128,7 +122,7 @@ export function PreTournamentFutures({
                 <select name="winner" defaultValue={pick.winner_team} required style={inputStyle} className={cls}>
                   {TEAMS.map(t => (
                     <option key={t.name} value={t.name}>
-                      {FLAGS[t.name] ?? ''} {t.name} - {t.odds.toFixed(2)}
+                      {getFlag(t.name)} {t.name} - {t.odds.toFixed(2)}
                     </option>
                   ))}
                 </select>
@@ -220,7 +214,7 @@ export function PreTournamentFutures({
               <option value="">Select a team…</option>
               {TEAMS.map(t => (
                 <option key={t.name} value={t.name}>
-                  {FLAGS[t.name] ?? ''} {t.name} - {t.odds.toFixed(2)}
+                  {getFlag(t.name)} {t.name} - {t.odds.toFixed(2)}
                 </option>
               ))}
             </select>

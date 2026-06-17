@@ -114,6 +114,25 @@ Three font families, each with a specific role:
 
 ---
 
+## Country Flags
+
+Emoji flags do not render on Windows/Chrome (they show as two-letter ISO codes). Use real flag images from flagcdn.com instead.
+
+```tsx
+import { getFlagUrl } from '@/lib/display'
+
+// 28×19 px flag image with rounded corners
+const url = getFlagUrl('Argentina') // "https://flagcdn.com/w40/ar.png"
+// eslint-disable-next-line @next/next/no-img-element
+<img src={url!} alt={name} width={28} height={19} style={{ borderRadius: 3, objectFit: 'cover' }} />
+```
+
+`getFlagUrl(name)` returns a `string | null` — null if the team is unknown. Always render a fallback (e.g. a `var(--color-elev)` placeholder box the same size).
+
+For HTML `<option>` elements inside `<select>` (which can't contain images), use `getFlag(name)` which returns the emoji — acceptable because select dropdowns typically don't render emoji on Windows either, making it a non-issue.
+
+---
+
 ## Component Patterns
 
 ### Cards
@@ -127,6 +146,29 @@ Three font families, each with a specific role:
 ```
 
 Add `className="pitch-stripes"` to hero / featured cards for the subtle grass-stripe texture.
+
+### Match card — teams row
+Compact single-row layout: flag image + team name inline, VS centered between them.
+
+```tsx
+// Home (left-aligned): [FLAG] TEAM NAME
+// Away (right-aligned): TEAM NAME [FLAG]  ← flex-row-reverse
+<div className="flex items-center gap-2 px-4 py-3" style={{ borderBottom: '1px solid var(--border-subtle)' }}>
+  <div className="flex items-center gap-2" style={{ flex: 1 }}>
+    <img src={getFlagUrl(homeTeam)!} width={28} height={19} style={{ borderRadius: 3, objectFit: 'cover' }} />
+    <span style={{ fontFamily: 'var(--font-display)', fontSize: 13, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+      {homeTeam}
+    </span>
+  </div>
+  <div style={{ minWidth: 56, textAlign: 'center', fontFamily: 'var(--font-display)', fontSize: 12, fontWeight: 700, color: 'var(--color-dim)', letterSpacing: '0.16em' }}>VS</div>
+  <div className="flex items-center gap-2 flex-row-reverse" style={{ flex: 1 }}>
+    <img src={getFlagUrl(awayTeam)!} width={28} height={19} style={{ borderRadius: 3, objectFit: 'cover' }} />
+    <span style={{ fontFamily: 'var(--font-display)', fontSize: 13, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', textAlign: 'right' }}>
+      {awayTeam}
+    </span>
+  </div>
+</div>
+```
 
 ### Selected / active state
 ```tsx

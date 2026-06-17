@@ -71,14 +71,13 @@ export function MatchDaySection({
 
       <div className="flex items-center justify-between pt-1">
         <div>
-          <div className="text-[10px] font-bold uppercase tracking-wide" style={{ color: 'var(--color-accent)' }}>
+          <div style={{ fontFamily: 'var(--font-display)', fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--color-accent)' }}>
             {stageLabel}
           </div>
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-bold text-text">{dateLabel}</span>
+          <div className="flex items-center gap-2 mt-0.5">
+            <span style={{ fontFamily: 'var(--font-display)', fontSize: 18, fontWeight: 700, letterSpacing: '-0.01em', color: 'var(--color-text)' }}>{dateLabel}</span>
             {isToday && (
-              <span className="text-[9px] font-black px-1.5 py-0.5 rounded-full"
-                style={{ background: 'var(--color-accent)', color: '#fff' }}>
+              <span style={{ fontFamily: 'var(--font-display)', fontSize: 9, fontWeight: 900, letterSpacing: '0.12em', padding: '2px 7px', borderRadius: 9999, background: 'var(--color-accent)', color: '#fff' }}>
                 TODAY
               </span>
             )}
@@ -86,21 +85,13 @@ export function MatchDaySection({
         </div>
 
         {sortedMatches.length > 0 && (allMatchesLocked ? (
-          <div className="text-[10px] font-bold px-2.5 py-1 rounded-full"
-            style={{ background: 'var(--color-danger-soft)', color: 'var(--color-danger)', border: '1px solid var(--border-danger)' }}>
+          <div style={{ fontFamily: 'var(--font-display)', fontSize: 10, fontWeight: 700, letterSpacing: '0.06em', padding: '4px 10px', borderRadius: 9999, background: 'var(--color-danger-soft)', color: 'var(--color-danger)', border: '1px solid var(--border-danger)' }}>
             🔒 Locked
           </div>
         ) : (
           <LockTimer lockTime={earliestLockTime} />
         ))}
       </div>
-
-      {sortedMatches.length > 0 && (
-        <div className="text-[10px] font-bold uppercase tracking-[1.2px]"
-          style={{ color: 'var(--color-muted)' }}>
-          Matches
-        </div>
-      )}
 
       {sortedMatches.map(match => {
         const tally = crowdTally[match.id] ?? { '1': 0, X: 0, '2': 0, total: 0 }
