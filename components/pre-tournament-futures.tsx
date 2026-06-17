@@ -112,7 +112,7 @@ export function PreTournamentFutures({
                   <div className="text-[11px] font-black uppercase tracking-wide mb-1" style={{ color: 'var(--color-gold)' }}>
                     🏆 Winner
                   </div>
-                  <div className="text-[22px] font-extrabold tracking-tight text-text">{pick.winner_team}</div>
+                  <div className="font-display text-[22px] font-extrabold tracking-tight text-text">{pick.winner_team}</div>
                   <div className="text-[11px] text-sub mt-1">
                     Win: <strong style={{ color: 'var(--color-gold)', fontFamily: 'var(--font-mono)' }}>
                       {(pick.winner_odds * 1.5).toFixed(2)} pts

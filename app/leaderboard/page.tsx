@@ -91,9 +91,9 @@ export default async function LeaderboardPage({
         <div
           className="mx-4 mb-1 px-3 py-2 rounded-xl text-[12px] font-semibold"
           style={{
-            background: 'rgba(220,38,38,0.1)',
+            background: 'var(--color-danger-soft)',
             color: 'var(--color-danger)',
-            border: '1px solid rgba(220,38,38,0.2)',
+            border: '1px solid var(--border-danger)',
           }}
         >
           ● {liveMatchCount} {liveMatchCount === 1 ? 'match' : 'matches'} live now · rankings update after final whistle

@@ -24,7 +24,7 @@ export default function LoginPage() {
       <div
         className="absolute inset-0 pointer-events-none"
         style={{
-          background: 'radial-gradient(ellipse 80% 60% at 50% 40%, rgba(0,217,126,0.12) 0%, transparent 70%)',
+          background: 'radial-gradient(ellipse 80% 60% at 50% 40%, color-mix(in srgb, var(--color-accent) 12%, transparent) 0%, transparent 70%)',
         }}
       />
 
@@ -37,7 +37,7 @@ export default function LoginPage() {
             width: 80,
             height: 80,
             background: 'var(--color-accent)',
-            boxShadow: '0 0 40px rgba(0,217,126,0.5), 0 0 80px rgba(0,217,126,0.20)',
+            boxShadow: '0 0 40px color-mix(in srgb, var(--color-accent) 50%, transparent), 0 0 80px color-mix(in srgb, var(--color-accent) 20%, transparent)',
           }}
         >
           <svg width="50" height="50" viewBox="0 0 24 24" fill="none">

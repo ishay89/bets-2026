@@ -177,7 +177,7 @@ export function Leaderboard({
                 )}
                 <div
                   className="flex items-start justify-center pt-2 rounded-t-lg font-black text-[18px]"
-                  style={{ height, background: `linear-gradient(180deg, ${color}, ${color}40)`, color: '#000' }}
+                  style={{ height, background: `linear-gradient(180deg, ${color}, ${color}40)`, color: '#fff' }}
                 >{displayRank}</div>
               </div>
             )
