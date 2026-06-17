@@ -6,7 +6,7 @@ import type { Insight } from '@/lib/crowd'
 import type { SaveResult } from '@/lib/prediction-saves'
 import type { PlayerRevealRow } from '@/lib/prediction-reveals'
 import { formatAppTime } from '@/lib/time'
-import { getFlag } from '@/lib/display'
+import { getFlagUrl } from '@/lib/display'
 import { CrowdInsight } from './crowd-insight'
 
 const PredictionRevealSheet = dynamic(
@@ -386,26 +386,67 @@ function TeamsRow({
     && liveScoreAway !== null && liveScoreAway !== undefined
 
   return (
-    <div className="flex items-center justify-around px-4 py-5">
-      <TeamBlock name={homeTeam} selected={selected === '1'} />
-      <div className="flex flex-col items-center gap-1">
+    <div className="flex items-center gap-2 px-4 py-3" style={{ borderBottom: '1px solid var(--border-subtle)' }}>
+      <TeamInline name={homeTeam} side="home" selected={selected === '1'} />
+      <div className="flex flex-col items-center gap-0.5 flex-shrink-0" style={{ minWidth: 56 }}>
         {showLiveScore ? (
-          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 26, fontWeight: 700, color: 'var(--color-text)', letterSpacing: '0.04em', lineHeight: 1 }}>
-            {liveScoreHome} – {liveScoreAway}
+          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 20, fontWeight: 700, color: 'var(--color-text)', letterSpacing: '0.02em', lineHeight: 1 }}>
+            {liveScoreHome}–{liveScoreAway}
           </div>
         ) : (
-          <div style={{ fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 700, color: 'var(--color-dim)', letterSpacing: '0.04em' }}>
+          <div style={{ fontFamily: 'var(--font-display)', fontSize: 12, fontWeight: 700, color: 'var(--color-dim)', letterSpacing: '0.16em' }}>
             VS
           </div>
         )}
         {result && (
-          <div className="text-[12px] font-bold px-2 py-0.5 rounded"
+          <div className="text-[10px] font-bold px-1.5 py-0.5 rounded"
             style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-gold)', background: 'var(--color-amber-soft)' }}>
             {result}
           </div>
         )}
       </div>
-      <TeamBlock name={awayTeam} selected={selected === '2'} />
+      <TeamInline name={awayTeam} side="away" selected={selected === '2'} />
+    </div>
+  )
+}
+
+function TeamInline({ name, side, selected }: { name: string; side: 'home' | 'away'; selected: boolean }) {
+  const flagUrl = getFlagUrl(name)
+  const isAway = side === 'away'
+  return (
+    <div
+      className={`flex items-center gap-2${isAway ? ' flex-row-reverse' : ''}`}
+      style={{ flex: 1, minWidth: 0 }}
+    >
+      {flagUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={flagUrl}
+          alt={name}
+          width={28}
+          height={19}
+          style={{ borderRadius: 3, objectFit: 'cover', flexShrink: 0, display: 'block' }}
+        />
+      ) : (
+        <div style={{ width: 28, height: 19, borderRadius: 3, background: 'var(--color-elev)', flexShrink: 0 }} />
+      )}
+      <span
+        style={{
+          fontFamily: 'var(--font-display)',
+          fontSize: 13,
+          fontWeight: 700,
+          letterSpacing: '0.08em',
+          textTransform: 'uppercase' as const,
+          color: selected ? 'var(--color-accent)' : 'var(--color-text)',
+          lineHeight: 1.2,
+          textAlign: isAway ? 'right' : 'left',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap',
+        }}
+      >
+        {name}
+      </span>
     </div>
   )
 }
@@ -559,26 +600,3 @@ function CrowdSection({
   )
 }
 
-function TeamBlock({ name, selected }: { name: string; selected: boolean }) {
-  return (
-    <div className="flex flex-col items-center gap-2" style={{ width: 80 }}>
-      <div className="size-12 rounded-full flex items-center justify-center text-2xl"
-        style={{
-          background: selected ? 'var(--color-accent-soft)' : 'var(--color-elev)',
-          border: selected ? '2px solid var(--border-accent)' : '2px solid var(--border-base)',
-          boxShadow: selected ? '0 0 12px color-mix(in srgb, var(--color-accent) 25%, transparent)' : 'none',
-          transform: selected ? 'scale(1.08)' : 'scale(1)',
-          transition: 'background 0.15s, border-color 0.15s, box-shadow 0.15s, transform 0.15s',
-        }}>
-        <span style={{ fontSize: 24, display: 'block' }}>{getFlag(name)}</span>
-      </div>
-      <div className="text-center leading-tight"
-        style={{
-          fontFamily: 'var(--font-display)', fontSize: 12, letterSpacing: '0.08em', textTransform: 'uppercase',
-          color: selected ? 'var(--color-accent)' : 'var(--color-sub)', fontWeight: selected ? 700 : 500,
-        }}>
-        {name}
-      </div>
-    </div>
-  )
-}

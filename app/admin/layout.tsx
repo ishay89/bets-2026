@@ -9,7 +9,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         className="px-4 py-3 flex justify-between items-center sticky top-0 z-10"
         style={{ background: 'var(--color-panel)', borderBottom: '1px solid var(--border-base)' }}
       >
-        <span className="font-black text-sm tracking-wide" style={{ color: 'var(--color-amber)' }}>⚙️ ADMIN</span>
+        <span style={{ fontFamily: 'var(--font-display)', fontSize: 13, fontWeight: 800, letterSpacing: '0.14em', color: 'var(--color-amber)' }}>⚙️ ADMIN</span>
       </header>
       <main className="p-4 pb-28">{children}</main>
       <AdminNav />

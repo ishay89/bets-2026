@@ -3,7 +3,7 @@ import { redirect, notFound } from 'next/navigation'
 import Link from 'next/link'
 import { BottomNav } from '@/components/bottom-nav'
 import { isMatchLocked } from '@/lib/lock'
-import { getAvatar, getAutomationLabel, getFlag, ordinal, stageLabel } from '@/lib/display'
+import { getAvatar, getAutomationLabel, getFlagUrl, ordinal, stageLabel } from '@/lib/display'
 import {
   getLeaderboardEntries,
   getMatchDaysWithUserData,
@@ -11,6 +11,7 @@ import {
   isFuturesLocked,
   type HistoryMatchDay,
 } from '@/lib/data'
+import { formatAppDate } from '@/lib/time'
 
 export const metadata = { title: 'Player history | Mondial Bets 2026', description: 'A player’s locked predictions' }
 
@@ -159,7 +160,7 @@ export default async function PlayerHistoryPage({
     <div className="min-h-screen bg-bg">
       <div className="px-4 pt-4 pb-3 flex items-center justify-between gap-3">
         <div className="min-w-0">
-          <div className="text-[10px] font-bold uppercase tracking-wide" style={{ color: 'var(--color-accent)' }}>
+          <div style={{ fontFamily: 'var(--font-display)', fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--color-accent)' }}>
             Locked picks · futures &amp; pikanteria
           </div>
           <div className="font-display text-[22px] font-extrabold text-text tracking-tight truncate">History</div>
@@ -193,7 +194,7 @@ export default async function PlayerHistoryPage({
                 style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-accent)' }}>
                 {(entry?.total_points ?? 0).toFixed(2)}
               </div>
-              <div className="text-[10px] font-bold uppercase tracking-wide text-muted">
+              <div style={{ fontFamily: 'var(--font-display)', fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--color-muted)' }}>
                 pts · {rank > 0 ? ordinal(rank) : '—'}
               </div>
             </div>
@@ -244,8 +245,12 @@ export default async function PlayerHistoryPage({
               <div className="flex items-center justify-between py-1">
                 <span className="text-[12px] text-sub">🏆 Champion</span>
                 <div className="flex items-center gap-2">
-                  <span className="text-[13px] font-semibold text-text">
-                    {getFlag(futuresPick.winner_team)} {futuresPick.winner_team}
+                  <span className="flex items-center gap-1.5 text-[13px] font-semibold text-text">
+                    {getFlagUrl(futuresPick.winner_team) ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={getFlagUrl(futuresPick.winner_team)!} alt={futuresPick.winner_team} width={20} height={13} style={{ borderRadius: 2, objectFit: 'cover' }} />
+                    ) : null}
+                    {futuresPick.winner_team}
                   </span>
                   {futuresPick.winner_points !== null && (
                     <span className="font-bold text-[12px]"
@@ -290,8 +295,8 @@ export default async function PlayerHistoryPage({
             <div className="flex items-center justify-between px-4 py-3"
               style={{ borderBottom: '1px solid var(--border-base)' }}>
               <div>
-                <div className="font-bold text-[13px] text-text">{day.date}</div>
-                <div className="text-[10px] font-bold uppercase tracking-wide text-muted mt-0.5">
+                <div style={{ fontFamily: 'var(--font-display)', fontSize: 14, fontWeight: 700, letterSpacing: '-0.01em', color: 'var(--color-text)' }}>{formatAppDate(day.date)}</div>
+                <div style={{ fontFamily: 'var(--font-display)', fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--color-muted)', marginTop: 2 }}>
                   {stageLabel(day.stage)}
                 </div>
               </div>
@@ -304,9 +309,17 @@ export default async function PlayerHistoryPage({
               {day.matches.map(m => (
                 <div key={m.id} className="flex items-center gap-2 py-1.5"
                   style={{ borderTop: '1px solid var(--border-subtle)' }}>
-                  <span className="text-[12px] text-sub flex-1">
-                    {getFlag(m.home)} {m.home} vs {m.away} {getFlag(m.away)}
-                  </span>
+                  <div className="flex items-center gap-1 text-[12px] text-sub flex-1 min-w-0">
+                    {getFlagUrl(m.home) ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={getFlagUrl(m.home)!} alt={m.home} width={18} height={12} style={{ borderRadius: 2, objectFit: 'cover', flexShrink: 0 }} />
+                    ) : null}
+                    <span className="truncate">{m.home} vs {m.away}</span>
+                    {getFlagUrl(m.away) ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={getFlagUrl(m.away)!} alt={m.away} width={18} height={12} style={{ borderRadius: 2, objectFit: 'cover', flexShrink: 0 }} />
+                    ) : null}
+                  </div>
                   <div className="flex items-center gap-2">
                     <span className="text-[11px] font-bold px-2 py-0.5 rounded"
                       style={{ background: 'var(--color-elev)', border: '1px solid var(--border-base)', color: 'var(--color-text)' }}>

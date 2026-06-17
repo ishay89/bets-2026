@@ -63,7 +63,7 @@ export default async function ProfilePage() {
                 style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-accent)' }}>
                 {total.toFixed(2)}
               </div>
-              <div className="text-[10px] font-bold uppercase tracking-wide text-muted">pts · {rank > 0 ? ordinal(rank) : '—'}</div>
+              <div style={{ fontFamily: 'var(--font-display)', fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--color-muted)' }}>pts · {rank > 0 ? ordinal(rank) : '—'}</div>
             </div>
           </div>
 
@@ -77,7 +77,7 @@ export default async function ProfilePage() {
               <div key={s.label} className="rounded-[10px] p-3"
                 style={{ background: 'var(--color-elev)' }}>
                 <div className="font-bold text-[16px] text-text" style={{ fontFamily: 'var(--font-mono)' }}>{s.value}</div>
-                <div className="text-[9.5px] font-bold uppercase tracking-wide text-muted mt-1">{s.label}</div>
+                <div style={{ fontFamily: 'var(--font-display)', fontSize: 9, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--color-muted)', marginTop: 4 }}>{s.label}</div>
               </div>
             ))}
           </div>

@@ -41,8 +41,7 @@ export default async function PendingPage() {
         </div>
 
         <div
-          className="font-black text-xl mb-2"
-          style={{ color: blocked ? 'var(--color-danger)' : 'var(--color-amber)' }}
+          style={{ fontFamily: 'var(--font-display)', fontSize: 20, fontWeight: 800, letterSpacing: '0.02em', marginBottom: 8, color: blocked ? 'var(--color-danger)' : 'var(--color-amber)' }}
         >
           {blocked ? 'Account blocked' : 'Waiting for approval'}
         </div>

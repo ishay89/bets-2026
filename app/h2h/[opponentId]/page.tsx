@@ -6,8 +6,9 @@ import { createClient } from '@/lib/supabase/server'
 import { BottomNav } from '@/components/bottom-nav'
 import { isMatchLocked } from '@/lib/lock'
 import { buildH2H, pickAgreement, type H2HMatch, type H2HRound, type H2HRoundResult, type RoundWinner } from '@/lib/h2h'
-import { getAvatar, getAutomationLabel, getFlag, isAutomated, stageLabel } from '@/lib/display'
+import { getAvatar, getAutomationLabel, getFlagUrl, isAutomated, stageLabel } from '@/lib/display'
 import { getLeaderboardEntries, getMatchDaysWithUserData, type HistoryMatchDay } from '@/lib/data'
+import { formatAppDate } from '@/lib/time'
 
 // View-model carried alongside each H2HMatch for rendering.
 type RowVM = {
@@ -523,7 +524,7 @@ function RoundCard({ round, result }: { round: RoundVM; result: H2HRoundResult |
         style={{ borderBottom: '1px solid var(--border-subtle)' }}
       >
         <div>
-          <div className="font-bold text-[13px] text-text">{round.date}</div>
+          <div style={{ fontFamily: 'var(--font-display)', fontSize: 14, fontWeight: 700, letterSpacing: '-0.01em', color: 'var(--color-text)' }}>{formatAppDate(round.date)}</div>
           <div
             className="mt-0.5"
             style={{
@@ -638,11 +639,17 @@ function CompareRow({ row }: { row: RowVM }) {
             🌶️ {row.label}
           </span>
         ) : (
-          <span className="text-[12px] truncate" style={{ color: 'var(--color-sub)' }}>
-            {row.homeTeam ? `${getFlag(row.homeTeam)} ` : ''}
-            {row.homeTeam} vs {row.awayTeam}
-            {row.awayTeam ? ` ${getFlag(row.awayTeam)}` : ''}
-          </span>
+          <div className="flex items-center gap-1 min-w-0" style={{ color: 'var(--color-sub)' }}>
+            {row.homeTeam && getFlagUrl(row.homeTeam) && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={getFlagUrl(row.homeTeam)!} alt={row.homeTeam} width={16} height={11} style={{ borderRadius: 2, objectFit: 'cover', flexShrink: 0 }} />
+            )}
+            <span className="text-[12px] truncate">{row.homeTeam} vs {row.awayTeam}</span>
+            {row.awayTeam && getFlagUrl(row.awayTeam) && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={getFlagUrl(row.awayTeam)!} alt={row.awayTeam} width={16} height={11} style={{ borderRadius: 2, objectFit: 'cover', flexShrink: 0 }} />
+            )}
+          </div>
         )}
       </div>
 

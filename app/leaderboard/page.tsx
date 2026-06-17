@@ -76,7 +76,7 @@ export default async function LeaderboardPage({
     <div className="min-h-screen bg-bg">
       <div className="px-4 pt-4 pb-3 flex items-center justify-between gap-3">
         <div>
-          <div className="text-[10px] font-bold uppercase tracking-wide" style={{ color: 'var(--color-accent)' }}>
+          <div style={{ fontFamily: 'var(--font-display)', fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--color-accent)' }}>
             {eyebrow}
           </div>
           <div className="font-display text-[22px] font-extrabold text-text tracking-tight">Leaderboard</div>
