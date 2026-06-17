@@ -67,7 +67,7 @@ export default async function BoardPage() {
   return (
     <div className="min-h-screen bg-bg">
       <header className="px-4 pt-4 pb-3">
-        <div className="text-[10px] font-bold uppercase tracking-wide" style={{ color: 'var(--color-accent)' }}>
+        <div style={{ fontFamily: 'var(--font-display)', fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--color-accent)' }}>
           Match-day chatter
         </div>
         <div className="font-display text-[22px] font-extrabold text-text tracking-tight">Message Board</div>

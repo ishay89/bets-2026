@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { BottomNav } from '@/components/bottom-nav'
 import { getMatchDaysWithUserData } from '@/lib/data'
+import { formatAppDate } from '@/lib/time'
 
 export const metadata = { title: 'History | Mondial Bets 2026', description: 'Your prediction history' }
 
@@ -39,7 +40,7 @@ export default async function HistoryPage() {
     <div className="min-h-screen bg-bg">
       <div className="px-4 pt-4 pb-3 flex items-center justify-between">
         <div>
-          <div className="text-[10px] font-bold uppercase tracking-wide" style={{ color: 'var(--color-accent)' }}>
+          <div style={{ fontFamily: 'var(--font-display)', fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--color-accent)' }}>
             Your bets so far
           </div>
           <div className="font-display text-[22px] font-extrabold text-text tracking-tight">History</div>
@@ -107,8 +108,8 @@ export default async function HistoryPage() {
               <div className="flex items-center justify-between px-4 py-3"
                 style={{ borderBottom: '1px solid var(--border-base)' }}>
                 <div>
-                  <div className="font-bold text-[13px] text-text">{day.date}</div>
-                  <div className="text-[10px] font-bold uppercase tracking-wide text-muted mt-0.5">
+                  <div style={{ fontFamily: 'var(--font-display)', fontSize: 14, fontWeight: 700, letterSpacing: '-0.01em', color: 'var(--color-text)' }}>{formatAppDate(day.date)}</div>
+                  <div style={{ fontFamily: 'var(--font-display)', fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--color-muted)', marginTop: 2 }}>
                     {STAGE_LABELS[day.stage] ?? day.stage}
                   </div>
                 </div>
