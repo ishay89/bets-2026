@@ -9,6 +9,7 @@ import type { CrowdTally } from '@/lib/crowd'
 import { toPct, matchInsight } from '@/lib/crowd'
 import { isMatchLocked, isPikanteriaLocked, matchLockMs } from '@/lib/lock'
 import { formatAppDate } from '@/lib/time'
+import { sortPredictMatches } from '@/lib/predict-match-order'
 
 export const STAGE_LABELS: Record<string, string> = {
   group: 'Group Stage', r32: 'Round of 32', r16: 'Round of 16', qf: 'Quarter Finals',
@@ -54,9 +55,7 @@ export function MatchDaySection({
   const isToday = matchDay.date === today
   const stageLabel = STAGE_LABELS[matchDay.stage] ?? matchDay.stage
   const pikaItems = matchDay.pikanteria
-  const sortedMatches = [...matchDay.matches].sort(
-    (a, b) => new Date(a.kickoff_time).getTime() - new Date(b.kickoff_time).getTime()
-  )
+  const sortedMatches = sortPredictMatches(matchDay.matches)
   const dateLabel = formatAppDate(matchDay.date)
   const allMatchesLocked = sortedMatches.length > 0 && sortedMatches.every(m => isMatchLocked(m))
   const earliestLockTime = sortedMatches.length > 0

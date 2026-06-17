@@ -28,6 +28,8 @@ import { getMatchPredictionsReveal, getPikanteriaAnswersReveal } from '@/lib/pre
 import { appDateKey } from '@/lib/time'
 import { MatchDaySection } from '@/components/match-day-section'
 import { LazyMatchDayList } from '@/components/lazy-match-day-list'
+import { PredictLiveRefresh } from '@/components/predict-live-refresh'
+import { getPredictLiveRefreshMatchIds, sortPredictMatchDays } from '@/lib/predict-match-order'
 
 export const metadata = { title: 'Predict | Mondial Bets 2026' }
 
@@ -177,11 +179,9 @@ export default async function PredictPage() {
   const futuresLocked = tournamentSettings?.futures_locked ?? false
   const futuresPublished = tournamentSettings?.futures_published ?? true
 
-  // Surface the most recently published match days first, so a returning player
-  // lands on the matches they still need to bet without scrolling.
-  const sortedDays = matchDays.toSorted(
-    (a, b) => new Date(b.published_at!).getTime() - new Date(a.published_at!).getTime()
-  )
+  // Surface live games first, then open upcoming games, then already-played days.
+  const sortedDays = sortPredictMatchDays(matchDays)
+  const liveRefreshMatchIds = getPredictLiveRefreshMatchIds(sortedDays)
 
   const predictionMap = Object.fromEntries(
     existingPredictions.map(p => [p.match_id, p.pick as Pick])
@@ -238,6 +238,8 @@ export default async function PredictPage() {
       </div>
 
       <main className="px-4 pb-28 space-y-6 mt-2">
+        <PredictLiveRefresh matchIds={liveRefreshMatchIds} />
+
         <MissingPicksBanner missing={missingPicks} />
 
         {futuresPublished && !hasEntryPick && (

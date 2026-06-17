@@ -94,6 +94,7 @@ async function syncLiveScores(config: FootballDataConfig): Promise<void> {
   }
 
   // Bust the page caches for pages that show live score data.
+  revalidatePath('/predict')
   revalidatePath('/board')
   revalidatePath('/leaderboard')
 }
