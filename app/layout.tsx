@@ -3,7 +3,6 @@ import { Oswald, Barlow, IBM_Plex_Mono } from 'next/font/google'
 import { cookies } from 'next/headers'
 import Script from 'next/script'
 import './globals.css'
-import { ThemeToggle } from '@/components/theme-toggle'
 import { createClient } from '@/lib/supabase/server'
 import { SpeedInsights } from '@vercel/speed-insights/next'
 import { Analytics } from '@vercel/analytics/next'
@@ -77,7 +76,6 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       </head>
       <body className="bg-bg text-text min-h-screen font-sans">
         {children}
-        <ThemeToggle />
         <SpeedInsights />
         <Analytics />
       </body>
