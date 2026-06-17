@@ -1,7 +1,9 @@
 import { unstable_cache } from 'next/cache'
+import { after } from 'next/server'
 import { createAdminClient, createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
+import { maybeSyncLiveScores } from '@/lib/live-sync'
 import { BottomNav } from '@/components/bottom-nav'
 import type { Pick } from '@/lib/types'
 import type { CrowdTally } from '@/lib/crowd'
@@ -137,6 +139,9 @@ export default async function PredictPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
+
+  // Fire-and-forget live score sync after the response is sent.
+  after(maybeSyncLiveScores)
 
   const adminClient = createAdminClient()
   await Promise.all([

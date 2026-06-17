@@ -47,6 +47,11 @@ interface Props {
   stageLabel?: string
   insight?: Insight | null
 
+  // Live score — written by the background sync; display-only, no scoring impact.
+  liveStatus?: 'TIMED' | 'IN_PLAY' | 'PAUSED' | 'FINISHED' | null
+  liveScoreHome?: number | null
+  liveScoreAway?: number | null
+
   // Pikanteria-only presentation
   question?: string
 }
@@ -114,6 +119,7 @@ export function BetCard(props: Props) {
     id, variant, options, result, currentPick, isLocked, onSave,
     crowd, crowdTotal = 0, myUserId, onReveal,
     homeTeam, awayTeam, kickoffTime, stageLabel, insight, question,
+    liveStatus, liveScoreHome, liveScoreAway,
   } = props
   const theme = THEME[variant]
 
@@ -209,6 +215,7 @@ export function BetCard(props: Props) {
           isWrong={isWrong}
           selectedLabel={labelFor(selected)}
           isLocked={isLocked}
+          liveStatus={liveStatus}
         />
       ) : (
         <PikaHeader
@@ -220,7 +227,10 @@ export function BetCard(props: Props) {
       )}
 
       {variant === 'match' ? (
-        <TeamsRow homeTeam={homeTeam!} awayTeam={awayTeam!} result={result} selected={selected} />
+        <TeamsRow
+          homeTeam={homeTeam!} awayTeam={awayTeam!} result={result} selected={selected}
+          liveStatus={liveStatus} liveScoreHome={liveScoreHome} liveScoreAway={liveScoreAway}
+        />
       ) : (
         <QuestionBlock question={question ?? ''} result={result} resultLabel={labelFor(result)} />
       )}
@@ -290,16 +300,32 @@ function VerdictChip({
 }
 
 function MatchHeader({
-  kickoff, stageLabel, isCorrect, isWrong, selectedLabel, isLocked,
+  kickoff, stageLabel, isCorrect, isWrong, selectedLabel, isLocked, liveStatus,
 }: {
   kickoff: string; stageLabel: string; isCorrect: boolean; isWrong: boolean
   selectedLabel: string | null; isLocked: boolean
+  liveStatus?: 'TIMED' | 'IN_PLAY' | 'PAUSED' | 'FINISHED' | null
 }) {
+  const isLive    = liveStatus === 'IN_PLAY'
+  const isHalfTime = liveStatus === 'PAUSED'
+
   return (
     <div className="flex items-center justify-between px-4 py-2" style={{ borderBottom: '1px solid var(--border-subtle)' }}>
-      <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--color-muted)', letterSpacing: '0.04em' }}>
-        {kickoff}
-      </span>
+      {isLive ? (
+        <span className="text-[10px] font-black px-2 py-0.5 rounded-full"
+          style={{ background: 'rgba(220,38,38,0.15)', color: 'var(--color-danger)', border: '1px solid rgba(220,38,38,0.3)', letterSpacing: '0.06em' }}>
+          ● LIVE
+        </span>
+      ) : isHalfTime ? (
+        <span className="text-[10px] font-black px-2 py-0.5 rounded-full"
+          style={{ background: 'var(--color-elev)', color: 'var(--color-sub)', border: '1px solid var(--border-base)', letterSpacing: '0.06em' }}>
+          ⏸ HT
+        </span>
+      ) : (
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--color-muted)', letterSpacing: '0.04em' }}>
+          {kickoff}
+        </span>
+      )}
       <span style={{ fontFamily: 'var(--font-display)', fontSize: 12, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--color-sub)' }}>
         {stageLabel}
       </span>
@@ -348,17 +374,30 @@ function QuestionBlock({
 }
 
 function TeamsRow({
-  homeTeam, awayTeam, result, selected,
+  homeTeam, awayTeam, result, selected, liveStatus, liveScoreHome, liveScoreAway,
 }: {
   homeTeam: string; awayTeam: string; result: Pick | null; selected: Pick | null
+  liveStatus?: 'TIMED' | 'IN_PLAY' | 'PAUSED' | 'FINISHED' | null
+  liveScoreHome?: number | null
+  liveScoreAway?: number | null
 }) {
+  const showLiveScore = (liveStatus === 'IN_PLAY' || liveStatus === 'PAUSED')
+    && liveScoreHome !== null && liveScoreHome !== undefined
+    && liveScoreAway !== null && liveScoreAway !== undefined
+
   return (
     <div className="flex items-center justify-around px-4 py-5">
       <TeamBlock name={homeTeam} selected={selected === '1'} />
       <div className="flex flex-col items-center gap-1">
-        <div style={{ fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 700, color: 'var(--color-dim)', letterSpacing: '0.04em' }}>
-          VS
-        </div>
+        {showLiveScore ? (
+          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 26, fontWeight: 700, color: 'var(--color-text)', letterSpacing: '0.04em', lineHeight: 1 }}>
+            {liveScoreHome} – {liveScoreAway}
+          </div>
+        ) : (
+          <div style={{ fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 700, color: 'var(--color-dim)', letterSpacing: '0.04em' }}>
+            VS
+          </div>
+        )}
         {result && (
           <div className="text-[12px] font-bold px-2 py-0.5 rounded"
             style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-gold)', background: 'var(--color-amber-soft)' }}>

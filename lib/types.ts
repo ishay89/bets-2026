@@ -27,6 +27,8 @@ export interface MatchDay {
   created_at: string
 }
 
+export type LiveStatus = 'TIMED' | 'IN_PLAY' | 'PAUSED' | 'FINISHED'
+
 export interface Match {
   id: string
   match_day_id: string
@@ -39,6 +41,11 @@ export interface Match {
   result: Pick | null
   locked: boolean
   published_at: string | null
+  // Live score fields — written by the background sync, never used for scoring.
+  live_status: LiveStatus | null
+  live_score_home: number | null
+  live_score_away: number | null
+  live_synced_at: string | null
 }
 
 // Pikanteria now mirrors the match shape: a question with up to three fixed
