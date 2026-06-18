@@ -156,13 +156,6 @@ export default async function ProfilePage() {
           </>
         )}
 
-        {/* Appearance */}
-        <div className="flex items-center justify-between rounded-[14px] px-4 py-3"
-          style={{ background: 'var(--color-panel)', border: '1px solid var(--border-base)' }}>
-          <span className="text-[13px] font-bold text-text">Appearance</span>
-          <ThemeToggle />
-        </div>
-
         {/* Admin link */}
         {profile?.is_admin && (
           <Link href="/admin"
@@ -171,6 +164,13 @@ export default async function ProfilePage() {
             ⚙️ Go to Admin Panel
           </Link>
         )}
+
+        {/* Appearance */}
+        <div className="flex items-center justify-between rounded-[14px] px-4 py-3"
+          style={{ background: 'var(--color-panel)', border: '1px solid var(--border-base)' }}>
+          <span className="text-[13px] font-bold text-text">Appearance</span>
+          <ThemeToggle />
+        </div>
       </main>
 
       <BottomNav />

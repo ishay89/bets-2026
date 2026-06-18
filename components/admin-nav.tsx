@@ -3,12 +3,12 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 
 const tabs = [
+  { href: '/admin', label: 'Home', exact: true },
   { href: '/admin/publish', label: 'Bets' },
   { href: '/admin/results', label: 'Results' },
-  { href: '/admin/tournament', label: 'Tourney' },
   { href: '/admin/players', label: 'Players' },
   { href: '/admin/audit', label: 'Audit' },
-  { href: '/', label: 'App' },
+  { href: '/', label: 'App', exact: true },
 ]
 
 export function AdminNav() {
@@ -24,10 +24,8 @@ export function AdminNav() {
         paddingBottom: 'env(safe-area-inset-bottom, 8px)',
       }}
     >
-      {tabs.map(({ href, label }) => {
-        // "App" (/) should only be active on the exact path; admin tabs stay lit
-        // on their nested routes (e.g. /admin/players/[id] keeps Players active).
-        const active = href === '/' ? pathname === '/' : pathname === href || pathname.startsWith(href + '/')
+      {tabs.map(({ href, label, exact }) => {
+        const active = exact ? pathname === href : pathname === href || pathname.startsWith(href + '/')
         return (
           <Link
             key={href}
