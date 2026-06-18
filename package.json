@@ -9,17 +9,15 @@
     "lint": "eslint",
     "test": "vitest run",
     "test:watch": "vitest",
+    "db:dump:prod": "powershell -ExecutionPolicy Bypass -File scripts/sync-prod-db-local.ps1 -DumpOnly -KeepDump",
+    "db:sync:prod-to-local": "powershell -ExecutionPolicy Bypass -File scripts/sync-prod-db-local.ps1 -Force",
     "seed": "tsx scripts/seed-wc2026.ts",
-    "sync:dry": "tsx scripts/sync-results-dry-run.ts",
-    "sync:fixtures": "tsx scripts/sync-fixtures.ts",
     "gen:types": "supabase gen types typescript --local > lib/supabase/types.ts",
     "doctor": "npx react-doctor@latest"
   },
   "dependencies": {
     "@supabase/ssr": "^0.10.3",
     "@supabase/supabase-js": "^2.106.2",
-    "@vercel/analytics": "^2.0.1",
-    "@vercel/speed-insights": "^2.0.0",
     "next": "16.2.6",
     "react": "19.2.4",
     "react-dom": "19.2.4"
