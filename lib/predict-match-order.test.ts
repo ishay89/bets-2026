@@ -21,6 +21,7 @@ function match(overrides: Partial<Match> & { id: string; kickoff_time: string })
     live_status: overrides.live_status ?? null,
     live_score_home: overrides.live_score_home ?? null,
     live_score_away: overrides.live_score_away ?? null,
+    live_minute: overrides.live_minute ?? null,
     live_synced_at: overrides.live_synced_at ?? null,
   }
 }
