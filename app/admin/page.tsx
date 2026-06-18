@@ -1,6 +1,7 @@
 import Link from 'next/link'
 
 const sections = [
+  { href: '/admin/missing-picks', icon: '🔔', label: 'Missing Picks', desc: 'See who still needs to submit picks' },
   { href: '/admin/publish', icon: '📋', label: 'Publish & Edit Bets', desc: 'Manage odds, visibility, pikanteria, and locks' },
   { href: '/admin/results', icon: '✅', label: 'Enter Results', desc: 'Record outcomes and trigger scoring' },
   { href: '/admin/tournament', icon: '🏆', label: 'Tournament End', desc: 'Set winner and top scorer' },
@@ -8,7 +9,6 @@ const sections = [
   { href: '/admin/ai-picks', icon: '🤖', label: 'Pick for AI', desc: 'Enter bets for Claude, Codex, and bot futures' },
   { href: '/admin/scores', icon: '📊', label: 'Score Snapshots', desc: 'Per-day breakdown and validation audit' },
   { href: '/admin/audit', icon: '🧾', label: 'User Audit', desc: 'Track user prediction commits and changes' },
-  { href: '/admin/missing-picks', icon: '🔔', label: 'Missing Picks', desc: 'See who still needs to submit picks' },
 ]
 
 export default function AdminHome() {

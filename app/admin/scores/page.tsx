@@ -2,6 +2,7 @@ import { createClient, createAdminClient, assertAdmin } from '@/lib/supabase/ser
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { recalculateAllSnapshots } from '@/lib/score-validation'
+import Link from 'next/link'
 
 async function revalidateAll() {
   'use server'
@@ -113,7 +114,10 @@ export default async function ScoresPage() {
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div>
-          <div className="font-display font-black text-lg" style={{ color: 'var(--color-amber)' }}>
+          <Link href="/admin" className="text-muted hover:text-amber transition-colors text-xs">
+            ← Admin
+          </Link>
+          <div className="font-display font-black text-lg mt-1" style={{ color: 'var(--color-amber)' }}>
             📊 Score Snapshots
           </div>
           <div className="text-muted text-xs mt-0.5">

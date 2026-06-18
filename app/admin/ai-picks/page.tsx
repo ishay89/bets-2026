@@ -108,7 +108,10 @@ export default async function AiPicksPage({
   return (
     <div className="max-w-lg mx-auto space-y-4 pb-10">
       <div>
-        <div className="font-display font-black text-lg" style={{ color: 'var(--color-amber)' }}>
+        <Link href="/admin" className="text-muted hover:text-amber transition-colors text-xs">
+          ← Admin
+        </Link>
+        <div className="font-display font-black text-lg mt-1" style={{ color: 'var(--color-amber)' }}>
           🤖 Pick for AI
         </div>
         <div className="text-muted text-xs mt-0.5">

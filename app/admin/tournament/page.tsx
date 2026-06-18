@@ -5,6 +5,7 @@ import { upsertPreTournamentSnapshot } from '@/lib/score-validation'
 import { buildTournamentScoringPayload } from '@/lib/scoring-writes'
 import { TEAMS, SCORERS, withCurrentFuturesOdds } from '@/lib/pre-tournament'
 import { parseTeamName, parseScorerName, parseNonEmpty } from '@/lib/validation'
+import Link from 'next/link'
 
 async function scoreTournamentEnd(formData: FormData) {
   'use server'
@@ -57,7 +58,10 @@ export default function TournamentEndPage() {
   return (
     <div className="max-w-lg mx-auto space-y-6 pb-10">
       <div>
-        <div className="font-display font-black text-lg" style={{ color: 'var(--color-amber)' }}>🏆 Score Tournament End</div>
+        <Link href="/admin" className="text-muted hover:text-amber transition-colors text-xs">
+          ← Admin
+        </Link>
+        <div className="font-display font-black text-lg mt-1" style={{ color: 'var(--color-amber)' }}>🏆 Score Tournament End</div>
         <div className="text-muted text-xs">
           Enter the final results to compute pre-tournament bonuses for all players
         </div>
