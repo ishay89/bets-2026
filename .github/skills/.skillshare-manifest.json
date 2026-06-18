@@ -1,0 +1,10 @@
+{
+  "managed": {
+    "claude-open-bet-predictions": "symlink",
+    "codex-open-bet-predictions": "symlink",
+    "publish-social-recap": "symlink",
+    "react-doctor": "symlink",
+    "winner-odds": "symlink"
+  },
+  "updated_at": "2026-06-18T11:49:26.8793831+03:00"
+}

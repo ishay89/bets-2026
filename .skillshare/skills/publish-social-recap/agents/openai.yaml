@@ -1,0 +1,4 @@
+interface:
+  display_name: "Publish Social Recap"
+  short_description: "Analyze standings and publish a playful Hebrew recap"
+  default_prompt: "Analyze the latest Mondial Bets standings and publish a playful Hebrew AI recap to the Social tab."
