@@ -240,7 +240,16 @@ Vitest tests are in `lib/*.test.ts` and cover the pure helpers (point math, payl
 - `lib/board-media.test.ts` / `lib/cloudflare-r2.test.ts` — board media handling and R2 uploads
 - `lib/match-day-grouping-migration.test.ts` — match-day grouping migration logic
 
-Before finishing code changes, run the narrow relevant tests and then `npm run lint` when practical. For docs-only updates, at minimum inspect the diff.
+Before finishing any code change, run the local CI parity checks so the PR should pass GitHub Actions before you push:
+
+```bash
+npm run lint
+npx tsc --noEmit
+npm run build
+npm test
+```
+
+Use the same placeholder environment as `.github/workflows/ci.yml` when running `npm run build` locally if real Supabase credentials are not needed. For docs-only updates, at minimum inspect the diff.
 
 ## Styling and UI
 
