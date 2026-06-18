@@ -6,7 +6,7 @@ const tabs = [
   { href: '/admin', label: 'Home', exact: true },
   { href: '/admin/publish', label: 'Bets' },
   { href: '/admin/results', label: 'Results' },
-  { href: '/admin/players', label: 'Players' },
+  { href: '/admin/missing-picks', label: 'Missing' },
   { href: '/admin/audit', label: 'Audit' },
   { href: '/', label: 'App', exact: true },
 ]

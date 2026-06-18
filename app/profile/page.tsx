@@ -49,6 +49,15 @@ export default async function ProfilePage() {
       </div>
 
       <main className="px-4 pb-28 space-y-4">
+        {/* Admin link */}
+        {profile?.is_admin && (
+          <Link href="/admin"
+            className="block w-full text-center py-2.5 rounded-xl font-bold text-[13px] transition-colors"
+            style={{ background: 'var(--color-amber-soft)', border: '1px solid var(--border-warn)', color: 'var(--color-amber)' }}>
+            ⚙️ Go to Admin Panel
+          </Link>
+        )}
+
         {/* Hero card */}
         <div className="rounded-[14px] p-4"
           style={{ background: 'var(--color-panel)', border: '1px solid var(--border-base)' }}>
@@ -154,15 +163,6 @@ export default async function ProfilePage() {
               </Link>
             </div>
           </>
-        )}
-
-        {/* Admin link */}
-        {profile?.is_admin && (
-          <Link href="/admin"
-            className="block w-full text-center py-2.5 rounded-xl font-bold text-[13px] transition-colors"
-            style={{ background: 'var(--color-amber-soft)', border: '1px solid var(--border-warn)', color: 'var(--color-amber)' }}>
-            ⚙️ Go to Admin Panel
-          </Link>
         )}
 
         {/* Appearance */}
