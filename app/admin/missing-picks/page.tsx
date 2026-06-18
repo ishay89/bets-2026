@@ -1,6 +1,6 @@
 import { createAdminClient, assertAdmin } from '@/lib/supabase/server'
 import Link from 'next/link'
-import { getPublishedMatchDaysWithAll } from '@/lib/data'
+import { fetchAllRows, getPublishedMatchDaysWithAll } from '@/lib/data'
 import { formatAppDate } from '@/lib/time'
 import {
   computeAllPlayersMissingPicks,
@@ -25,24 +25,24 @@ export default async function MissingPicksPage() {
   await assertAdmin()
   const supabase = createAdminClient()
 
-  const [matchDays, predictionsResult, answersResult, futuresPicksResult, playersResult, tournamentSettingsResult] =
+  const [matchDays, predictions, answers, futuresPicksResult, playersResult, tournamentSettingsResult] =
     await Promise.all([
       getPublishedMatchDaysWithAll(supabase),
-      supabase.from('predictions').select('user_id, match_id'),
-      supabase.from('pikanteria_answers').select('user_id, pikanteria_id'),
+      fetchAllRows<{ user_id: string; match_id: string }>(() =>
+        supabase.from('predictions').select('user_id, match_id'),
+      ),
+      fetchAllRows<{ user_id: string; pikanteria_id: string }>(() =>
+        supabase.from('pikanteria_answers').select('user_id, pikanteria_id'),
+      ),
       supabase.from('pre_tournament_picks').select('user_id, winner_team, top_scorer'),
       supabase.from('users').select('id, display_name').eq('status', 'approved').eq('is_monkey', false),
       supabase.from('tournament_settings').select('futures_locked, futures_published').eq('id', true).single(),
     ])
 
-  const { data: predictions, error: predictionsError } = predictionsResult
-  const { data: answers, error: answersError } = answersResult
   const { data: futuresPicks, error: futuresPicksError } = futuresPicksResult
   const { data: players, error: playersError } = playersResult
   const { data: tournamentSettings, error: tournamentSettingsError } = tournamentSettingsResult
 
-  throwQueryError('predictions', predictionsError)
-  throwQueryError('pikanteria answers', answersError)
   throwQueryError('futures picks', futuresPicksError)
   throwQueryError('players', playersError)
   throwQueryError('tournament settings', tournamentSettingsError)
@@ -52,8 +52,8 @@ export default async function MissingPicksPage() {
   const summary = computeAllPlayersMissingPicks({
     matchDays,
     players: players ?? [],
-    predictions: predictions ?? [],
-    answers: answers ?? [],
+    predictions,
+    answers,
     futuresPicks: futuresPicks ?? [],
     futuresOpen,
   })

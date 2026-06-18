@@ -90,6 +90,11 @@ class FakeQuery implements PromiseLike<{ data: Row[] | Row | null; error: null; 
     return this
   }
 
+  range(from: number, to: number): this {
+    this.rows = this.rows.slice(from, to + 1)
+    return this
+  }
+
   maybeSingle(): this {
     this.singleMode = 'maybeSingle'
     return this
