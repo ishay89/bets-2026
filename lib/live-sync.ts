@@ -16,9 +16,10 @@ import { fetchAllMatches, getFootballDataConfig, type FootballDataConfig } from 
 import { runResultsSync } from './result-sync-runner'
 import type { LiveStatus } from './types'
 
-// A match is in its live window if its kickoff is within the past 145 minutes
-// (90 regular + 30 extra + 25 buffer) or the next 10 minutes (pre-match).
-const WINDOW_PAST_MS  = 145 * 60 * 1000
+// A match is in its live window if its kickoff is within the past 200 minutes
+// (90 regular + 30 extra time + 30 min penalties + 50 min buffer) or the next
+// 10 minutes (pre-match). 200 min covers the worst-case knockout scenario.
+const WINDOW_PAST_MS  = 200 * 60 * 1000
 const WINDOW_FUTURE_MS = 10 * 60 * 1000
 
 // Only re-sync a match whose live_synced_at is older than this threshold.
@@ -76,6 +77,7 @@ async function syncLiveScores(config: FootballDataConfig): Promise<void> {
         live_status:     m.status as LiveStatus,
         live_score_home: m.score.fullTime.home,
         live_score_away: m.score.fullTime.away,
+        live_minute:     m.minute ?? null,
         live_synced_at:  syncedAt,
       })
       .eq('external_match_id', m.id)
@@ -99,12 +101,27 @@ async function syncLiveScores(config: FootballDataConfig): Promise<void> {
   revalidatePath('/leaderboard')
 }
 
+// Clear any matches that are stuck in IN_PLAY/PAUSED but whose kickoff is old
+// enough that they must have finished. This handles cases where the live window
+// expired before the sync could write FINISHED (e.g. extra-time games, or a
+// gap in page visits during the match).
+async function clearStuckLiveMatches(): Promise<void> {
+  const cutoff = new Date(Date.now() - WINDOW_PAST_MS).toISOString()
+  const supabase = createAdminClient()
+  await supabase
+    .from('matches')
+    .update({ live_status: 'FINISHED', live_minute: null })
+    .in('live_status', ['IN_PLAY', 'PAUSED'])
+    .lt('kickoff_time', cutoff)
+}
+
 // Public entry point for page after() callbacks. Catches all errors so a sync
 // failure never surfaces to users (the response is already sent at this point).
 export async function maybeSyncLiveScores(): Promise<void> {
   const config = getFootballDataConfig()
   if (!config) return
   try {
+    await clearStuckLiveMatches()
     if (!await needsLiveSync()) return
     await syncLiveScores(config)
   } catch (err) {

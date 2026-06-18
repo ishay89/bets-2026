@@ -22,6 +22,10 @@ export interface FdMatch {
   id: number
   utcDate: string
   status: 'SCHEDULED' | 'TIMED' | 'IN_PLAY' | 'PAUSED' | 'FINISHED' | string
+  // Current match minute for live games (IN_PLAY / PAUSED). null pre-match;
+  // the provider also returns injuryTime separately when stoppage time is on.
+  minute?: number | null
+  injuryTime?: number | null
   stage: string
   group: string | null
   homeTeam: { id: number | null; name: string | null; shortName?: string | null }

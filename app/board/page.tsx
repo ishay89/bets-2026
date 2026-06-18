@@ -14,7 +14,7 @@ const getCachedLiveMatches = unstable_cache(
     const supabase = createAdminClient()
     const { data, error } = await supabase
       .from('matches')
-      .select('id, home_team, away_team, live_status, live_score_home, live_score_away')
+      .select('id, home_team, away_team, live_status, live_score_home, live_score_away, live_minute')
       .in('live_status', ['IN_PLAY', 'PAUSED'])
       .not('published_at', 'is', null)
       .order('kickoff_time', { ascending: true })
