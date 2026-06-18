@@ -10,7 +10,11 @@ import type {
 } from './types'
 import type { Database } from './supabase/types'
 import type { AutomatedUser } from './monkey'
-import { buildHistoricalLeaderboardEntries, selectScoredLeaderboardDays } from './historical-leaderboard'
+import {
+  buildHistoricalLeaderboardEntries,
+  type HistoricalScoredPick,
+  selectScoredLeaderboardDays,
+} from './historical-leaderboard'
 
 type Db = SupabaseClient<Database>
 
@@ -198,22 +202,59 @@ export async function getHistoricalLeaderboardEntries(
   selectedDayId: string,
   days: ScoredLeaderboardDay[],
 ): Promise<HistoricalLeaderboardEntry[]> {
-  const [{ data: users, error: usersError }, { data: snapshots, error: snapshotsError }] = await Promise.all([
+  const [
+    { data: users, error: usersError },
+    { data: snapshots, error: snapshotsError },
+    { data: scoredMatches, error: scoredMatchesError },
+    { data: scoredPikanteria, error: scoredPikanteriaError },
+  ] = await Promise.all([
     supabase
       .from('users')
       .select('id, display_name, is_monkey, automation_strategy, avatar_emoji, status'),
     supabase
       .from('score_snapshots')
       .select('user_id, match_day_id, day_points'),
+    supabase
+      .from('matches')
+      .select('match_day_id, result, predictions(user_id, pick)')
+      .not('result', 'is', null),
+    supabase
+      .from('pikanteria')
+      .select('match_day_id, result, pikanteria_answers(user_id, pick)')
+      .not('result', 'is', null),
   ])
 
   if (usersError) throw usersError
   if (snapshotsError) throw snapshotsError
+  if (scoredMatchesError) throw scoredMatchesError
+  if (scoredPikanteriaError) throw scoredPikanteriaError
+
+  const scoredPicks: HistoricalScoredPick[] = [
+    ...((scoredMatches ?? []) as Array<{
+      match_day_id: string
+      result: Pick
+      predictions: Array<{ user_id: string; pick: Pick }>
+    }>).flatMap(match => match.predictions.map(prediction => ({
+      user_id: prediction.user_id,
+      match_day_id: match.match_day_id,
+      is_success: prediction.pick === match.result,
+    }))),
+    ...((scoredPikanteria ?? []) as Array<{
+      match_day_id: string
+      result: Pick
+      pikanteria_answers: Array<{ user_id: string; pick: Pick }>
+    }>).flatMap(item => item.pikanteria_answers.map(answer => ({
+      user_id: answer.user_id,
+      match_day_id: item.match_day_id,
+      is_success: answer.pick === item.result,
+    }))),
+  ]
 
   return buildHistoricalLeaderboardEntries({
     selectedDayId,
     days,
     users: users ?? [],
     snapshots: snapshots ?? [],
+    scoredPicks,
   })
 }

@@ -111,6 +111,12 @@ export interface LeaderboardEntry {
   current_rank: number | null
   previous_rank: number | null
   rank_delta: number | null
+  total_success_rate: number | null
+  total_successful_picks: number
+  total_scored_picks: number
+  today_success_rate: number | null
+  today_successful_picks: number
+  today_scored_picks: number
 }
 
 export interface ScoredLeaderboardDay {

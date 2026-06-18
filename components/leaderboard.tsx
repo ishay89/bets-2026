@@ -56,6 +56,15 @@ function deltaColor(delta: number | null | undefined): string {
   return delta && delta < 0 ? 'var(--color-danger)' : 'var(--color-accent)'
 }
 
+function successLabel(entry: LeaderboardEntry, mode: 'total' | 'today'): string {
+  const rate = mode === 'today' ? entry.today_success_rate : entry.total_success_rate
+  const successful = mode === 'today' ? entry.today_successful_picks : entry.total_successful_picks
+  const scored = mode === 'today' ? entry.today_scored_picks : entry.total_scored_picks
+  if (typeof rate !== 'number' || scored === 0) return '-- (0/0)'
+  const pct = Number.isInteger(rate) ? rate.toFixed(0) : rate.toFixed(1)
+  return `${pct}% (${successful}/${scored})`
+}
+
 export function Leaderboard({
   entries,
   currentUserId,
@@ -152,6 +161,9 @@ export function Leaderboard({
                 </Link>
                 <div className="font-mono text-[11px] text-sub mb-1" style={{ fontFamily: 'var(--font-mono)' }}>
                   {score(entry).toFixed(2)}
+                </div>
+                <div className="text-[10px] font-bold text-sub mb-1" style={{ fontFamily: 'var(--font-mono)' }}>
+                  {successLabel(entry, mode)}
                 </div>
                 {(rankDelta || todayMovement) && (
                   <div className="mb-1 flex min-h-[16px] items-center justify-center gap-1.5 text-[10px] font-bold">
@@ -280,6 +292,9 @@ export function Leaderboard({
                   style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-text)' }}
                 >
                   <div>{score(entry).toFixed(2)}</div>
+                  <div className="text-[10px] font-semibold text-sub">
+                    {successLabel(entry, mode)}
+                  </div>
                   {todayMovement && (
                     <div className="text-[10px] font-semibold text-sub">{todayMovement}</div>
                   )}

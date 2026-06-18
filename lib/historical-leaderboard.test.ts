@@ -149,6 +149,43 @@ describe('buildHistoricalLeaderboardEntries', () => {
       ['u3', 0, 0],
     ])
   })
+
+  it('computes total and selected-day pick success rates without changing score order', () => {
+    const entries = buildHistoricalLeaderboardEntries({
+      selectedDayId: 'day-2',
+      days,
+      users,
+      snapshots: [
+        { user_id: 'u1', match_day_id: 'day-1', day_points: 3 },
+        { user_id: 'u1', match_day_id: 'day-2', day_points: 1 },
+        { user_id: 'u2', match_day_id: 'day-1', day_points: 2 },
+        { user_id: 'u2', match_day_id: 'day-2', day_points: 5 },
+      ],
+      scoredPicks: [
+        { user_id: 'u1', match_day_id: 'day-1', is_success: true },
+        { user_id: 'u1', match_day_id: 'day-1', is_success: false },
+        { user_id: 'u1', match_day_id: 'day-2', is_success: true },
+        { user_id: 'u1', match_day_id: 'day-2', is_success: false },
+        { user_id: 'u2', match_day_id: 'day-1', is_success: true },
+        { user_id: 'u2', match_day_id: 'day-2', is_success: true },
+      ],
+    })
+
+    expect(entries.map(e => [
+      e.id,
+      e.total_points,
+      e.total_success_rate,
+      e.total_successful_picks,
+      e.total_scored_picks,
+      e.today_success_rate,
+      e.today_successful_picks,
+      e.today_scored_picks,
+    ])).toEqual([
+      ['u2', 7, 100, 2, 2, 100, 1, 1],
+      ['u1', 4, 50, 2, 4, 50, 1, 2],
+      ['u3', 0, null, 0, 0, null, 0, 0],
+    ])
+  })
 })
 
 describe('selectScoredLeaderboardDays', () => {
