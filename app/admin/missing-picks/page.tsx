@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { getPublishedMatchDaysWithAll } from '@/lib/data'
 import { formatAppDate } from '@/lib/time'
 import {
+  collectOpenItemIds,
   computeAllPlayersMissingPicks,
   computeMissingPicksViewState,
   type MissingPicksSummary,
@@ -25,11 +26,17 @@ export default async function MissingPicksPage() {
   await assertAdmin()
   const supabase = createAdminClient()
 
-  const [matchDays, predictionsResult, answersResult, futuresPicksResult, playersResult, tournamentSettingsResult] =
+  const matchDays = await getPublishedMatchDaysWithAll(supabase)
+  const { matchIds: openMatchIds, pikanteriaIds: openPikanteriaIds } = collectOpenItemIds(matchDays)
+
+  const [predictionsResult, answersResult, futuresPicksResult, playersResult, tournamentSettingsResult] =
     await Promise.all([
-      getPublishedMatchDaysWithAll(supabase),
-      supabase.from('predictions').select('user_id, match_id'),
-      supabase.from('pikanteria_answers').select('user_id, pikanteria_id'),
+      openMatchIds.length > 0
+        ? supabase.from('predictions').select('user_id, match_id').in('match_id', openMatchIds)
+        : Promise.resolve({ data: [], error: null }),
+      openPikanteriaIds.length > 0
+        ? supabase.from('pikanteria_answers').select('user_id, pikanteria_id').in('pikanteria_id', openPikanteriaIds)
+        : Promise.resolve({ data: [], error: null }),
       supabase.from('pre_tournament_picks').select('user_id, winner_team, top_scorer'),
       supabase.from('users').select('id, display_name').eq('status', 'approved').eq('is_monkey', false),
       supabase.from('tournament_settings').select('futures_locked, futures_published').eq('id', true).single(),

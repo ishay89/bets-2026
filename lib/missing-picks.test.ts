@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { computeAllPlayersMissingPicks, computeMissingPicksViewState, computeUserMissingCounts } from './missing-picks'
+import {
+  collectOpenItemIds,
+  computeAllPlayersMissingPicks,
+  computeMissingPicksViewState,
+  computeUserMissingCounts,
+} from './missing-picks'
 
 const day = (overrides: Partial<{
   id: string
@@ -214,6 +219,31 @@ describe('computeAllPlayersMissingPicks', () => {
       { player: { id: 'u2', display_name: 'Bob' }, missingCount: 2, futuresMissing: true },
       { player: { id: 'u1', display_name: 'Alice' }, missingCount: 0, futuresMissing: false },
     ])
+  })
+})
+
+describe('collectOpenItemIds', () => {
+  it('returns empty arrays when there are no open items', () => {
+    const lockedDay = [day({
+      matches: [{ id: 'm-locked', kickoff_time: PAST_KICKOFF, locked: false, published_at: '2026-06-01T00:00:00Z' }],
+      pikanteria: [{ id: 'p-unpublished', locked: false, published_at: null }],
+    })]
+    expect(collectOpenItemIds(lockedDay)).toEqual({ matchIds: [], pikanteriaIds: [] })
+  })
+
+  it('collects ids of open matches and pikanteria across all match days', () => {
+    const days = [
+      day({
+        id: 'day-1',
+        matches: [{ id: 'm1', kickoff_time: FUTURE_KICKOFF, locked: false, published_at: '2026-06-01T00:00:00Z' }],
+        pikanteria: [{ id: 'p1', locked: false, published_at: '2026-06-01T00:00:00Z' }],
+      }),
+      day({
+        id: 'day-2',
+        matches: [{ id: 'm2', kickoff_time: FUTURE_KICKOFF, locked: false, published_at: '2026-06-01T00:00:00Z' }],
+      }),
+    ]
+    expect(collectOpenItemIds(days)).toEqual({ matchIds: ['m1', 'm2'], pikanteriaIds: ['p1'] })
   })
 })
 

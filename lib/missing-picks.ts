@@ -40,6 +40,21 @@ function openItemsForDay(day: MatchDayWithItems): { matches: OpenMatch[]; pikant
   }
 }
 
+/** Ids of all open (published, unlocked) matches/pikanteria across the given match days. */
+export function collectOpenItemIds(matchDays: MatchDayWithItems[]): {
+  matchIds: string[]
+  pikanteriaIds: string[]
+} {
+  const matchIds: string[] = []
+  const pikanteriaIds: string[] = []
+  for (const day of matchDays) {
+    const { matches, pikanteria } = openItemsForDay(day)
+    matchIds.push(...matches.map(m => m.id))
+    pikanteriaIds.push(...pikanteria.map(p => p.id))
+  }
+  return { matchIds, pikanteriaIds }
+}
+
 export function computeUserMissingCounts(params: {
   matchDays: MatchDayWithItems[]
   predictedMatchIds: Set<string>
