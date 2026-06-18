@@ -306,8 +306,9 @@ function MatchHeader({
   selectedLabel: string | null; isLocked: boolean
   liveStatus?: 'TIMED' | 'IN_PLAY' | 'PAUSED' | 'FINISHED' | null
 }) {
-  const isLive    = liveStatus === 'IN_PLAY'
+  const isLive     = liveStatus === 'IN_PLAY'
   const isHalfTime = liveStatus === 'PAUSED'
+  const isFinished = liveStatus === 'FINISHED'
 
   return (
     <div className="flex items-center justify-between px-4 py-2" style={{ borderBottom: '1px solid var(--border-subtle)' }}>
@@ -320,6 +321,11 @@ function MatchHeader({
         <span className="text-[10px] font-black px-2 py-0.5 rounded-full"
           style={{ background: 'var(--color-elev)', color: 'var(--color-sub)', border: '1px solid var(--border-base)', letterSpacing: '0.06em' }}>
           ⏸ HT
+        </span>
+      ) : isFinished ? (
+        <span className="text-[10px] font-black px-2 py-0.5 rounded-full"
+          style={{ background: 'var(--color-elev)', color: 'var(--color-sub)', border: '1px solid var(--border-base)', letterSpacing: '0.06em' }}>
+          FT
         </span>
       ) : (
         <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--color-muted)', letterSpacing: '0.04em' }}>
@@ -381,7 +387,7 @@ function TeamsRow({
   liveScoreHome?: number | null
   liveScoreAway?: number | null
 }) {
-  const showLiveScore = (liveStatus === 'IN_PLAY' || liveStatus === 'PAUSED')
+  const showLiveScore = (liveStatus === 'IN_PLAY' || liveStatus === 'PAUSED' || liveStatus === 'FINISHED')
     && liveScoreHome !== null && liveScoreHome !== undefined
     && liveScoreAway !== null && liveScoreAway !== undefined
 

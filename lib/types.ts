@@ -45,6 +45,7 @@ export interface Match {
   live_status: LiveStatus | null
   live_score_home: number | null
   live_score_away: number | null
+  live_minute: number | null
   live_synced_at: string | null
 }
 

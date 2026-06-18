@@ -9,6 +9,7 @@ export interface LiveMatchRow {
   live_status: 'IN_PLAY' | 'PAUSED'
   live_score_home: number | null
   live_score_away: number | null
+  live_minute: number | null
 }
 
 export function LiveScoreStrip({ matches }: { matches: LiveMatchRow[] }) {
@@ -33,10 +34,10 @@ export function LiveScoreStrip({ matches }: { matches: LiveMatchRow[] }) {
             </span>
           ) : (
             <span
-              className="shrink-0 text-[9px] font-black px-1.5 py-0.5 rounded-full"
+              className="shrink-0 text-[9px] font-black px-1.5 py-0.5 rounded-full tabular-nums"
               style={{ background: 'rgba(220,38,38,0.15)', color: 'var(--color-danger)', border: '1px solid rgba(220,38,38,0.3)', letterSpacing: '0.06em' }}
             >
-              ● LIVE
+              {m.live_minute != null ? `● ${m.live_minute}'` : '● LIVE'}
             </span>
           )}
 
