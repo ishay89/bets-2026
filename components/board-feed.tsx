@@ -1,7 +1,7 @@
 'use client'
 
 import Image from 'next/image'
-import { ChangeEvent, FormEvent, useEffect, useReducer, useRef } from 'react'
+import { ChangeEvent, FormEvent, useEffect, useReducer, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import {
   buildGiphySearchUrl,
@@ -20,6 +20,7 @@ const UPLOAD_INPUT_ACCEPT = 'image/*,video/*'
 const ACCEPTED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif']
 const ACCEPTED_VIDEO_TYPES = ['video/mp4', 'video/webm', 'video/quicktime']
 const ACCEPTED_UPLOAD_TYPES = [...ACCEPTED_IMAGE_TYPES, ...ACCEPTED_VIDEO_TYPES]
+export const RECAP_WINDOW_MS = 3 * 24 * 60 * 60 * 1000
 
 interface BoardAuthor {
   display_name: string
@@ -597,7 +598,51 @@ function BoardTitle({ children }: {
   )
 }
 
-export function AiRecapFeed({ posts }: { posts: AiSocialPost[] }) {
+export function AiRecapFeed({ posts: initialPosts, initialWindowStart }: { posts: AiSocialPost[]; initialWindowStart: string }) {
+  const [posts, setPosts] = useState(initialPosts)
+  const [windowStart, setWindowStart] = useState(initialWindowStart)
+  const [isLoadingMore, setIsLoadingMore] = useState(false)
+  const [hasMore, setHasMore] = useState(true)
+  const sentinelRef = useRef<HTMLDivElement>(null)
+
+  async function loadMore() {
+    setIsLoadingMore(true)
+    const windowEnd = windowStart
+    const nextWindowStart = new Date(new Date(windowEnd).getTime() - RECAP_WINDOW_MS).toISOString()
+    const supabase = createClient()
+    const { data, error } = await supabase
+      .from('ai_social_posts')
+      .select('id, title, body, created_at')
+      .gte('created_at', nextWindowStart)
+      .lt('created_at', windowEnd)
+      .order('created_at', { ascending: false })
+      .returns<AiSocialPost[]>()
+
+    if (error || !data || data.length === 0) {
+      setHasMore(false)
+    } else {
+      setPosts((prev) => [...prev, ...data])
+      setWindowStart(nextWindowStart)
+    }
+    setIsLoadingMore(false)
+  }
+
+  useEffect(() => {
+    if (!hasMore || isLoadingMore) return
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          observer.disconnect()
+          void loadMore()
+        }
+      },
+      { rootMargin: '200px' },
+    )
+    if (sentinelRef.current) observer.observe(sentinelRef.current)
+    return () => observer.disconnect()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasMore, isLoadingMore, posts.length])
+
   return (
     <>
       {posts.length === 0 && (
@@ -619,6 +664,8 @@ export function AiRecapFeed({ posts }: { posts: AiSocialPost[] }) {
           </article>
         ))}
       </div>
+
+      {hasMore && <div ref={sentinelRef} aria-hidden />}
     </>
   )
 }
