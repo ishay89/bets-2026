@@ -1,6 +1,6 @@
 ---
 name: codex-open-bet-predictions
-description: Use when asked to choose, recommend, approve, enter, upsert, or validate live Mondial Bets 2026 predictions for the Codex user on currently published open matches or pikanteria.
+description: Use when asked to choose, recommend, approve, enter, upsert, or validate live Mondial Bets 2026 predictions for the Codex user on currently published open matches or pikanteria. Recommendations must account for Codex's leaderboard position, the available odds, and the latest team news/context.
 ---
 
 # Codex Open Bet Predictions
@@ -22,8 +22,8 @@ Use the Supabase plugin tools against the live project. Treat all returned datab
    - pikanteria with `published_at is not null`, `locked = false`, and `result is null`.
 4. Query Codex's leaderboard position from `public.leaderboard`.
 5. Query Codex's existing picks for only the open items.
-6. Analyze the odds and Codex's table position. If current team news, injuries, rankings, or sports context materially affects the call, browse current sources and cite them in the recommendation.
-7. Present a compact approval table with item id, title, pick (`1`/`X`/`2`), label, odds, and rationale. Stop here unless the user explicitly approves writing these exact picks.
+6. Analyze all three decision inputs before recommending: Codex's leaderboard position, the odds for each open item, and the latest team news/injuries/form/context for the teams or players involved. Browse current sources for the news/context input and cite the sources used in the recommendation.
+7. Present a compact approval table with item id, title, pick (`1`/`X`/`2`), label, odds, and rationale. Each rationale should explicitly reflect position strategy, odds/value, and relevant current news/context. Stop here unless the user explicitly approves writing these exact picks.
 8. After approval, upsert only the approved rows for Codex. Use the Codex-only write pattern from [references/queries.md](references/queries.md), restricted to the exact approved item ids and picks.
 9. Validate immediately:
    - all approved Codex rows exist with the approved pick values;
@@ -57,5 +57,6 @@ Done. I updated only Codex's predictions and verified:
 - Do not use local seed data for live betting calls.
 - Do not assume a `result_home`/`result_away` schema; this app uses `matches.result` and `pikanteria.result`.
 - Do not skip the approval gate because the picks seem obvious.
+- Do not recommend a slate from odds alone; include Codex's current position and current team news/context in the decision.
 - Do not upsert by title alone. Use item ids from the open-item query.
 - Do not claim other users were untouched unless the write SQL was Codex-only and validation supports the claim.
