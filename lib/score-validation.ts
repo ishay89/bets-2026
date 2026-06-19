@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { fetchAllRows } from './data'
 
 export const SNAPSHOT_EPSILON = 0.005
 
@@ -328,8 +329,8 @@ export async function snapshotMatchDay(
     { data: matchDay },
     { data: matchPredRows },
     { data: pikAnswerRows },
-    { data: allPredRows },
-    { data: allPikaRows },
+    allPredRows,
+    allPikaRows,
     { data: preTournRows },
     { data: existingSnapshots },
   ] = await Promise.all([
@@ -345,8 +346,12 @@ export async function snapshotMatchDay(
       .select('user_id, points, pikanteria!inner(match_day_id)')
       .eq('pikanteria.match_day_id', matchDayId)
       .not('points', 'is', null),
-    supabase.from('predictions').select('user_id, points').not('points', 'is', null),
-    supabase.from('pikanteria_answers').select('user_id, points').not('points', 'is', null),
+    fetchAllRows<{ user_id: string; points: number | null }>(() =>
+      supabase.from('predictions').select('user_id, points').not('points', 'is', null),
+    ),
+    fetchAllRows<{ user_id: string; points: number | null }>(() =>
+      supabase.from('pikanteria_answers').select('user_id, points').not('points', 'is', null),
+    ),
     supabase.from('pre_tournament_picks').select('user_id, winner_points, top_scorer_points'),
     supabase.from('score_snapshots').select('id, user_id, match_day_id, day_points'),
   ])
@@ -359,8 +364,8 @@ export async function snapshotMatchDay(
     stage,
     matchPredRows: (matchPredRows ?? []) as { user_id: string; points: number | null }[],
     pikAnswerRows: (pikAnswerRows ?? []) as { user_id: string; points: number | null }[],
-    allPredRows: (allPredRows ?? []) as { user_id: string; points: number | null }[],
-    allPikaRows: (allPikaRows ?? []) as { user_id: string; points: number | null }[],
+    allPredRows,
+    allPikaRows,
     preTournRows: (preTournRows ?? []) as { user_id: string; winner_points: number | null; top_scorer_points: number | null }[],
     existingSnapshots: (existingSnapshots ?? []) as { id: string; user_id: string; match_day_id: string | null; day_points: number }[],
     now: new Date().toISOString(),

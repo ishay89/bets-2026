@@ -57,6 +57,27 @@ export type HistoryMatchDay = {
 
 // ── Query functions ──────────────────────────────────────────────────────────
 
+// PostgREST caps unranged selects at 1000 rows by default. predictions and
+// pikanteria_answers grow past that mid-tournament, so any unfiltered (or
+// loosely filtered) select over them must page through with .range() or rows
+// beyond the cutoff are silently dropped.
+export async function fetchAllRows<T>(
+  buildQuery: () => { range: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: { message: string } | null }> },
+  pageSize = 1000,
+): Promise<T[]> {
+  const rows: T[] = []
+  let from = 0
+  for (;;) {
+    const { data, error } = await buildQuery().range(from, from + pageSize - 1)
+    if (error) throw new Error(error.message)
+    if (!data || data.length === 0) break
+    rows.push(...data)
+    if (data.length < pageSize) break
+    from += pageSize
+  }
+  return rows
+}
+
 export async function getPublishedMatchDaysWithAll(supabase: Db): Promise<FullMatchDay[]> {
   const { data, error } = await supabase
     .from('match_days')
