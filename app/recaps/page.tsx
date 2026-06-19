@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation'
-import { AiRecapFeed, type AiSocialPost } from '@/components/board-feed'
+import { AiRecapFeed, RECAP_WINDOW_MS, type AiSocialPost } from '@/components/board-feed'
 import { BottomNav } from '@/components/bottom-nav'
 import { createClient } from '@/lib/supabase/server'
 
@@ -8,16 +8,23 @@ export const metadata = {
   description: 'AI match-day recaps and commentary',
 }
 
+// Module-level helper keeps the impure Date.now() out of the component body,
+// satisfying the react-compiler purity lint rule (mirrors app/h2h/[opponentId]).
+function nowMs(): number {
+  return Date.now()
+}
+
 export default async function RecapsPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
+  const windowStart = new Date(nowMs() - RECAP_WINDOW_MS).toISOString()
   const { data: aiPosts, error } = await supabase
     .from('ai_social_posts')
     .select('id, title, body, created_at')
+    .gte('created_at', windowStart)
     .order('created_at', { ascending: false })
-    .limit(50)
     .returns<AiSocialPost[]>()
 
   if (error) throw error
@@ -32,7 +39,7 @@ export default async function RecapsPage() {
       </header>
 
       <main className="px-4 pb-28">
-        <AiRecapFeed posts={aiPosts ?? []} />
+        <AiRecapFeed posts={aiPosts ?? []} initialWindowStart={windowStart} />
       </main>
 
       <BottomNav />

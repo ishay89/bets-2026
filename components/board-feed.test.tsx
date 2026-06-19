@@ -95,7 +95,9 @@ describe('BoardFeed', () => {
 
 describe('AiRecapFeed', () => {
   it('renders AI recap posts separately from the user board', () => {
-    const markup = renderToStaticMarkup(<AiRecapFeed posts={aiPosts} />)
+    const markup = renderToStaticMarkup(
+      <AiRecapFeed posts={aiPosts} initialWindowStart="2026-06-09T12:00:00.000Z" />,
+    )
 
     expect(markup).toContain('Opening line')
     expect(markup).toContain('Codex recap body')
