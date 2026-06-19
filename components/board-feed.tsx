@@ -600,14 +600,16 @@ function BoardTitle({ children }: {
 
 export function AiRecapFeed({ posts: initialPosts, initialWindowStart }: { posts: AiSocialPost[]; initialWindowStart: string }) {
   const [posts, setPosts] = useState(initialPosts)
-  const [windowStart, setWindowStart] = useState(initialWindowStart)
-  const [isLoadingMore, setIsLoadingMore] = useState(false)
   const [hasMore, setHasMore] = useState(true)
+  const windowStartRef = useRef(initialWindowStart)
+  const isLoadingRef = useRef(false)
   const sentinelRef = useRef<HTMLDivElement>(null)
 
   async function loadMore() {
-    setIsLoadingMore(true)
-    const windowEnd = windowStart
+    if (isLoadingRef.current) return
+    isLoadingRef.current = true
+
+    const windowEnd = windowStartRef.current
     const nextWindowStart = new Date(new Date(windowEnd).getTime() - RECAP_WINDOW_MS).toISOString()
     const supabase = createClient()
     const { data, error } = await supabase
@@ -621,14 +623,14 @@ export function AiRecapFeed({ posts: initialPosts, initialWindowStart }: { posts
     if (error || !data || data.length === 0) {
       setHasMore(false)
     } else {
+      windowStartRef.current = nextWindowStart
       setPosts((prev) => [...prev, ...data])
-      setWindowStart(nextWindowStart)
     }
-    setIsLoadingMore(false)
+    isLoadingRef.current = false
   }
 
   useEffect(() => {
-    if (!hasMore || isLoadingMore) return
+    if (!hasMore) return
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting) {
@@ -640,8 +642,7 @@ export function AiRecapFeed({ posts: initialPosts, initialWindowStart }: { posts
     )
     if (sentinelRef.current) observer.observe(sentinelRef.current)
     return () => observer.disconnect()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hasMore, isLoadingMore, posts.length])
+  }, [hasMore, posts.length])
 
   return (
     <>
