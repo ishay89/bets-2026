@@ -10,6 +10,7 @@ import {
   type GiphyBoardMedia,
 } from '@/lib/board-media'
 import { getAvatar } from '@/lib/display'
+import { RECAP_WINDOW_MS } from '@/lib/recaps'
 import { formatAppDateTime } from '@/lib/time'
 import type { AutomationStrategy } from '@/lib/types'
 
@@ -20,7 +21,6 @@ const UPLOAD_INPUT_ACCEPT = 'image/*,video/*'
 const ACCEPTED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif']
 const ACCEPTED_VIDEO_TYPES = ['video/mp4', 'video/webm', 'video/quicktime']
 const ACCEPTED_UPLOAD_TYPES = [...ACCEPTED_IMAGE_TYPES, ...ACCEPTED_VIDEO_TYPES]
-export const RECAP_WINDOW_MS = 3 * 24 * 60 * 60 * 1000
 
 interface BoardAuthor {
   display_name: string

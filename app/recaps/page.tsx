@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
-import { AiRecapFeed, RECAP_WINDOW_MS, type AiSocialPost } from '@/components/board-feed'
+import { AiRecapFeed, type AiSocialPost } from '@/components/board-feed'
 import { BottomNav } from '@/components/bottom-nav'
+import { RECAP_WINDOW_MS } from '@/lib/recaps'
 import { createClient } from '@/lib/supabase/server'
 
 export const metadata = {
