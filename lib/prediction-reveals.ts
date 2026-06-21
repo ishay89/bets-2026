@@ -23,13 +23,7 @@ export function sortAndRankRevealRows(
   rows: Omit<PlayerRevealRow, 'rank'>[],
 ): PlayerRevealRow[] {
   return rows
-    .toSorted((a, b) => {
-      // Players who never submitted a pick sink to the bottom, regardless of points.
-      const aMissing = a.pick === null ? 1 : 0
-      const bMissing = b.pick === null ? 1 : 0
-      if (aMissing !== bMissing) return aMissing - bMissing
-      return b.totalPoints - a.totalPoints
-    })
+    .toSorted((a, b) => b.totalPoints - a.totalPoints)
     .map((row, i) => ({ ...row, rank: i + 1 }))
 }
 
