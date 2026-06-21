@@ -39,7 +39,7 @@ async function main() {
 
   for (const day of days ?? []) {
     for (const m of (day.matches ?? []) as any[]) {
-      if (m.result != null || isMatchLocked(m)) continue
+      if (m.published_at == null || m.result != null || isMatchLocked(m)) continue
       console.log(
         'MATCH', m.id, day.date,
         JSON.stringify(m.home_team), 'vs', JSON.stringify(m.away_team),
@@ -48,7 +48,7 @@ async function main() {
       )
     }
     for (const p of (day.pikanteria ?? []) as any[]) {
-      if (p.result != null || p.locked) continue
+      if (p.published_at == null || p.result != null || p.locked) continue
       console.log(
         'PIKA', p.id, day.date, JSON.stringify(p.question),
         '1:', p.label_1, p.odds_1, 'X:', p.label_x, p.odds_x, '2:', p.label_2, p.odds_2,

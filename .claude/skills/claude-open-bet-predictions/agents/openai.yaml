@@ -1,4 +1,4 @@
 interface:
   display_name: "Claude Open Bet Predictions"
   short_description: "Draft and apply Claude-only open bet picks."
-  default_prompt: "Check the current open published bets, look at Claude's leaderboard position and the odds, recommend Claude picks, ask for approval, then upsert and verify only Claude rows."
+  default_prompt: "Check the current open published bets, factor in Claude's position, odds, and latest team news, recommend Claude picks, ask for approval, then upsert and verify only Claude rows."
