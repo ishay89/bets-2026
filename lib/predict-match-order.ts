@@ -1,9 +1,14 @@
 import type { FullMatchDay } from './data'
-import type { Match } from './types'
+import type { Match, Pikanteria } from './types'
 
 type MatchBucket = 0 | 1 | 2
 const LIVE_REFRESH_WINDOW_PAST_MS = 145 * 60 * 1000
 const LIVE_REFRESH_WINDOW_FUTURE_MS = 10 * 60 * 1000
+const MISSING_KICKOFF_TIME = Number.MAX_SAFE_INTEGER
+
+export type PredictDayBet =
+  | { kind: 'match'; bet: Match }
+  | { kind: 'pikanteria'; bet: Pikanteria }
 
 function matchBucket(match: Pick<Match, 'kickoff_time' | 'live_status' | 'result'>, now = Date.now()): MatchBucket {
   if (match.live_status === 'IN_PLAY' || match.live_status === 'PAUSED') return 0
@@ -16,6 +21,15 @@ function kickoffMs(match: Pick<Match, 'kickoff_time'>): number {
   return new Date(match.kickoff_time).getTime()
 }
 
+function itemKickoffMs(item: Match | Pikanteria): number {
+  if (!item.kickoff_time) return MISSING_KICKOFF_TIME
+  return new Date(item.kickoff_time).getTime()
+}
+
+function isLiveMatch(item: PredictDayBet): boolean {
+  return item.kind === 'match' && (item.bet.live_status === 'IN_PLAY' || item.bet.live_status === 'PAUSED')
+}
+
 export function sortPredictMatches<T extends Pick<Match, 'kickoff_time' | 'live_status' | 'result'>>(
   matches: readonly T[],
   now = Date.now(),
@@ -24,6 +38,17 @@ export function sortPredictMatches<T extends Pick<Match, 'kickoff_time' | 'live_
     const bucketDiff = matchBucket(a, now) - matchBucket(b, now)
     if (bucketDiff !== 0) return bucketDiff
     return kickoffMs(a) - kickoffMs(b)
+  })
+}
+
+export function sortPredictDayBets(day: FullMatchDay): PredictDayBet[] {
+  return [
+    ...day.matches.map((bet): PredictDayBet => ({ kind: 'match', bet })),
+    ...day.pikanteria.map((bet): PredictDayBet => ({ kind: 'pikanteria', bet })),
+  ].toSorted((a, b) => {
+    const liveDiff = Number(isLiveMatch(b)) - Number(isLiveMatch(a))
+    if (liveDiff !== 0) return liveDiff
+    return itemKickoffMs(a.bet) - itemKickoffMs(b.bet)
   })
 }
 

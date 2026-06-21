@@ -9,7 +9,7 @@ import type { CrowdTally } from '@/lib/crowd'
 import { toPct, matchInsight } from '@/lib/crowd'
 import { isMatchLocked, isPikanteriaLocked, matchLockMs } from '@/lib/lock'
 import { formatAppDate } from '@/lib/time'
-import { sortPredictMatches } from '@/lib/predict-match-order'
+import { sortPredictDayBets, sortPredictMatches } from '@/lib/predict-match-order'
 
 export const STAGE_LABELS: Record<string, string> = {
   group: 'Group Stage', r32: 'Round of 32', r16: 'Round of 16', qf: 'Quarter Finals',
@@ -54,8 +54,8 @@ export function MatchDaySection({
 }: MatchDaySectionProps) {
   const isToday = matchDay.date === today
   const stageLabel = STAGE_LABELS[matchDay.stage] ?? matchDay.stage
-  const pikaItems = matchDay.pikanteria
   const sortedMatches = sortPredictMatches(matchDay.matches)
+  const sortedBets = sortPredictDayBets(matchDay)
   const dateLabel = formatAppDate(matchDay.date)
   const allMatchesLocked = sortedMatches.length > 0 && sortedMatches.every(m => isMatchLocked(m))
   const earliestLockTime = sortedMatches.length > 0
@@ -92,69 +92,60 @@ export function MatchDaySection({
         ))}
       </div>
 
-      {sortedMatches.map(match => {
-        const tally = crowdTally[match.id] ?? { '1': 0, X: 0, '2': 0, total: 0 }
+      {sortedBets.map(item => {
+        if (item.kind === 'match') {
+          const match = item.bet
+          const tally = crowdTally[match.id] ?? { '1': 0, X: 0, '2': 0, total: 0 }
+          return (
+            <BetCard
+              key={`${match.id}:${predictionMap[match.id] ?? 'none'}`}
+              id={match.id}
+              variant="match"
+              options={matchOptions(match)}
+              result={match.result}
+              homeTeam={match.home_team}
+              awayTeam={match.away_team}
+              kickoffTime={match.kickoff_time}
+              stageLabel={stageLabel}
+              currentPick={predictionMap[match.id] ?? null}
+              isLocked={isMatchLocked(match)}
+              onSave={onSavePick}
+              crowd={toPct(tally)}
+              crowdTotal={tally.total}
+              insight={matchInsight({
+                tally,
+                odds: { '1': match.odds_home, X: match.odds_draw, '2': match.odds_away },
+                myPick: predictionMap[match.id] ?? null,
+              })}
+              myUserId={userId}
+              onReveal={onRevealMatch}
+              liveStatus={match.live_status}
+              liveScoreHome={match.live_score_home}
+              liveScoreAway={match.live_score_away}
+            />
+          )
+        }
+
+        const pika = item.bet
+        const tally = crowdPikTally[pika.id] ?? { '1': 0, X: 0, '2': 0, total: 0 }
         return (
           <BetCard
-            key={`${match.id}:${predictionMap[match.id] ?? 'none'}`}
-            id={match.id}
-            variant="match"
-            options={matchOptions(match)}
-            result={match.result}
-            homeTeam={match.home_team}
-            awayTeam={match.away_team}
-            kickoffTime={match.kickoff_time}
-            stageLabel={stageLabel}
-            currentPick={predictionMap[match.id] ?? null}
-            isLocked={isMatchLocked(match)}
-            onSave={onSavePick}
+            key={`${pika.id}:${answerMap[pika.id] ?? 'none'}`}
+            id={pika.id}
+            variant="pika"
+            question={pika.question}
+            options={pikaOptions(pika)}
+            result={pika.result}
+            currentPick={answerMap[pika.id] ?? null}
+            isLocked={isPikanteriaLocked(pika)}
+            onSave={onSaveAnswer}
             crowd={toPct(tally)}
             crowdTotal={tally.total}
-            insight={matchInsight({
-              tally,
-              odds: { '1': match.odds_home, X: match.odds_draw, '2': match.odds_away },
-              myPick: predictionMap[match.id] ?? null,
-            })}
             myUserId={userId}
-            onReveal={onRevealMatch}
-            liveStatus={match.live_status}
-            liveScoreHome={match.live_score_home}
-            liveScoreAway={match.live_score_away}
+            onReveal={onRevealPikanteria}
           />
         )
       })}
-
-      {pikaItems.length > 0 && (
-        <>
-          <div className="flex items-center gap-2 pt-2">
-            <span className="text-lg">🌶️</span>
-            <span className="text-[10px] font-bold uppercase tracking-[1.2px]"
-              style={{ color: 'var(--color-amber)' }}>
-              Pikanteria · {pikaItems.length} side bets
-            </span>
-          </div>
-          {pikaItems.map(item => {
-            const tally = crowdPikTally[item.id] ?? { '1': 0, X: 0, '2': 0, total: 0 }
-            return (
-              <BetCard
-                key={`${item.id}:${answerMap[item.id] ?? 'none'}`}
-                id={item.id}
-                variant="pika"
-                question={item.question}
-                options={pikaOptions(item)}
-                result={item.result}
-                currentPick={answerMap[item.id] ?? null}
-                isLocked={isPikanteriaLocked(item)}
-                onSave={onSaveAnswer}
-                crowd={toPct(tally)}
-                crowdTotal={tally.total}
-                myUserId={userId}
-                onReveal={onRevealPikanteria}
-              />
-            )
-          })}
-        </>
-      )}
     </div>
   )
 }

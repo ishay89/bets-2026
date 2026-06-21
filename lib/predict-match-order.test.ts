@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { getPredictLiveRefreshMatchIds, sortPredictMatchDays, sortPredictMatches } from './predict-match-order'
+import { getPredictLiveRefreshMatchIds, sortPredictDayBets, sortPredictMatchDays, sortPredictMatches } from './predict-match-order'
 import type { FullMatchDay } from './data'
-import type { Match } from './types'
+import type { Match, Pikanteria } from './types'
 
 const NOW = new Date('2026-06-17T18:00:00Z').getTime()
 
@@ -23,6 +23,25 @@ function match(overrides: Partial<Match> & { id: string; kickoff_time: string })
     live_score_away: overrides.live_score_away ?? null,
     live_minute: overrides.live_minute ?? null,
     live_synced_at: overrides.live_synced_at ?? null,
+  }
+}
+
+function pikanteria(overrides: Partial<Pikanteria> & { id: string; kickoff_time: string | null }): Pikanteria {
+  return {
+    id: overrides.id,
+    match_day_id: overrides.match_day_id ?? 'day-1',
+    question: overrides.question ?? 'Question?',
+    label_1: overrides.label_1 ?? 'Yes',
+    label_2: overrides.label_2 ?? 'No',
+    label_x: overrides.label_x ?? null,
+    odds_1: overrides.odds_1 ?? 1.8,
+    odds_2: overrides.odds_2 ?? 2.1,
+    odds_x: overrides.odds_x ?? null,
+    result: overrides.result ?? null,
+    locked: overrides.locked ?? false,
+    kickoff_time: overrides.kickoff_time,
+    created_at: overrides.created_at ?? '2026-06-17T08:00:00Z',
+    published_at: overrides.published_at ?? '2026-06-17T08:00:00Z',
   }
 }
 
@@ -54,6 +73,32 @@ describe('sortPredictMatches', () => {
       'upcoming-early',
       'upcoming-late',
       'played',
+    ])
+  })
+})
+
+describe('sortPredictDayBets', () => {
+  it('groups matches and pikanteria by kickoff while keeping live matches first', () => {
+    const matchDay = day({
+      id: 'mixed-day',
+      date: '2026-06-17',
+      matches: [
+        match({ id: 'played-early', kickoff_time: '2026-06-17T15:00:00Z', result: '1' }),
+        match({ id: 'live', kickoff_time: '2026-06-17T17:00:00Z', live_status: 'IN_PLAY' }),
+        match({ id: 'late-match', kickoff_time: '2026-06-17T21:00:00Z' }),
+      ],
+      pikanteria: [
+        pikanteria({ id: 'middle-pika', kickoff_time: '2026-06-17T19:00:00Z' }),
+        pikanteria({ id: 'early-pika', kickoff_time: '2026-06-17T16:00:00Z' }),
+      ],
+    })
+
+    expect(sortPredictDayBets(matchDay).map(item => `${item.kind}:${item.bet.id}`)).toEqual([
+      'match:live',
+      'match:played-early',
+      'pikanteria:early-pika',
+      'pikanteria:middle-pika',
+      'match:late-match',
     ])
   })
 })
