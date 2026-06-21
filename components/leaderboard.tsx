@@ -3,6 +3,12 @@ import React, { useState } from 'react'
 import Link from 'next/link'
 import type { LeaderboardEntry } from '@/lib/types'
 import { formatRankDelta, formatTodayMovementPoints } from '@/lib/leaderboard-movement'
+import {
+  hasLeaderboardResults,
+  sortLeaderboardEntries,
+  type LeaderboardScoreMode,
+  type LeaderboardSortMode,
+} from '@/lib/leaderboard-sort'
 
 interface Props {
   entries: LeaderboardEntry[]
@@ -51,6 +57,8 @@ const podiumOrder = [
   { idx: 0, color: podiumColors.gold, height: 118 },
   { idx: 2, color: podiumColors.bronze, height: 72 },
 ]
+const scoreModeOptions: LeaderboardScoreMode[] = ['total', 'today']
+const sortModeOptions: LeaderboardSortMode[] = ['score', 'successRate']
 
 function deltaColor(delta: number | null | undefined): string {
   return delta && delta < 0 ? 'var(--color-danger)' : 'var(--color-accent)'
@@ -72,14 +80,19 @@ export function Leaderboard({
   movementPointsLabel = 'today',
   todayEmptyMessage = 'No results scored yet for the latest day',
 }: Props) {
-  const [mode, setMode] = useState<'total' | 'today'>('total')
+  const [scoreMode, setScoreMode] = useState<LeaderboardScoreMode>('total')
+  const [sortMode, setSortMode] = useState<LeaderboardSortMode>('score')
 
-  const sorted = mode === 'today'
-    ? entries.toSorted((a, b) => b.today_points - a.today_points)
-    : entries
+  const sorted = sortLeaderboardEntries(entries, scoreMode, sortMode)
 
   const score = (e: LeaderboardEntry) =>
-    mode === 'today' ? e.today_points : e.total_points
+    scoreMode === 'today' ? e.today_points : e.total_points
+
+  const primaryMetric = (entry: LeaderboardEntry) =>
+    sortMode === 'successRate' ? successLabel(entry, scoreMode) : score(entry).toFixed(2)
+
+  const secondaryMetric = (entry: LeaderboardEntry) =>
+    sortMode === 'successRate' ? `${score(entry).toFixed(2)} pts` : successLabel(entry, scoreMode)
 
   const top3 = sorted.slice(0, 3)
   const rest = sorted.slice(3)
@@ -87,7 +100,7 @@ export function Leaderboard({
   // Fines per the rules: the player finishing LAST pays ₪200, second-to-last
   // pays ₪100. Automated baselines are not eligible for prizes or fines, so
   // the fines target the bottom two human players.
-  const humans = sorted.filter(e => !isAutomated(e))
+  const humans = sortMode === 'score' ? sorted.filter(e => !isAutomated(e)) : []
   const fineByEntryId = new Map<string, string>()
   if (humans.length >= 2) {
     fineByEntryId.set(humans[humans.length - 1].id, '+₪200')
@@ -95,12 +108,13 @@ export function Leaderboard({
   }
   const firstDangerIndex = rest.findIndex(e => fineByEntryId.has(e.id))
 
-  const hasToday = entries.some(e => e.today_points > 0)
+  const hasToday = hasLeaderboardResults(entries, 'today')
+  const showScoreRankDetails = scoreMode === 'total' && sortMode === 'score'
 
   return (
     <div className="pb-28 px-4">
-      {/* Mode toggle */}
-      <div className="flex justify-center mb-5 mt-1">
+      {/* Mode toggles */}
+      <div className="mb-5 mt-1 flex flex-col items-center gap-2">
         <div
           className="relative flex rounded-full p-[3px]"
           style={{ background: 'var(--color-elev)', border: '1px solid var(--border-base)' }}
@@ -110,26 +124,61 @@ export function Leaderboard({
             className="absolute top-[3px] bottom-[3px] rounded-full transition-all duration-200"
             style={{
               width: 'calc(50% - 3px)',
-              left: mode === 'total' ? '3px' : 'calc(50%)',
+              left: scoreMode === 'total' ? '3px' : 'calc(50%)',
               background: 'var(--color-accent)',
             }}
           />
-          {(['total', 'today'] as const).map(m => (
+          {scoreModeOptions.map(m => (
             <button
               key={m}
               type="button"
-              onClick={() => setMode(m)}
+              aria-pressed={scoreMode === m}
+              onClick={() => setScoreMode(m)}
               className="relative z-10 px-5 py-1.5 rounded-full text-[11px] font-bold tracking-wide transition-colors duration-150"
-              style={{ color: mode === m ? '#fff' : 'var(--color-muted)', minWidth: 72 }}
+              style={{ color: scoreMode === m ? '#fff' : 'var(--color-muted)', minWidth: 72 }}
             >
               {m === 'total' ? 'Total' : todayModeLabel}
             </button>
           ))}
         </div>
+
+        <div className="flex items-center gap-2">
+          <span
+            className="text-[10px] font-bold uppercase"
+            style={{ color: 'var(--color-muted)', letterSpacing: '0.08em' }}
+          >
+            Rank by
+          </span>
+          <div
+            className="relative flex rounded-full p-[3px]"
+            style={{ background: 'var(--color-elev)', border: '1px solid var(--border-base)' }}
+          >
+            <div
+              className="absolute top-[3px] bottom-[3px] rounded-full transition-all duration-200"
+              style={{
+                width: 'calc(50% - 3px)',
+                left: sortMode === 'score' ? '3px' : 'calc(50%)',
+                background: 'var(--color-accent)',
+              }}
+            />
+            {sortModeOptions.map(m => (
+              <button
+                key={m}
+                type="button"
+                aria-pressed={sortMode === m}
+                onClick={() => setSortMode(m)}
+                className="relative z-10 px-4 py-1.5 rounded-full text-[11px] font-bold tracking-wide transition-colors duration-150"
+                style={{ color: sortMode === m ? '#fff' : 'var(--color-muted)', minWidth: 82 }}
+              >
+                {m === 'score' ? 'Score' : 'Success'}
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
 
       {/* No today data notice */}
-      {mode === 'today' && !hasToday && (
+      {scoreMode === 'today' && !hasToday && (
         <div className="text-center text-[12px] font-semibold mb-4" style={{ color: 'var(--color-muted)' }}>
           {todayEmptyMessage}
         </div>
@@ -142,9 +191,9 @@ export function Leaderboard({
             const entry = top3[idx]
             if (!entry) return null
             const rank = idx + 1
-            const displayRank = mode === 'total' && entry.current_rank ? entry.current_rank : rank
-            const rankDelta = mode === 'total' ? formatRankDelta(entry.rank_delta) : null
-            const todayMovement = mode === 'total'
+            const displayRank = showScoreRankDetails && entry.current_rank ? entry.current_rank : rank
+            const rankDelta = showScoreRankDetails ? formatRankDelta(entry.rank_delta) : null
+            const todayMovement = showScoreRankDetails
               ? formatTodayMovementPoints(entry.today_points, movementPointsLabel)
               : null
             const av = getAvatar(entry)
@@ -160,10 +209,10 @@ export function Leaderboard({
                   <div className="font-extrabold text-[13px] text-text truncate">{entry.display_name}</div>
                 </Link>
                 <div className="font-mono text-[11px] text-sub mb-1" style={{ fontFamily: 'var(--font-mono)' }}>
-                  {score(entry).toFixed(2)}
+                  {primaryMetric(entry)}
                 </div>
                 <div className="text-[10px] font-bold text-sub mb-1" style={{ fontFamily: 'var(--font-mono)' }}>
-                  {successLabel(entry, mode)}
+                  {secondaryMetric(entry)}
                 </div>
                 {(rankDelta || todayMovement) && (
                   <div className="mb-1 flex min-h-[16px] items-center justify-center gap-1.5 text-[10px] font-bold">
@@ -201,9 +250,9 @@ export function Leaderboard({
       <div className="rounded-b-xl overflow-hidden">
         {rest.map((entry, i) => {
           const rank = i + 4
-          const displayRank = mode === 'total' && entry.current_rank ? entry.current_rank : rank
-          const rankDelta = mode === 'total' ? formatRankDelta(entry.rank_delta) : null
-          const todayMovement = mode === 'total'
+          const displayRank = showScoreRankDetails && entry.current_rank ? entry.current_rank : rank
+          const rankDelta = showScoreRankDetails ? formatRankDelta(entry.rank_delta) : null
+          const todayMovement = showScoreRankDetails
             ? formatTodayMovementPoints(entry.today_points, movementPointsLabel)
             : null
           const isMe = entry.id === currentUserId
@@ -288,12 +337,16 @@ export function Leaderboard({
                   </Link>
                 )}
                 <div
-                  className="min-w-[72px] text-right font-bold text-[13px]"
-                  style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-text)' }}
+                  className="text-right font-bold text-[13px]"
+                  style={{
+                    fontFamily: 'var(--font-mono)',
+                    color: 'var(--color-text)',
+                    minWidth: sortMode === 'successRate' ? 96 : 72,
+                  }}
                 >
-                  <div>{score(entry).toFixed(2)}</div>
+                  <div>{primaryMetric(entry)}</div>
                   <div className="text-[10px] font-semibold text-sub">
-                    {successLabel(entry, mode)}
+                    {secondaryMetric(entry)}
                   </div>
                   {todayMovement && (
                     <div className="text-[10px] font-semibold text-sub">{todayMovement}</div>
