@@ -9,7 +9,9 @@ export type PlayerRevealRow = {
   isMonkey: boolean
   automationStrategy: AutomationStrategy | null
   avatarEmoji: string | null
-  pick: string
+  /** The player's pick, or `null` when an approved player never submitted one
+   * (they forgot). Null rows are sorted to the bottom and shown as "didn't bet". */
+  pick: string | null
   /** Odds for this player's pick. Null for match/pikanteria rows — BetCard fills these in
    * client-side from its own `options`. Populated server-side for futures rows. */
   odds: number | null
@@ -21,20 +23,67 @@ export function sortAndRankRevealRows(
   rows: Omit<PlayerRevealRow, 'rank'>[],
 ): PlayerRevealRow[] {
   return rows
-    .toSorted((a, b) => b.totalPoints - a.totalPoints)
+    .toSorted((a, b) => {
+      // Players who never submitted a pick sink to the bottom, regardless of points.
+      const aMissing = a.pick === null ? 1 : 0
+      const bMissing = b.pick === null ? 1 : 0
+      if (aMissing !== bMissing) return aMissing - bMissing
+      return b.totalPoints - a.totalPoints
+    })
     .map((row, i) => ({ ...row, rank: i + 1 }))
 }
 
 export type PickDistributionSegment = { pick: string; count: number; pct: number }
 
-/** Groups reveal rows by `pick`, returning counts and rounded percentages, sorted by count descending. */
+/** Groups reveal rows by `pick`, returning counts and rounded percentages, sorted
+ * by count descending. Rows with no pick (forgot) are excluded — the distribution
+ * is over players who actually bet. */
 export function computePickDistribution(rows: PlayerRevealRow[]): PickDistributionSegment[] {
   const counts = new Map<string, number>()
-  for (const row of rows) counts.set(row.pick, (counts.get(row.pick) ?? 0) + 1)
-  const total = rows.length
+  let total = 0
+  for (const row of rows) {
+    if (row.pick === null) continue
+    counts.set(row.pick, (counts.get(row.pick) ?? 0) + 1)
+    total++
+  }
+  if (total === 0) return []
   return Array.from(counts.entries())
     .map(([pick, count]) => ({ pick, count, pct: Math.round((count / total) * 100) }))
     .sort((a, b) => b.count - a.count)
+}
+
+/** Approved player who is expected to bet on open items. Monkeys (benchmark bots)
+ * are excluded — "forgetting" is a human/AI concept, matching the admin
+ * missing-picks page universe. */
+export type ApprovedPlayer = {
+  id: string
+  display_name: string
+  is_monkey: boolean
+  automation_strategy: AutomationStrategy | null
+  avatar_emoji: string | null
+}
+
+/** Appends a `pick: null` row for every approved player who is missing from
+ * `pickedRows`, so the reveal always shows everyone — including who forgot. */
+export function appendMissingPlayers(
+  pickedRows: Omit<PlayerRevealRow, 'rank'>[],
+  approvedPlayers: ApprovedPlayer[],
+  pointsMap: Record<string, number>,
+): Omit<PlayerRevealRow, 'rank'>[] {
+  const pickedIds = new Set(pickedRows.map(r => r.userId))
+  const missing: Omit<PlayerRevealRow, 'rank'>[] = approvedPlayers
+    .filter(p => !pickedIds.has(p.id))
+    .map(p => ({
+      userId: p.id,
+      displayName: p.display_name,
+      isMonkey: p.is_monkey,
+      automationStrategy: p.automation_strategy,
+      avatarEmoji: p.avatar_emoji,
+      pick: null,
+      odds: null,
+      totalPoints: pointsMap[p.id] ?? 0,
+    }))
+  return [...pickedRows, ...missing]
 }
 
 type Db = SupabaseClient<Database>
@@ -64,6 +113,17 @@ async function buildPointsMap(supabase: Db): Promise<Record<string, number>> {
   return Object.fromEntries((data ?? []).map(r => [r.id as string, Number(r.total_points) || 0]))
 }
 
+/** Every approved player expected to submit picks (humans + AI, excluding
+ * benchmark monkeys) — the universe used to surface who forgot to bet. */
+async function fetchApprovedPlayers(supabase: Db): Promise<ApprovedPlayer[]> {
+  const { data } = await supabase
+    .from('users')
+    .select('id, display_name, is_monkey, automation_strategy, avatar_emoji')
+    .eq('status', 'approved')
+    .eq('is_monkey', false)
+  return (data ?? []) as unknown as ApprovedPlayer[]
+}
+
 export async function getMatchPredictionsReveal(
   supabase: Db,
   matchId: string,
@@ -73,18 +133,19 @@ export async function getMatchPredictionsReveal(
   } catch {
     return []
   }
-  const [{ data: predData }, pointsMap] = await Promise.all([
+  const [{ data: predData }, approvedPlayers, pointsMap] = await Promise.all([
     supabase
       .from('predictions')
       .select('pick, user_id, users(display_name, is_monkey, automation_strategy, avatar_emoji, status)')
       .eq('match_id', matchId),
+    fetchApprovedPlayers(supabase),
     buildPointsMap(supabase),
   ])
   if (!predData) return []
-  const unranked: Omit<PlayerRevealRow, 'rank'>[] = []
+  const picked: Omit<PlayerRevealRow, 'rank'>[] = []
   for (const prediction of predData as unknown as PredRaw[]) {
     if (prediction.users.status !== 'approved') continue
-    unranked.push({
+    picked.push({
       userId: prediction.user_id,
       displayName: prediction.users.display_name,
       isMonkey: prediction.users.is_monkey,
@@ -95,7 +156,7 @@ export async function getMatchPredictionsReveal(
       totalPoints: pointsMap[prediction.user_id] ?? 0,
     })
   }
-  return sortAndRankRevealRows(unranked)
+  return sortAndRankRevealRows(appendMissingPlayers(picked, approvedPlayers, pointsMap))
 }
 
 type FuturesRaw = {
@@ -145,18 +206,19 @@ export async function getPikanteriaAnswersReveal(
   } catch {
     return []
   }
-  const [{ data: answerData }, pointsMap] = await Promise.all([
+  const [{ data: answerData }, approvedPlayers, pointsMap] = await Promise.all([
     supabase
       .from('pikanteria_answers')
       .select('pick, user_id, users(display_name, is_monkey, automation_strategy, avatar_emoji, status)')
       .eq('pikanteria_id', pikanteriaId),
+    fetchApprovedPlayers(supabase),
     buildPointsMap(supabase),
   ])
   if (!answerData) return []
-  const unranked: Omit<PlayerRevealRow, 'rank'>[] = []
+  const picked: Omit<PlayerRevealRow, 'rank'>[] = []
   for (const answer of answerData as unknown as AnswerRaw[]) {
     if (answer.users.status !== 'approved') continue
-    unranked.push({
+    picked.push({
       userId: answer.user_id,
       displayName: answer.users.display_name,
       isMonkey: answer.users.is_monkey,
@@ -167,5 +229,5 @@ export async function getPikanteriaAnswersReveal(
       totalPoints: pointsMap[answer.user_id] ?? 0,
     })
   }
-  return sortAndRankRevealRows(unranked)
+  return sortAndRankRevealRows(appendMissingPlayers(picked, approvedPlayers, pointsMap))
 }

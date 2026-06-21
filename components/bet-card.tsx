@@ -265,7 +265,7 @@ export function BetCard(props: Props) {
       {state.sheetOpen && state.revealRows !== null && myUserId && (
         <PredictionRevealSheet
           title={variant === 'match' ? `${homeTeam} vs ${awayTeam} · Picks` : (question ?? 'Picks')}
-          rows={state.revealRows.map(row => ({ ...row, odds: oddsByPick[row.pick as Pick] ?? null }))}
+          rows={state.revealRows.map(row => ({ ...row, odds: row.pick === null ? null : (oddsByPick[row.pick as Pick] ?? null) }))}
           myUserId={myUserId}
           optionLabels={variant === 'pika' ? Object.fromEntries(options.map(o => [o.pick, o.label])) : undefined}
           result={result}

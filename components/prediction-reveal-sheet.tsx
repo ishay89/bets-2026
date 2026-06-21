@@ -22,6 +22,7 @@ export function PredictionRevealSheet({ title, rows, myUserId, optionLabels, res
 
   const optionKeys = optionLabels ? Object.keys(optionLabels) : undefined
   const segments = computePickDistribution(rows)
+  const missingCount = rows.reduce((n, r) => (r.pick === null ? n + 1 : n), 0)
   const colorByPick: Record<string, string> = Object.fromEntries(
     segments.map((s, i) => [s.pick, pickColor(s.pick, i, optionLabels, optionKeys)]),
   )
@@ -65,6 +66,20 @@ export function PredictionRevealSheet({ title, rows, myUserId, optionLabels, res
         {/* Pick distribution */}
         <PickDistributionChart segments={segments} colorByPick={colorByPick} optionLabels={optionLabels} />
 
+        {missingCount > 0 && (
+          <div
+            style={{
+              textAlign: 'center',
+              fontFamily: 'var(--font-mono)',
+              fontSize: 12,
+              color: 'var(--color-muted)',
+              padding: '0 16px 8px',
+            }}
+          >
+            🕳️ {missingCount} {missingCount === 1 ? 'player' : 'players'} didn&apos;t bet
+          </div>
+        )}
+
         {/* Player list */}
         {rows.length === 0 ? (
           <div className="prediction-reveal-empty">
@@ -75,8 +90,11 @@ export function PredictionRevealSheet({ title, rows, myUserId, optionLabels, res
           <div className="prediction-reveal-list">
             {rows.map((row, i) => {
               const isMe = row.userId === myUserId
-              const pickLabel = optionLabels ? (optionLabels[row.pick] ?? row.pick) : row.pick
-              const pickColorValue = colorByPick[row.pick]
+              const didNotBet = row.pick === null
+              const pickLabel = didNotBet
+                ? "Didn't bet"
+                : (optionLabels ? (optionLabels[row.pick!] ?? row.pick!) : row.pick!)
+              const pickColorValue = didNotBet ? 'var(--color-muted)' : colorByPick[row.pick!]
               const automationLabel = getAutomationLabel({
                 is_monkey: row.isMonkey,
                 automation_strategy: row.automationStrategy,
@@ -90,6 +108,7 @@ export function PredictionRevealSheet({ title, rows, myUserId, optionLabels, res
                     borderBottom: i < rows.length - 1 ? '1px solid var(--border-subtle)' : 'none',
                     background: isMe ? 'var(--color-accent-soft)' : 'transparent',
                     borderLeft: isMe ? '3px solid var(--color-accent)' : '3px solid transparent',
+                    opacity: didNotBet ? 0.6 : 1,
                   }}
                 >
                   {/* Avatar */}
@@ -120,12 +139,15 @@ export function PredictionRevealSheet({ title, rows, myUserId, optionLabels, res
                   {/* Pick label, odds, and result verdict */}
                   <div className="prediction-reveal-pick-wrap">
                     <div className="flex items-center gap-1">
-                      {result != null && (
+                      {result != null && !didNotBet && (
                         <span style={{ fontSize: 12, color: row.pick === result ? 'var(--color-accent)' : 'var(--color-danger)' }}>
                           {row.pick === result ? '✓' : '✗'}
                         </span>
                       )}
-                      <div className="prediction-reveal-pick" style={{ color: pickColorValue }}>
+                      <div
+                        className="prediction-reveal-pick"
+                        style={{ color: pickColorValue, fontStyle: didNotBet ? 'italic' : 'normal' }}
+                      >
                         {pickLabel}
                       </div>
                     </div>
