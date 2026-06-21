@@ -46,25 +46,16 @@ describe('sortAndRankRevealRows', () => {
     expect(result[1].rank).toBe(2)
   })
 
-  it('sinks players who did not bet (pick null) to the bottom regardless of points', () => {
+  it('keeps players who did not bet (pick null) in their points-ranked position', () => {
     const rows = [
       { ...base, userId: 'a', displayName: 'Alice', pick: null, totalPoints: 100 },
       { ...base, userId: 'b', displayName: 'Bob', pick: '1', totalPoints: 5 },
       { ...base, userId: 'c', displayName: 'Carol', pick: 'X', totalPoints: 50 },
     ]
     const result = sortAndRankRevealRows(rows)
-    expect(result.map(r => r.userId)).toEqual(['c', 'b', 'a'])
-    expect(result[2]).toMatchObject({ userId: 'a', pick: null, rank: 3 })
-  })
-
-  it('orders multiple non-bettors among themselves by points, still below bettors', () => {
-    const rows = [
-      { ...base, userId: 'a', displayName: 'A', pick: null, totalPoints: 10 },
-      { ...base, userId: 'b', displayName: 'B', pick: null, totalPoints: 40 },
-      { ...base, userId: 'c', displayName: 'C', pick: '1', totalPoints: 1 },
-    ]
-    const result = sortAndRankRevealRows(rows)
-    expect(result.map(r => r.userId)).toEqual(['c', 'b', 'a'])
+    // Non-bettors are sorted by points just like everyone else, not pushed down.
+    expect(result.map(r => r.userId)).toEqual(['a', 'c', 'b'])
+    expect(result[0]).toMatchObject({ userId: 'a', pick: null, rank: 1 })
   })
 })
 

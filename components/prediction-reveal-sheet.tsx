@@ -76,7 +76,7 @@ export function PredictionRevealSheet({ title, rows, myUserId, optionLabels, res
               padding: '0 16px 8px',
             }}
           >
-            🕳️ {missingCount} {missingCount === 1 ? 'player' : 'players'} didn&apos;t bet
+            {`🕳️ ${missingCount} ${missingCount === 1 ? 'player' : 'players'} didn't bet`}
           </div>
         )}
 
