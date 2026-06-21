@@ -38,58 +38,44 @@ If the result is empty, stop and report "No eligible matches to update."
 Use Chrome browser tools in this exact sequence:
 
 1. **Get tab context** — call `mcp__claude-in-chrome__tabs_context_mcp` with `createIfEmpty: true`.
-2. **Navigate** to:
+2. **Navigate** to the league page **without** a `/היום/` (today) segment in the path — the today-scoped URL defaults the main grid to "group winner" outright bets, not match 1X2 odds:
    ```
-   https://www.winner.co.il/%D7%9E%D7%A9%D7%97%D7%A7%D7%99%D7%9D/%D7%95%D7%95%D7%99%D7%A0%D7%A8-%D7%9C%D7%99%D7%99%D7%9F/%D7%94%D7%99%D7%95%D7%9D/%D7%91%D7%99%D7%A0%D7%9C%D7%90%D7%95%D7%9E%D7%99/%D7%91%D7%99%D7%A0%D7%9C%D7%90%D7%95%D7%9E%D7%99$%D7%9E%D7%95%D7%A0%D7%93%D7%99%D7%90%D7%9C%202026
+   https://www.winner.co.il/%D7%9E%D7%A9%D7%97%D7%A7%D7%99%D7%9D/%D7%95%D7%95%D7%99%D7%A0%D7%A8-%D7%9C%D7%99%D7%99%D7%9F/%D7%91%D7%99%D7%A0%D7%9C%D7%90%D7%95%D7%9E%D7%99/%D7%91%D7%99%D7%A0%D7%9C%D7%90%D7%95%D7%9E%D7%99$%D7%9E%D7%95%D7%A0%D7%93%D7%99%D7%90%D7%9C%202026
    ```
-3. **Click "All Days" and wait** via JS:
+   On a fresh load of this URL, the main grid (`.market-list-container`) already carries the `isAllDaysTab` class and its `.market.market-01` elements are the World Cup 1X2 full-time markets by default — no "All Days" click or market filter click is needed (the page's old `.filter-container` / `.filter-container-selected` filter UI now only controls a 3-item "Expert Tips" widget, not the main grid, and clicking around in it left the grid showing matches from unrelated foreign leagues mixed in by kickoff time). Scrape immediately after load, before clicking anything else on the page.
+3. **Scrape all markets and verify they're Mondial 2026, not contaminated by other leagues** via JS (wrapped in an IIFE so repeated runs in the same console don't collide on `const`/`let` names):
    ```js
-   Array.from(document.querySelectorAll('.tab.nav-link'))
-     .find(el => el.innerText?.trim() === 'כל הימים')?.click();
-   await new Promise(r => setTimeout(r, 1500));
-   'all days clicked';
+   (function() {
+     const clean = s => s.replace(/[‎‏‪-‮]/g, '').trim();
+     const markets = document.querySelectorAll('.market.market-01');
+     const rows = [];
+     const seen = new Set();
+     for (const market of markets) {
+       const outcomes = market.querySelectorAll('.outcome-container');
+       if (outcomes.length < 3) continue;
+       // League/market-type check: each market's own innerText carries its league name and
+       // market-type label inline (there is no separate breadcrumb ancestor element on the
+       // current page). Require both the league name and the exact 1X2-full-time market type,
+       // since other Mondial 2026 sub-markets (e.g. player goal-matchup props) also mention
+       // "מונדיאל 2026" but aren't the main 1X2 market and can have a misleading "X" outcome.
+       const full = clean(market.innerText);
+       if (!full.includes('מונדיאל 2026')) continue;
+       if (!full.includes('1X2 - תוצאת סיום')) continue;
+       const lines = el => clean(el.innerText).split('\n').map(s => s.trim()).filter(Boolean);
+       const h = lines(outcomes[0]), x = lines(outcomes[1]), a = lines(outcomes[2]);
+       // Safety check: middle outcome must be labelled "X" (confirms 1X2 market)
+       if (x[0] !== 'X') continue;
+       const key = h[0] + '|' + a[0];
+       if (seen.has(key)) continue; // dedupe vs Expert Tips widget duplicates
+       seen.add(key);
+       rows.push({ home_he: h[0], home_odds: parseFloat(h[1]),
+                   draw_odds: parseFloat(x[1]),
+                   away_odds: parseFloat(a[1]), away_he: a[0] });
+     }
+     return JSON.stringify(rows);
+   })();
    ```
-4. **Click the correct 1X2 Full Time filter and verify**. The page has multiple 1X2 filters (full-time, first half, second half) — strip RTL bidi marks before matching and confirm the right one got selected:
-   ```js
-   const clean = s => s.replace(/[‎‏‪-‮]/g, '').trim();
-   // Find: contains "1X2", "תוצאת סיום", "ללא הארכות", does NOT contain "מחצית"
-   const target = Array.from(document.querySelectorAll('.filter-container'))
-     .find(el => {
-       const t = clean(el.innerText);
-       return t.includes('1X2') && t.includes('תוצאת סיום') && t.includes('ללא הארכות') && !t.includes('מחצית');
-     });
-   if (!target) throw new Error('1X2 full-time filter not found');
-   target.click();
-   await new Promise(r => setTimeout(r, 1500));
-   // Verify the right filter is now selected
-   const selected = document.querySelector('.filter-container-selected');
-   const selText = clean(selected?.innerText ?? '');
-   if (!selText.includes('תוצאת סיום') || !selText.includes('ללא הארכות') || selText.includes('מחצית')) {
-     throw new Error('Wrong filter selected after click: ' + selText);
-   }
-   'filter confirmed: ' + selText.slice(0, 60);
-   ```
-   **If the verification throws**, do not proceed — report the error and stop.
-5. **Scrape all markets** via JS:
-   ```js
-   const clean = s => s.replace(/[‎‏‪-‮]/g, '').trim();
-   const markets = document.querySelectorAll('.market.market-01');
-   const rows = [];
-   for (const market of markets) {
-     const outcomes = market.querySelectorAll('.outcome-container');
-     if (outcomes.length < 3) continue;
-     const il = market.closest('.item-leagues');
-     if (!il) continue; // skip mobile duplicates
-     const lines = el => clean(el.innerText).split('\n').map(s => s.trim()).filter(Boolean);
-     const h = lines(outcomes[0]), x = lines(outcomes[1]), a = lines(outcomes[2]);
-     // Safety check: middle outcome must be labelled "X" (confirms 1X2 market)
-     if (x[0] !== 'X') continue;
-     rows.push({ home_he: h[0], home_odds: parseFloat(h[1]),
-                 draw_odds: parseFloat(x[1]),
-                 away_odds: parseFloat(a[1]), away_he: a[0] });
-   }
-   JSON.stringify(rows);
-   ```
+   If `rows` looks suspiciously short (fewer matches than expected from Step 1) that's normal — winner.co.il only opens betting lines progressively as kickoff approaches, not for all matches at once. Only update what's actually scraped.
 
 ### Step 3 — Match Hebrew names to DB rows
 
