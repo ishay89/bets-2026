@@ -27,7 +27,9 @@ const STALE_MS = 60 * 1000
 
 // Check whether any published match in the live window has stale or absent
 // live data. Returns false quickly (one cheap indexed DB read) so pages pay no
-// latency penalty when no matches are active.
+// latency penalty when no matches are active. Matches already marked FINISHED
+// are excluded — once a game is over there is nothing left to live-sync, so a
+// finished-but-stale row should not keep waking the sync up.
 async function needsLiveSync(): Promise<boolean> {
   const now = new Date()
   const windowStart    = new Date(now.getTime() - WINDOW_PAST_MS).toISOString()
@@ -41,6 +43,7 @@ async function needsLiveSync(): Promise<boolean> {
     .gte('kickoff_time', windowStart)
     .lte('kickoff_time', windowEnd)
     .not('published_at', 'is', null)
+    .or('live_status.is.null,live_status.neq.FINISHED')
     .or(`live_synced_at.is.null,live_synced_at.lt.${staleThreshold}`)
     .limit(1)
     .maybeSingle()
