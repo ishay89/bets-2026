@@ -27,11 +27,14 @@ export function PredictLiveRefresh({ matchIds }: { matchIds: string[] }) {
     async function syncAndRefresh() {
       if (document.visibilityState !== 'visible') return
       try {
-        await fetch('/api/live-sync', { cache: 'no-store' })
+        const res = await fetch('/api/live-sync', { cache: 'no-store' })
+        const { changed } = await res.json() as { changed?: boolean }
+        // Only re-render the page when the sync actually wrote new live data —
+        // the Supabase Realtime subscription below already covers updates
+        // triggered by other users' syncs, so this poll is just a fallback.
+        if (changed) refreshSoon()
       } catch {
         // A failed live sync should not make the prediction page noisy.
-      } finally {
-        refreshSoon()
       }
     }
 

@@ -51,7 +51,7 @@ async function needsLiveSync(): Promise<boolean> {
   return data !== null
 }
 
-async function syncLiveScores(config: FootballDataConfig): Promise<void> {
+async function syncLiveScores(config: FootballDataConfig): Promise<boolean> {
   const supabase = createAdminClient()
 
   // One API call fetches the entire WC season (~80 matches). Filtering to the
@@ -68,7 +68,7 @@ async function syncLiveScores(config: FootballDataConfig): Promise<void> {
     return ms >= windowStart && ms <= windowEnd
   })
 
-  if (liveWindowMatches.length === 0) return
+  if (liveWindowMatches.length === 0) return false
 
   const syncedAt = now.toISOString()
   let anyFinished = false
@@ -102,6 +102,8 @@ async function syncLiveScores(config: FootballDataConfig): Promise<void> {
   revalidatePath('/predict')
   revalidatePath('/board')
   revalidatePath('/leaderboard')
+
+  return true
 }
 
 // Clear any matches that are stuck in IN_PLAY/PAUSED but whose kickoff is old
@@ -118,16 +120,20 @@ async function clearStuckLiveMatches(): Promise<void> {
     .lt('kickoff_time', cutoff)
 }
 
-// Public entry point for page after() callbacks. Catches all errors so a sync
-// failure never surfaces to users (the response is already sent at this point).
-export async function maybeSyncLiveScores(): Promise<void> {
+// Public entry point for page after() callbacks and the client poller. Catches
+// all errors so a sync failure never surfaces to users (the response is
+// already sent at this point for the after() case). Returns whether a sync
+// actually wrote new live data, so callers can skip refreshing when nothing
+// changed.
+export async function maybeSyncLiveScores(): Promise<boolean> {
   const config = getFootballDataConfig()
-  if (!config) return
+  if (!config) return false
   try {
     await clearStuckLiveMatches()
-    if (!await needsLiveSync()) return
-    await syncLiveScores(config)
+    if (!await needsLiveSync()) return false
+    return await syncLiveScores(config)
   } catch (err) {
     console.error('[live-sync] background sync error', err)
+    return false
   }
 }
