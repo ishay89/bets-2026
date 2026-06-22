@@ -26,6 +26,6 @@ export async function GET() {
     return NextResponse.json({ ok: false, error: 'forbidden' }, { status: 403 })
   }
 
-  await maybeSyncLiveScores()
-  return NextResponse.json({ ok: true })
+  const changed = await maybeSyncLiveScores()
+  return NextResponse.json({ ok: true, changed })
 }
