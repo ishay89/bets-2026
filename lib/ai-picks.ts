@@ -1,8 +1,8 @@
 import type { Pick } from './types'
 
 // AI-controlled dummy players (see supabase/migrations/20260608000000_ai_dummy_users.sql).
-// They are approved regular users with stable IDs; admins enter their picks via
-// /admin/ai-picks. Server Actions must refuse to write for any other user.
+// They are approved regular users with stable IDs; /admin/ai-picks now targets
+// them through the same approved-user selector as human players.
 export const AI_USERS = [
   { id: '00000000-0000-0000-0000-000000000006', name: 'Claude', slug: 'claude' },
   { id: '00000000-0000-0000-0000-000000000005', name: 'Codex', slug: 'codex' },

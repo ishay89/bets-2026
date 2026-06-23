@@ -2,32 +2,46 @@
 
 import { createAdminClient, assertAdmin } from '@/lib/supabase/server'
 import { parseUUID, parsePick, parseTeamName, parseScorerName } from '@/lib/validation'
-import { aiUserById, isValidPikanteriaPick, usersMissingFutures, type AiUser } from '@/lib/ai-picks'
+import { isValidPikanteriaPick, usersMissingFutures } from '@/lib/ai-picks'
+import { canAdminPickForUser, type AdminPickTargetUser } from '@/lib/admin-picks'
 import { buildAutomatedFuturesRows } from '@/lib/monkey'
 import { TEAMS, SCORERS } from '@/lib/pre-tournament'
 import { getAutomatedUsers, isFuturesLocked, isFuturesPublished } from '@/lib/data'
-import { isMatchLocked, isPikanteriaLocked } from '@/lib/lock'
 import { shouldWriteAuditEvent, writeAuditEvent, type AuditJson } from '@/lib/audit'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 
-function aiPicksPath(slug: string, notice?: string) {
-  const params = new URLSearchParams({ user: slug })
+function adminPicksPath(userId?: string, notice?: string) {
+  const params = new URLSearchParams()
+  if (userId) params.set('user', userId)
   if (notice) params.set('notice', notice)
-  return `/admin/ai-picks?${params.toString()}`
+  const query = params.toString()
+  return query ? `/admin/ai-picks?${query}` : '/admin/ai-picks'
 }
 
-function requireAiUser(formData: FormData): AiUser {
+async function requirePickTargetUser(
+  supabase: ReturnType<typeof createAdminClient>,
+  formData: FormData,
+): Promise<AdminPickTargetUser> {
   const userId = parseUUID(formData.get('user_id'), 'user_id')
-  const aiUser = aiUserById(userId)
-  if (!aiUser) redirect(aiPicksPath('claude', 'invalid'))
-  return aiUser
+  const { data: user, error } = await supabase
+    .from('users')
+    .select('id, display_name, email, status, is_monkey')
+    .eq('id', userId)
+    .maybeSingle()
+  if (error) throw error
+
+  const targetUser = user as AdminPickTargetUser | null
+  if (!targetUser || !canAdminPickForUser(targetUser)) {
+    redirect(adminPicksPath(undefined, 'invalid'))
+  }
+  return targetUser
 }
 
-function finish(slug: string, notice: string): never {
+function finish(userId: string | undefined, notice: string): never {
   revalidatePath('/admin/ai-picks')
   revalidatePath('/predict')
-  redirect(aiPicksPath(slug, notice))
+  redirect(adminPicksPath(userId, notice))
 }
 
 function pikanteriaValue(
@@ -39,11 +53,11 @@ function pikanteriaValue(
   return { pick, label: item.label_x, odds: item.odds_x }
 }
 
-export async function saveAiMatchPick(formData: FormData) {
+export async function saveAdminMatchPick(formData: FormData) {
   await assertAdmin()
   const supabase = createAdminClient()
 
-  const aiUser = requireAiUser(formData)
+  const targetUser = await requirePickTargetUser(supabase, formData)
   const matchId = parseUUID(formData.get('match_id'), 'match_id')
   const pick = parsePick(formData.get('pick'), 'pick')
 
@@ -53,29 +67,22 @@ export async function saveAiMatchPick(formData: FormData) {
     .eq('id', matchId)
     .single()
 
-  if (!match || match.published_at == null) redirect(aiPicksPath(aiUser.slug, 'not_found'))
-  if (match.result != null || isMatchLocked(match)) {
-    // Mirror save_match_prediction: persist the lazy time-based lock on the
-    // first save attempt past the deadline so it applies to everyone.
-    if (!match.locked) {
-      await supabase.from('matches').update({ locked: true }).eq('id', matchId).eq('locked', false)
-    }
-    redirect(aiPicksPath(aiUser.slug, 'locked'))
-  }
+  if (!match || match.published_at == null) redirect(adminPicksPath(targetUser.id, 'not_found'))
+  if (match.result != null) redirect(adminPicksPath(targetUser.id, 'scored'))
 
   const { data: existing } = await supabase
     .from('predictions')
     .select('id, pick')
-    .eq('user_id', aiUser.id)
+    .eq('user_id', targetUser.id)
     .eq('match_id', matchId)
     .maybeSingle()
 
-  if (existing?.pick === pick) redirect(aiPicksPath(aiUser.slug, 'unchanged'))
+  if (existing?.pick === pick) redirect(adminPicksPath(targetUser.id, 'unchanged'))
 
   const { data: saved, error } = await supabase
     .from('predictions')
     .upsert(
-      { user_id: aiUser.id, match_id: matchId, pick, points: null },
+      { user_id: targetUser.id, match_id: matchId, pick, points: null },
       { onConflict: 'user_id,match_id' },
     )
     .select('id')
@@ -87,7 +94,7 @@ export async function saveAiMatchPick(formData: FormData) {
   // Mirrors the audit shape save_match_prediction writes, so /admin/audit
   // renders these events exactly like player-committed ones.
   await writeAuditEvent(supabase, {
-    user_id: aiUser.id,
+    user_id: targetUser.id,
     event_type: 'match_prediction',
     action: existing ? 'update' : 'create',
     entity_id: saved.id,
@@ -109,14 +116,14 @@ export async function saveAiMatchPick(formData: FormData) {
     },
   })
 
-  finish(aiUser.slug, 'saved')
+  finish(targetUser.id, 'saved')
 }
 
-export async function saveAiPikanteriaPick(formData: FormData) {
+export async function saveAdminPikanteriaPick(formData: FormData) {
   await assertAdmin()
   const supabase = createAdminClient()
 
-  const aiUser = requireAiUser(formData)
+  const targetUser = await requirePickTargetUser(supabase, formData)
   const pikanteriaId = parseUUID(formData.get('pikanteria_id'), 'pikanteria_id')
   const pick = parsePick(formData.get('pick'), 'pick')
 
@@ -126,23 +133,23 @@ export async function saveAiPikanteriaPick(formData: FormData) {
     .eq('id', pikanteriaId)
     .single()
 
-  if (!item || item.published_at == null) redirect(aiPicksPath(aiUser.slug, 'not_found'))
-  if (item.result != null || isPikanteriaLocked(item)) redirect(aiPicksPath(aiUser.slug, 'locked'))
-  if (!isValidPikanteriaPick(pick, item.odds_x)) redirect(aiPicksPath(aiUser.slug, 'invalid'))
+  if (!item || item.published_at == null) redirect(adminPicksPath(targetUser.id, 'not_found'))
+  if (item.result != null) redirect(adminPicksPath(targetUser.id, 'scored'))
+  if (!isValidPikanteriaPick(pick, item.odds_x)) redirect(adminPicksPath(targetUser.id, 'invalid'))
 
   const { data: existing } = await supabase
     .from('pikanteria_answers')
     .select('id, pick')
-    .eq('user_id', aiUser.id)
+    .eq('user_id', targetUser.id)
     .eq('pikanteria_id', pikanteriaId)
     .maybeSingle()
 
-  if (existing?.pick === pick) redirect(aiPicksPath(aiUser.slug, 'unchanged'))
+  if (existing?.pick === pick) redirect(adminPicksPath(targetUser.id, 'unchanged'))
 
   const { data: saved, error } = await supabase
     .from('pikanteria_answers')
     .upsert(
-      { user_id: aiUser.id, pikanteria_id: pikanteriaId, pick, points: null },
+      { user_id: targetUser.id, pikanteria_id: pikanteriaId, pick, points: null },
       { onConflict: 'user_id,pikanteria_id' },
     )
     .select('id')
@@ -150,7 +157,7 @@ export async function saveAiPikanteriaPick(formData: FormData) {
   if (error) throw error
 
   await writeAuditEvent(supabase, {
-    user_id: aiUser.id,
+    user_id: targetUser.id,
     event_type: 'pikanteria_answer',
     action: existing ? 'update' : 'create',
     entity_id: saved.id,
@@ -171,14 +178,14 @@ export async function saveAiPikanteriaPick(formData: FormData) {
     },
   })
 
-  finish(aiUser.slug, 'saved')
+  finish(targetUser.id, 'saved')
 }
 
-export async function saveAiFutures(formData: FormData) {
+export async function saveAdminFutures(formData: FormData) {
   await assertAdmin()
   const supabase = createAdminClient()
 
-  const aiUser = requireAiUser(formData)
+  const targetUser = await requirePickTargetUser(supabase, formData)
   const winnerName = parseTeamName(formData.get('winner'))
   const scorerName = parseScorerName(formData.get('scorer'))
   const winner = TEAMS.find(t => t.name === winnerName)!
@@ -188,14 +195,14 @@ export async function saveAiFutures(formData: FormData) {
     supabase
       .from('pre_tournament_picks')
       .select('id, winner_team, winner_odds, top_scorer, top_scorer_odds')
-      .eq('user_id', aiUser.id)
+      .eq('user_id', targetUser.id)
       .maybeSingle(),
     isFuturesLocked(supabase),
     isFuturesPublished(supabase),
   ])
 
   if (existingError) throw existingError
-  if (!published || locked) redirect(aiPicksPath(aiUser.slug, 'locked'))
+  if (!published || locked) redirect(adminPicksPath(targetUser.id, 'locked'))
 
   const oldValue: AuditJson | null = existing ? {
     winner_team: existing.winner_team,
@@ -214,7 +221,7 @@ export async function saveAiFutures(formData: FormData) {
   const { data: saved, error } = await supabase
     .from('pre_tournament_picks')
     .upsert({
-      user_id: aiUser.id,
+      user_id: targetUser.id,
       winner_team: winner.name,
       winner_odds: winner.odds,
       top_scorer: scorer.name,
@@ -226,7 +233,7 @@ export async function saveAiFutures(formData: FormData) {
 
   if (shouldAudit) {
     await writeAuditEvent(supabase, {
-      user_id: aiUser.id,
+      user_id: targetUser.id,
       event_type: 'pre_tournament_pick',
       action: existing ? 'update' : 'create',
       entity_id: saved.id,
@@ -237,17 +244,17 @@ export async function saveAiFutures(formData: FormData) {
     })
   }
 
-  finish(aiUser.slug, shouldAudit ? 'saved' : 'unchanged')
+  finish(targetUser.id, shouldAudit ? 'saved' : 'unchanged')
 }
 
 export async function generateBotFutures(formData: FormData) {
   await assertAdmin()
   const supabase = createAdminClient()
 
-  // Keep the user toggle stable across the redirect.
-  const slug = formData.get('user_slug') === 'codex' ? 'codex' : 'claude'
+  const userId = formData.get('user_id')
+  const redirectUserId = typeof userId === 'string' && userId.length > 0 ? userId : undefined
 
-  if (await isFuturesLocked(supabase)) redirect(aiPicksPath(slug, 'locked'))
+  if (await isFuturesLocked(supabase)) redirect(adminPicksPath(redirectUserId, 'locked'))
 
   const bots = await getAutomatedUsers(supabase)
   const { data: existingPicks, error: existingError } = await supabase
@@ -267,5 +274,5 @@ export async function generateBotFutures(formData: FormData) {
     if (error) throw error
   }
 
-  finish(slug, `bots-${missing.length}-${bots.length - missing.length}`)
+  finish(redirectUserId, `bots-${missing.length}-${bots.length - missing.length}`)
 }

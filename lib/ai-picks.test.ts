@@ -34,7 +34,7 @@ describe('aiUserById', () => {
   })
 
   it('returns undefined for any other user id', () => {
-    // Monkey's id — a real user, but not an AI user the admin may write for.
+    // Monkey's id — a real user, but not one of the seeded AI dummy accounts.
     expect(aiUserById('00000000-0000-0000-0000-000000000001')).toBeUndefined()
     expect(aiUserById('not-a-uuid')).toBeUndefined()
   })
