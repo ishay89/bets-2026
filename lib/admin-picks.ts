@@ -20,12 +20,9 @@ type PublishedPikanteriaItem = {
   kickoff_time?: string | null
 }
 
-type AdminPickDay<
-  TMatch extends PublishedMatchItem,
-  TPikanteria extends PublishedPikanteriaItem,
-> = {
-  matches?: TMatch[] | null
-  pikanteria?: TPikanteria[] | null
+type AdminPickDay = {
+  matches?: readonly PublishedMatchItem[] | null
+  pikanteria?: readonly PublishedPikanteriaItem[] | null
 }
 
 export function canAdminPickForUser(user: AdminPickTargetUser): boolean {
@@ -49,17 +46,20 @@ function sortTime(value: string | null | undefined): number {
   return Number.isFinite(time) ? time : Number.MAX_SAFE_INTEGER
 }
 
-export function filterAdminPickDays<
-  TMatch extends PublishedMatchItem,
-  TPikanteria extends PublishedPikanteriaItem,
-  TDay extends AdminPickDay<TMatch, TPikanteria>,
->(matchDays: TDay[]): Array<{ day: TDay; openMatches: TMatch[]; openPikanteria: TPikanteria[] }> {
-  const result = []
+type DayMatch<TDay extends AdminPickDay> = NonNullable<TDay['matches']>[number]
+type DayPikanteria<TDay extends AdminPickDay> = NonNullable<TDay['pikanteria']>[number]
+
+export function filterAdminPickDays<TDay extends AdminPickDay>(
+  matchDays: readonly TDay[],
+): Array<{ day: TDay; openMatches: DayMatch<TDay>[]; openPikanteria: DayPikanteria<TDay>[] }> {
+  const result: Array<{ day: TDay; openMatches: DayMatch<TDay>[]; openPikanteria: DayPikanteria<TDay>[] }> = []
   for (const day of matchDays) {
-    const openMatches = (day.matches ?? [])
+    const matches = (day.matches ?? []) as DayMatch<TDay>[]
+    const pikanteria = (day.pikanteria ?? []) as DayPikanteria<TDay>[]
+    const openMatches = matches
       .filter(match => match.published_at != null && match.result == null)
       .toSorted((a, b) => sortTime(a.kickoff_time) - sortTime(b.kickoff_time))
-    const openPikanteria = (day.pikanteria ?? [])
+    const openPikanteria = pikanteria
       .filter(item => item.published_at != null && item.result == null)
       .toSorted((a, b) => sortTime(a.kickoff_time) - sortTime(b.kickoff_time))
     if (openMatches.length > 0 || openPikanteria.length > 0) {
