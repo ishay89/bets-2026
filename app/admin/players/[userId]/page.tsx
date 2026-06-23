@@ -18,10 +18,9 @@ const STAGE_LABELS: Record<string, string> = {
 
 const PICK_LABELS: Record<Pick, string> = { '1': 'Home', X: 'Draw', '2': 'Away' }
 
-// Same open-item filtering as /admin/ai-picks: this page reads via the
-// service-role client (no RLS), so draft and already-scored items must be
-// excluded explicitly — players can only act on published, unscored,
-// unlocked items.
+// Player status intentionally mirrors the player-facing lock rules. This page
+// reads via the service-role client (no RLS), so draft and already-scored items
+// must be excluded explicitly.
 function filterOpenDays(matchDays: FullMatchDay[]) {
   const result = []
   for (const day of matchDays) {

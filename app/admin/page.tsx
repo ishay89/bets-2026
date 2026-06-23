@@ -6,7 +6,7 @@ const sections = [
   { href: '/admin/results', icon: '✅', label: 'Enter Results', desc: 'Record outcomes and trigger scoring' },
   { href: '/admin/tournament', icon: '🏆', label: 'Tournament End', desc: 'Set winner and top scorer' },
   { href: '/admin/players', icon: '👥', label: 'Manage Players', desc: 'View players and admin roles' },
-  { href: '/admin/ai-picks', icon: '🤖', label: 'Pick for AI', desc: 'Enter bets for Claude, Codex, and bot futures' },
+  { href: '/admin/ai-picks', icon: '👥', label: 'Pick for Users', desc: 'Enter bets for approved players and AI accounts' },
   { href: '/admin/scores', icon: '📊', label: 'Score Snapshots', desc: 'Per-day breakdown and validation audit' },
   { href: '/admin/audit', icon: '🧾', label: 'User Audit', desc: 'Track user prediction commits and changes' },
 ]
