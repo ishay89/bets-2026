@@ -167,6 +167,8 @@ async function scoreItems(
   revalidatePath('/predict')
   revalidatePath('/leaderboard')
   revalidatePath('/admin/scores')
+  revalidatePath('/u/[userId]', 'layout')
+  revalidatePath('/h2h/[opponentId]', 'layout')
 }
 
 async function scoreMatch(formData: FormData) {
@@ -208,6 +210,8 @@ async function resetPikanteria(formData: FormData) {
   revalidatePath('/')
   revalidatePath('/leaderboard')
   revalidatePath('/admin/scores')
+  revalidatePath('/u/[userId]', 'layout')
+  revalidatePath('/h2h/[opponentId]', 'layout')
   redirect('/admin/results')
 }
 
@@ -229,6 +233,8 @@ async function resetMatch(formData: FormData) {
   revalidatePath('/')
   revalidatePath('/leaderboard')
   revalidatePath('/admin/scores')
+  revalidatePath('/u/[userId]', 'layout')
+  revalidatePath('/h2h/[opponentId]', 'layout')
   redirect('/admin/results')
 }
 

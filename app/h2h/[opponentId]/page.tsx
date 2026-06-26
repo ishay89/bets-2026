@@ -2,13 +2,31 @@ export const metadata = { title: 'H2H | Mondial Bets 2026', description: 'Head-t
 
 import { redirect, notFound } from 'next/navigation'
 import Link from 'next/link'
-import { createClient } from '@/lib/supabase/server'
+import { unstable_cache } from 'next/cache'
+import { createAdminClient, createClient } from '@/lib/supabase/server'
 import { BottomNav } from '@/components/bottom-nav'
 import { isMatchLocked } from '@/lib/lock'
 import { buildH2H, pickAgreement, type H2HMatch, type H2HRound, type H2HRoundResult, type RoundWinner } from '@/lib/h2h'
 import { getAvatar, getAutomationLabel, getFlagUrl, isAutomated, stageLabel } from '@/lib/display'
 import { getLeaderboardEntries, getMatchDaysWithUserData, type HistoryMatchDay } from '@/lib/data'
 import { formatAppDate } from '@/lib/time'
+
+// Same cache key as /leaderboard, so this reuses that entry — totals are
+// identical for every viewer.
+const getCachedLeaderboardEntries = unstable_cache(
+  () => getLeaderboardEntries(createAdminClient()),
+  ['leaderboard-entries'],
+  { revalidate: 300, tags: ['leaderboard'] },
+)
+
+// Admin-bypassed (RLS-free) fetch, shared across every viewer. Below,
+// theirHidden is now computed purely from lock state (not from row presence),
+// so an opponent's unlocked pick still never leaks despite the wider data.
+const getCachedMatchDaysWithUserData = unstable_cache(
+  () => getMatchDaysWithUserData(createAdminClient()),
+  ['match-days-user-data'],
+  { revalidate: 60, tags: ['match-days'] },
+)
 
 // View-model carried alongside each H2HMatch for rendering.
 type RowVM = {
@@ -60,8 +78,9 @@ function buildRoundsVM(
       const predByUser = new Map(m.predictions.map(p => [p.user_id, p]))
       const myPred = predByUser.get(myId)
       const theirPred = predByUser.get(opponentId)
-      // Hidden = not locked & no opponent row reached us (RLS withheld it).
-      const theirHidden = !locked && !theirPred
+      // Data now comes from an admin (RLS-free) fetch shared across viewers,
+      // so hiding must be decided purely by lock state, not by row presence.
+      const theirHidden = !locked
       const resolved = m.result !== null
 
       const h2h: H2HMatch = {
@@ -101,7 +120,7 @@ function buildRoundsVM(
       const ansByUser = new Map(pk.pikanteria_answers.map(a => [a.user_id, a]))
       const myAns = ansByUser.get(myId)
       const theirAns = ansByUser.get(opponentId)
-      const theirHidden = !pk.locked && !theirAns
+      const theirHidden = !pk.locked
       const resolved = pk.result !== null
 
       const h2h: H2HMatch = {
@@ -149,11 +168,12 @@ export default async function H2HComparePage({
   if (opponentId === myId) redirect('/h2h')
 
   // Totals from the leaderboard view (consistent with standings) + identity.
-  // Nested payload — mirror history. RLS (migration 009) already strips the
-  // opponent's unlocked rows; we keep only the two users' rows in JS.
+  // Nested payload — mirror history. Fetched admin-side (RLS-free) and cached
+  // for every viewer; buildRoundsVM below strips the opponent's unlocked picks
+  // itself via theirHidden, so nothing leaks despite the wider data.
   const [entries, matchDaysRaw] = await Promise.all([
-    getLeaderboardEntries(supabase),
-    getMatchDaysWithUserData(supabase),
+    getCachedLeaderboardEntries(),
+    getCachedMatchDaysWithUserData(),
   ])
   const me = entries.find(e => e.id === myId) ?? null
   const them = entries.find(e => e.id === opponentId) ?? null

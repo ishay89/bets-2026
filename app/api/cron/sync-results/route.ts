@@ -35,6 +35,8 @@ export async function GET(req: Request) {
       revalidatePath('/')
       revalidatePath('/predict')
       revalidatePath('/leaderboard')
+      revalidatePath('/u/[userId]', 'layout')
+      revalidatePath('/h2h/[opponentId]', 'layout')
     }
     return NextResponse.json(summary)
   } catch (err) {

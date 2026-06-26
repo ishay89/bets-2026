@@ -102,6 +102,8 @@ async function syncLiveScores(config: FootballDataConfig): Promise<boolean> {
   revalidatePath('/predict')
   revalidatePath('/board')
   revalidatePath('/leaderboard')
+  revalidatePath('/u/[userId]', 'layout')
+  revalidatePath('/h2h/[opponentId]', 'layout')
 
   return true
 }

@@ -1,6 +1,7 @@
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient, createClient } from '@/lib/supabase/server'
 import { redirect, notFound } from 'next/navigation'
 import Link from 'next/link'
+import { unstable_cache } from 'next/cache'
 import { BottomNav } from '@/components/bottom-nav'
 import { isMatchLocked } from '@/lib/lock'
 import { getAvatar, getAutomationLabel, getFlagUrl, ordinal, stageLabel } from '@/lib/display'
@@ -12,6 +13,23 @@ import {
   type HistoryMatchDay,
 } from '@/lib/data'
 import { formatAppDate } from '@/lib/time'
+
+// Same cache key as /leaderboard, so this reuses that entry — totals are
+// identical for every viewer.
+const getCachedLeaderboardEntries = unstable_cache(
+  () => getLeaderboardEntries(createAdminClient()),
+  ['leaderboard-entries'],
+  { revalidate: 300, tags: ['leaderboard'] },
+)
+
+// buildDays() below keeps only the target player's LOCKED picks and discards
+// everything else, so this stays safe to fetch admin-side (RLS-free) and share
+// across every viewer — no one's open pick can leak through that filter.
+const getCachedMatchDaysWithUserData = unstable_cache(
+  () => getMatchDaysWithUserData(createAdminClient()),
+  ['match-days-user-data'],
+  { revalidate: 60, tags: ['match-days'] },
+)
 
 export const metadata = { title: 'Player history | Mondial Bets 2026', description: 'A player’s locked predictions' }
 
@@ -124,8 +142,8 @@ export default async function PlayerHistoryPage({
       .select('id, display_name, avatar_emoji, is_monkey, automation_strategy, status')
       .eq('id', userId)
       .maybeSingle(),
-    getLeaderboardEntries(supabase),
-    getMatchDaysWithUserData(supabase),
+    getCachedLeaderboardEntries(),
+    getCachedMatchDaysWithUserData(),
     isFuturesLocked(supabase),
     getUserFuturesPick(supabase, userId),
   ])
