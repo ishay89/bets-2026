@@ -32,6 +32,23 @@ const getCachedMatchDaysForViewer = unstable_cache(
   { revalidate: 60, tags: ['match-days'] },
 )
 
+// Caches the DERIVED view model, not just the raw fetch — Vercel's Active CPU
+// billing excludes I/O wait (the DB round-trip above), so the actual billed
+// cost per request is buildRoundsVM/buildH2H's loop over every match day.
+// Without this, that loop re-runs on every request even when
+// getCachedMatchDaysForViewer hits. nowBucket rounds down to the minute so the
+// key stays stable within the same 60s window as the underlying data;
+// rounding down only ever delays a lock transition by up to 60s, never
+// reveals a pick early.
+const getCachedH2HViewModel = unstable_cache(
+  async (viewerId: string, opponentId: string, accessToken: string, nowBucket: number) => {
+    const days = await getCachedMatchDaysForViewer(viewerId, accessToken)
+    return computeH2HViewModel(days, viewerId, opponentId, nowBucket)
+  },
+  ['h2h-view-model'],
+  { revalidate: 60, tags: ['match-days'] },
+)
+
 // View-model carried alongside each H2HMatch for rendering.
 type RowVM = {
   h2h: H2HMatch
@@ -162,6 +179,14 @@ function buildRoundsVM(
   return { roundsVM, h2hRounds }
 }
 
+// Combines buildRoundsVM + buildH2H so both pure transforms ride in the same
+// cache entry above.
+function computeH2HViewModel(days: HistoryMatchDay[], myId: string, opponentId: string, now: number) {
+  const { roundsVM, h2hRounds } = buildRoundsVM(days, myId, opponentId, now)
+  const { rounds: roundResults, summary } = buildH2H(h2hRounds, myId, opponentId)
+  return { roundsVM, roundResults, summary }
+}
+
 export default async function H2HComparePage({
   params,
 }: {
@@ -177,26 +202,23 @@ export default async function H2HComparePage({
   // — getUser() above remains the authoritative identity check.
   const { data: { session } } = await supabase.auth.getSession()
 
+  const now = nowMs()
+  const nowBucket = Math.floor(now / 60_000) * 60_000
+
   // Totals from the leaderboard view (consistent with standings) + identity.
   // Nested payload — mirror history. Cached per viewer through their own RLS
-  // scope; buildRoundsVM below also strips the opponent's unlocked picks via
+  // scope; computeH2HViewModel also strips the opponent's unlocked picks via
   // theirHidden, as a redundant guard against admin RLS seeing more.
-  const [entries, matchDaysRaw] = await Promise.all([
+  const [entries, { roundsVM, roundResults, summary }] = await Promise.all([
     getCachedLeaderboardEntries(),
     session
-      ? getCachedMatchDaysForViewer(myId, session.access_token)
-      : getMatchDaysWithUserData(supabase),
+      ? getCachedH2HViewModel(myId, opponentId, session.access_token, nowBucket)
+      : getMatchDaysWithUserData(supabase).then(days => computeH2HViewModel(days, myId, opponentId, now)),
   ])
   const me = entries.find(e => e.id === myId) ?? null
   const them = entries.find(e => e.id === opponentId) ?? null
   if (!them) notFound()
 
-  const now = nowMs()
-  const days = matchDaysRaw as HistoryMatchDay[]
-
-  const { roundsVM, h2hRounds } = buildRoundsVM(days, myId, opponentId, now)
-
-  const { rounds: roundResults, summary } = buildH2H(h2hRounds, myId, opponentId)
   const roundResultById = new Map(roundResults.map(r => [r.matchDayId, r]))
 
   // Totals: prefer the leaderboard view (consistent with standings); fall back
