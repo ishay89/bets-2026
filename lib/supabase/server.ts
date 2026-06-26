@@ -33,6 +33,23 @@ export function createAdminClient() {
   )
 }
 
+// Authenticated client built from an explicit access token instead of
+// cookies, so it can run inside unstable_cache() (which forbids reading
+// cookies()/headers()). Still runs as `authenticated` for that one user, RLS
+// fully enforced — NOT a service-role client. Lets a per-viewer cache entry
+// reuse the viewer's own RLS scope instead of bypassing it with the admin
+// client.
+export function createClientWithToken(accessToken: string) {
+  return createSupabaseClient<Database>(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      global: { headers: { Authorization: `Bearer ${accessToken}` } },
+      auth: { autoRefreshToken: false, persistSession: false },
+    }
+  )
+}
+
 export async function assertAdmin(): Promise<void> {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()

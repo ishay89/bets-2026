@@ -1,6 +1,7 @@
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient, createClient, createClientWithToken } from '@/lib/supabase/server'
 import { redirect, notFound } from 'next/navigation'
 import Link from 'next/link'
+import { unstable_cache } from 'next/cache'
 import { BottomNav } from '@/components/bottom-nav'
 import { isMatchLocked } from '@/lib/lock'
 import { getAvatar, getAutomationLabel, getFlagUrl, ordinal, stageLabel } from '@/lib/display'
@@ -12,6 +13,27 @@ import {
   type HistoryMatchDay,
 } from '@/lib/data'
 import { formatAppDate } from '@/lib/time'
+
+// Same cache key as /leaderboard, so this reuses that entry — totals are
+// identical for every viewer.
+const getCachedLeaderboardEntries = unstable_cache(
+  () => getLeaderboardEntries(createAdminClient()),
+  ['leaderboard-entries'],
+  { revalidate: 300, tags: ['leaderboard'] },
+)
+
+// Cached PER VIEWER (keyed on their access token), not shared globally — this
+// still runs through the viewer's own RLS scope (token-built client, no admin
+// bypass), so the database keeps doing the real filtering of unlocked rows.
+// It still kills the original fan-out: this fetch takes no target userId, so
+// one session's burst of prefetched profile/H2H pages all hit this single
+// entry instead of re-querying per page.
+const getCachedMatchDaysForViewer = unstable_cache(
+  (_viewerId: string, accessToken: string) =>
+    getMatchDaysWithUserData(createClientWithToken(accessToken)),
+  ['match-days-user-data'],
+  { revalidate: 60, tags: ['match-days'] },
+)
 
 export const metadata = { title: 'Player history | Mondial Bets 2026', description: 'A player’s locked predictions' }
 
@@ -118,14 +140,20 @@ export default async function PlayerHistoryPage({
   // Viewing your own row → your full history (which includes open picks).
   if (userId === user.id) redirect('/history')
 
+  // getSession() only to grab the access token for the per-viewer cache below
+  // — getUser() above remains the authoritative identity check.
+  const { data: { session } } = await supabase.auth.getSession()
+
   const [profileRes, entries, matchDaysRaw, futuresLocked, futuresPick] = await Promise.all([
     supabase
       .from('users')
       .select('id, display_name, avatar_emoji, is_monkey, automation_strategy, status')
       .eq('id', userId)
       .maybeSingle(),
-    getLeaderboardEntries(supabase),
-    getMatchDaysWithUserData(supabase),
+    getCachedLeaderboardEntries(),
+    session
+      ? getCachedMatchDaysForViewer(user.id, session.access_token)
+      : getMatchDaysWithUserData(supabase),
     isFuturesLocked(supabase),
     getUserFuturesPick(supabase, userId),
   ])

@@ -18,6 +18,8 @@ export async function syncResultsAction() {
   revalidatePath('/')
   revalidatePath('/predict')
   revalidatePath('/leaderboard')
+  revalidatePath('/u/[userId]', 'layout')
+  revalidatePath('/h2h/[opponentId]', 'layout')
 }
 
 export async function dismissSuggestionAction(formData: FormData) {

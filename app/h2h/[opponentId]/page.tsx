@@ -2,13 +2,35 @@ export const metadata = { title: 'H2H | Mondial Bets 2026', description: 'Head-t
 
 import { redirect, notFound } from 'next/navigation'
 import Link from 'next/link'
-import { createClient } from '@/lib/supabase/server'
+import { unstable_cache } from 'next/cache'
+import { createAdminClient, createClient, createClientWithToken } from '@/lib/supabase/server'
 import { BottomNav } from '@/components/bottom-nav'
 import { isMatchLocked } from '@/lib/lock'
 import { buildH2H, pickAgreement, type H2HMatch, type H2HRound, type H2HRoundResult, type RoundWinner } from '@/lib/h2h'
 import { getAvatar, getAutomationLabel, getFlagUrl, isAutomated, stageLabel } from '@/lib/display'
 import { getLeaderboardEntries, getMatchDaysWithUserData, type HistoryMatchDay } from '@/lib/data'
 import { formatAppDate } from '@/lib/time'
+
+// Same cache key as /leaderboard, so this reuses that entry — totals are
+// identical for every viewer.
+const getCachedLeaderboardEntries = unstable_cache(
+  () => getLeaderboardEntries(createAdminClient()),
+  ['leaderboard-entries'],
+  { revalidate: 300, tags: ['leaderboard'] },
+)
+
+// Cached PER VIEWER (keyed on their access token), not shared globally — this
+// still runs through the viewer's own RLS scope (token-built client, no admin
+// bypass), so the database keeps doing the real filtering of unlocked rows.
+// It still kills the original fan-out: this fetch takes no opponentId, so one
+// session's burst of prefetched H2H/profile pages all hit this single entry
+// instead of re-querying per page.
+const getCachedMatchDaysForViewer = unstable_cache(
+  (_viewerId: string, accessToken: string) =>
+    getMatchDaysWithUserData(createClientWithToken(accessToken)),
+  ['match-days-user-data'],
+  { revalidate: 60, tags: ['match-days'] },
+)
 
 // View-model carried alongside each H2HMatch for rendering.
 type RowVM = {
@@ -60,8 +82,11 @@ function buildRoundsVM(
       const predByUser = new Map(m.predictions.map(p => [p.user_id, p]))
       const myPred = predByUser.get(myId)
       const theirPred = predByUser.get(opponentId)
-      // Hidden = not locked & no opponent row reached us (RLS withheld it).
-      const theirHidden = !locked && !theirPred
+      // Decided purely by lock state, not by row presence. RLS already keeps
+      // an unlocked opponent row out of a normal viewer's query, but admin
+      // RLS can read unlocked rows too (see app/u/[userId]) — this redundant
+      // check is what keeps an admin viewer from seeing an open H2H pick.
+      const theirHidden = !locked
       const resolved = m.result !== null
 
       const h2h: H2HMatch = {
@@ -101,7 +126,7 @@ function buildRoundsVM(
       const ansByUser = new Map(pk.pikanteria_answers.map(a => [a.user_id, a]))
       const myAns = ansByUser.get(myId)
       const theirAns = ansByUser.get(opponentId)
-      const theirHidden = !pk.locked && !theirAns
+      const theirHidden = !pk.locked
       const resolved = pk.result !== null
 
       const h2h: H2HMatch = {
@@ -148,12 +173,19 @@ export default async function H2HComparePage({
 
   if (opponentId === myId) redirect('/h2h')
 
+  // getSession() only to grab the access token for the per-viewer cache below
+  // — getUser() above remains the authoritative identity check.
+  const { data: { session } } = await supabase.auth.getSession()
+
   // Totals from the leaderboard view (consistent with standings) + identity.
-  // Nested payload — mirror history. RLS (migration 009) already strips the
-  // opponent's unlocked rows; we keep only the two users' rows in JS.
+  // Nested payload — mirror history. Cached per viewer through their own RLS
+  // scope; buildRoundsVM below also strips the opponent's unlocked picks via
+  // theirHidden, as a redundant guard against admin RLS seeing more.
   const [entries, matchDaysRaw] = await Promise.all([
-    getLeaderboardEntries(supabase),
-    getMatchDaysWithUserData(supabase),
+    getCachedLeaderboardEntries(),
+    session
+      ? getCachedMatchDaysForViewer(myId, session.access_token)
+      : getMatchDaysWithUserData(supabase),
   ])
   const me = entries.find(e => e.id === myId) ?? null
   const them = entries.find(e => e.id === opponentId) ?? null

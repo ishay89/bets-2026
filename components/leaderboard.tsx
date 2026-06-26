@@ -201,7 +201,7 @@ export function Leaderboard({
             const profileHref = isMe ? '/history' : `/u/${entry.id}`
             return (
               <div key={entry.id} style={{ width: idx === 0 ? '36%' : '32%', textAlign: 'center' }}>
-                <Link href={profileHref} style={{ textDecoration: 'none', color: 'inherit' }}>
+                <Link href={profileHref} prefetch={false} style={{ textDecoration: 'none', color: 'inherit' }}>
                   <div
                     className="mx-auto mb-1.5 flex items-center justify-center rounded-full text-xl"
                     style={{ width: 42, height: 42, background: 'var(--color-elev)', border: `2px solid ${color}` }}
@@ -308,6 +308,7 @@ export function Leaderboard({
                 )}
                 <Link
                   href={isMe ? '/history' : `/u/${entry.id}`}
+                  prefetch={false}
                   className="flex flex-1 items-center gap-3 min-w-0 not-italic"
                   style={{ textDecoration: 'none' }}
                 >
@@ -330,6 +331,7 @@ export function Leaderboard({
                 {!isMe && (
                   <Link
                     href={`/h2h/${entry.id}`}
+                    prefetch={false}
                     className="px-2 py-0.5 rounded-full not-italic shrink-0"
                     style={vsLinkStyle}
                   >
