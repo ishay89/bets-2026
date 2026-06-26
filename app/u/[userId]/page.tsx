@@ -1,4 +1,4 @@
-import { createAdminClient, createClient } from '@/lib/supabase/server'
+import { createAdminClient, createClient, createClientWithToken } from '@/lib/supabase/server'
 import { redirect, notFound } from 'next/navigation'
 import Link from 'next/link'
 import { unstable_cache } from 'next/cache'
@@ -22,11 +22,15 @@ const getCachedLeaderboardEntries = unstable_cache(
   { revalidate: 300, tags: ['leaderboard'] },
 )
 
-// buildDays() below keeps only the target player's LOCKED picks and discards
-// everything else, so this stays safe to fetch admin-side (RLS-free) and share
-// across every viewer — no one's open pick can leak through that filter.
-const getCachedMatchDaysWithUserData = unstable_cache(
-  () => getMatchDaysWithUserData(createAdminClient()),
+// Cached PER VIEWER (keyed on their access token), not shared globally — this
+// still runs through the viewer's own RLS scope (token-built client, no admin
+// bypass), so the database keeps doing the real filtering of unlocked rows.
+// It still kills the original fan-out: this fetch takes no target userId, so
+// one session's burst of prefetched profile/H2H pages all hit this single
+// entry instead of re-querying per page.
+const getCachedMatchDaysForViewer = unstable_cache(
+  (_viewerId: string, accessToken: string) =>
+    getMatchDaysWithUserData(createClientWithToken(accessToken)),
   ['match-days-user-data'],
   { revalidate: 60, tags: ['match-days'] },
 )
@@ -136,6 +140,10 @@ export default async function PlayerHistoryPage({
   // Viewing your own row → your full history (which includes open picks).
   if (userId === user.id) redirect('/history')
 
+  // getSession() only to grab the access token for the per-viewer cache below
+  // — getUser() above remains the authoritative identity check.
+  const { data: { session } } = await supabase.auth.getSession()
+
   const [profileRes, entries, matchDaysRaw, futuresLocked, futuresPick] = await Promise.all([
     supabase
       .from('users')
@@ -143,7 +151,9 @@ export default async function PlayerHistoryPage({
       .eq('id', userId)
       .maybeSingle(),
     getCachedLeaderboardEntries(),
-    getCachedMatchDaysWithUserData(),
+    session
+      ? getCachedMatchDaysForViewer(user.id, session.access_token)
+      : getMatchDaysWithUserData(supabase),
     isFuturesLocked(supabase),
     getUserFuturesPick(supabase, userId),
   ])

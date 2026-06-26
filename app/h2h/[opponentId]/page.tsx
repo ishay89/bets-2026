@@ -3,7 +3,7 @@ export const metadata = { title: 'H2H | Mondial Bets 2026', description: 'Head-t
 import { redirect, notFound } from 'next/navigation'
 import Link from 'next/link'
 import { unstable_cache } from 'next/cache'
-import { createAdminClient, createClient } from '@/lib/supabase/server'
+import { createAdminClient, createClient, createClientWithToken } from '@/lib/supabase/server'
 import { BottomNav } from '@/components/bottom-nav'
 import { isMatchLocked } from '@/lib/lock'
 import { buildH2H, pickAgreement, type H2HMatch, type H2HRound, type H2HRoundResult, type RoundWinner } from '@/lib/h2h'
@@ -19,11 +19,15 @@ const getCachedLeaderboardEntries = unstable_cache(
   { revalidate: 300, tags: ['leaderboard'] },
 )
 
-// Admin-bypassed (RLS-free) fetch, shared across every viewer. Below,
-// theirHidden is now computed purely from lock state (not from row presence),
-// so an opponent's unlocked pick still never leaks despite the wider data.
-const getCachedMatchDaysWithUserData = unstable_cache(
-  () => getMatchDaysWithUserData(createAdminClient()),
+// Cached PER VIEWER (keyed on their access token), not shared globally — this
+// still runs through the viewer's own RLS scope (token-built client, no admin
+// bypass), so the database keeps doing the real filtering of unlocked rows.
+// It still kills the original fan-out: this fetch takes no opponentId, so one
+// session's burst of prefetched H2H/profile pages all hit this single entry
+// instead of re-querying per page.
+const getCachedMatchDaysForViewer = unstable_cache(
+  (_viewerId: string, accessToken: string) =>
+    getMatchDaysWithUserData(createClientWithToken(accessToken)),
   ['match-days-user-data'],
   { revalidate: 60, tags: ['match-days'] },
 )
@@ -78,8 +82,10 @@ function buildRoundsVM(
       const predByUser = new Map(m.predictions.map(p => [p.user_id, p]))
       const myPred = predByUser.get(myId)
       const theirPred = predByUser.get(opponentId)
-      // Data now comes from an admin (RLS-free) fetch shared across viewers,
-      // so hiding must be decided purely by lock state, not by row presence.
+      // Decided purely by lock state, not by row presence. RLS already keeps
+      // an unlocked opponent row out of a normal viewer's query, but admin
+      // RLS can read unlocked rows too (see app/u/[userId]) — this redundant
+      // check is what keeps an admin viewer from seeing an open H2H pick.
       const theirHidden = !locked
       const resolved = m.result !== null
 
@@ -167,13 +173,19 @@ export default async function H2HComparePage({
 
   if (opponentId === myId) redirect('/h2h')
 
+  // getSession() only to grab the access token for the per-viewer cache below
+  // — getUser() above remains the authoritative identity check.
+  const { data: { session } } = await supabase.auth.getSession()
+
   // Totals from the leaderboard view (consistent with standings) + identity.
-  // Nested payload — mirror history. Fetched admin-side (RLS-free) and cached
-  // for every viewer; buildRoundsVM below strips the opponent's unlocked picks
-  // itself via theirHidden, so nothing leaks despite the wider data.
+  // Nested payload — mirror history. Cached per viewer through their own RLS
+  // scope; buildRoundsVM below also strips the opponent's unlocked picks via
+  // theirHidden, as a redundant guard against admin RLS seeing more.
   const [entries, matchDaysRaw] = await Promise.all([
     getCachedLeaderboardEntries(),
-    getCachedMatchDaysWithUserData(),
+    session
+      ? getCachedMatchDaysForViewer(myId, session.access_token)
+      : getMatchDaysWithUserData(supabase),
   ])
   const me = entries.find(e => e.id === myId) ?? null
   const them = entries.find(e => e.id === opponentId) ?? null
