@@ -2,6 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from './supabase/types'
 import type { AutomationStrategy } from './types'
 import { parseUUID } from './validation'
+import { withCurrentFuturesOdds } from './pre-tournament'
 
 export type PlayerRevealRow = {
   userId: string
@@ -185,9 +186,10 @@ export async function getFuturesReveal(supabase: Db): Promise<FuturesReveal> {
     avatarEmoji: p.users.avatar_emoji,
     totalPoints: pointsMap[p.user_id] ?? 0,
   })
+  const current = approved.map(withCurrentFuturesOdds)
   return {
-    winner: sortAndRankRevealRows(approved.map(p => ({ ...base(p), pick: p.winner_team, odds: p.winner_odds }))),
-    scorer: sortAndRankRevealRows(approved.map(p => ({ ...base(p), pick: p.top_scorer, odds: p.top_scorer_odds }))),
+    winner: sortAndRankRevealRows(current.map(p => ({ ...base(p), pick: p.winner_team, odds: p.winner_odds }))),
+    scorer: sortAndRankRevealRows(current.map(p => ({ ...base(p), pick: p.top_scorer, odds: p.top_scorer_odds }))),
   }
 }
 
