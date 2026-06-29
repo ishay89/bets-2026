@@ -1,4 +1,4 @@
 interface:
   display_name: "Codex Open Bet Predictions"
-  short_description: "Draft and apply Codex-only open bet picks."
-  default_prompt: "Check the current open published bets, factor in Codex's position, odds, and latest team news, recommend Codex picks, ask for approval, then upsert and verify only Codex rows."
+  short_description: "Apply Codex-only open bet picks."
+  default_prompt: "Check the current open published bets, factor in Codex's position, odds, and latest team news, choose Codex picks, upsert them for Codex only, and verify the saved rows."
