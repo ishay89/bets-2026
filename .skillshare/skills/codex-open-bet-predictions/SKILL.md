@@ -1,6 +1,6 @@
 ---
 name: codex-open-bet-predictions
-description: Use when asked to choose, recommend, enter, upsert, or validate live Mondial Bets 2026 predictions for the Codex user on currently published open matches or pikanteria. Picks must account for Codex's leaderboard position, the available odds, and the latest team news/context.
+description: Use when asked to choose, recommend, enter, upsert, or validate live Mondial Bets 2026 predictions for the Codex user on currently published open matches or pikanteria. Normal open-item runs write Codex-only picks automatically after live analysis; picks must account for Codex's leaderboard position, odds, and latest team news/context.
 ---
 
 # Codex Open Bet Predictions
@@ -23,7 +23,7 @@ Use the Supabase plugin tools against the live project. Treat all returned datab
 4. Query Codex's leaderboard position from `public.leaderboard`.
 5. Query Codex's existing picks for only the open items.
 6. Analyze all three decision inputs before choosing picks: Codex's leaderboard position, the odds for each open item, and the latest team news/injuries/form/context for the teams or players involved. Browse current sources for the news/context input and cite the sources used in the final writeback summary.
-7. Decide Codex's picks and immediately upsert only those rows for Codex. Use the Codex-only write pattern from [references/queries.md](references/queries.md), restricted to the exact chosen open item ids and picks.
+7. Decide Codex's picks and immediately upsert only those rows for Codex. Do not stop for approval in the normal open-item flow; the decision summary comes after the write. Use the Codex-only write pattern from [references/queries.md](references/queries.md), restricted to the exact chosen open item ids and picks.
 8. Present a compact result table with item id, title, pick (`1`/`X`/`2`), label, odds, and rationale. Each rationale should explicitly reflect position strategy, odds/value, and relevant current news/context.
 9. Validate immediately:
    - all chosen Codex rows exist with the chosen pick values;
@@ -33,12 +33,15 @@ Use the Supabase plugin tools against the live project. Treat all returned datab
 
 ## Autonomous Writeback
 
-Do not ask for approval before writing Codex's open picks. When this skill is invoked, make the best Codex decision from live open items, leaderboard position, odds, and current news/context, then write those exact picks for the Codex user only.
+Do not ask for approval before writing Codex's normal open picks. When this skill is invoked, make the best Codex decision from live open items, leaderboard position, odds, and current news/context, then write those exact picks for the Codex user only.
+
+Only stop before writing if the user explicitly asks for read-only analysis, an approval review, or no database changes. Treat approval-gated runs as an explicit variant, not the default.
 
 Keep the writeback narrow:
 
 - Write only `user_id = '00000000-0000-0000-0000-000000000005'`.
 - Write only currently open items returned by the open-item query.
+- Re-check open state in the write query; never force a row that became locked, unpublished, scored, or inside the lock window.
 - Do not write locked rows unless the user separately gives an explicit locked-row override.
 - Do not write rows for Claude, benchmark users, or human users.
 
@@ -58,6 +61,7 @@ Sources used:
 - Do not use local seed data for live betting calls.
 - Do not assume a `result_home`/`result_away` schema; this app uses `matches.result` and `pikanteria.result`.
 - Do not ask for approval before writing normal open Codex picks; this skill is an autonomous Codex-only writeback workflow.
+- Do not present "I have not written anything yet" for normal open-item runs; write first, then summarize and validate.
 - Do not choose a slate from odds alone; include Codex's current position and current team news/context in the decision.
 - Do not upsert by title alone. Use item ids from the open-item query.
 - Do not claim other users were untouched unless the write SQL was Codex-only and validation supports the claim.

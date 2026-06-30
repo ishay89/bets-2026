@@ -1,6 +1,6 @@
 # Query Reference
 
-Use these as templates. Keep the item ids and picks explicit in the approval artifact and in the write query.
+Use these as templates. Keep the item ids and picks explicit in the decision summary and in the write query.
 
 ## Open Items
 
@@ -96,7 +96,7 @@ left join public.pikanteria_answers pa
 
 ## Codex-Only Upsert and Validation
 
-Fill `approved_matches` and `approved_pikanteria` from the exact approved table. When there are no approved rows of a type, use an empty CTE body like `select null::uuid as match_id, null::text as pick where false`.
+Fill `chosen_matches` and `chosen_pikanteria` from the exact picks chosen by Codex. When there are no chosen rows of a type, use an empty CTE body like `select null::uuid as match_id, null::text as pick where false`.
 
 ```sql
 begin;
@@ -116,13 +116,13 @@ group by pikanteria_id;
 with codex_user as (
   select '00000000-0000-0000-0000-000000000005'::uuid as user_id
 ),
-approved_matches(match_id, pick) as (
+chosen_matches(match_id, pick) as (
   values
     ('00000000-0000-0000-0000-000000000000'::uuid, '1')
 ),
 open_matches as (
   select am.match_id, am.pick
-  from approved_matches am
+  from chosen_matches am
   join public.matches m on m.id = am.match_id
   where m.published_at is not null
     and coalesce(m.locked, false) = false
@@ -140,13 +140,13 @@ written_matches as (
         points = null
   returning match_id, pick
 ),
-approved_pikanteria(pikanteria_id, pick) as (
+chosen_pikanteria(pikanteria_id, pick) as (
   values
     ('00000000-0000-0000-0000-000000000000'::uuid, '1')
 ),
 open_pikanteria as (
   select ap.pikanteria_id, ap.pick
-  from approved_pikanteria ap
+  from chosen_pikanteria ap
   join public.pikanteria p on p.id = ap.pikanteria_id
   where p.published_at is not null
     and coalesce(p.locked, false) = false
@@ -168,24 +168,24 @@ union all
 select 'pikanteria' as item_type, pikanteria_id as item_id, pick from written_pikanteria
 order by item_type, item_id;
 
-with approved_matches(match_id, pick) as (
+with chosen_matches(match_id, pick) as (
   values
     ('00000000-0000-0000-0000-000000000000'::uuid, '1')
 ),
-approved_pikanteria(pikanteria_id, pick) as (
+chosen_pikanteria(pikanteria_id, pick) as (
   values
     ('00000000-0000-0000-0000-000000000000'::uuid, '1')
 ),
 codex_match_validation as (
   select 'match' as item_type, am.match_id as item_id, am.pick as expected_pick, pr.pick as actual_pick
-  from approved_matches am
+  from chosen_matches am
   left join public.predictions pr
     on pr.match_id = am.match_id
    and pr.user_id = '00000000-0000-0000-0000-000000000005'
 ),
 codex_pikanteria_validation as (
   select 'pikanteria' as item_type, ap.pikanteria_id as item_id, ap.pick as expected_pick, pa.pick as actual_pick
-  from approved_pikanteria ap
+  from chosen_pikanteria ap
   left join public.pikanteria_answers pa
     on pa.pikanteria_id = ap.pikanteria_id
    and pa.user_id = '00000000-0000-0000-0000-000000000005'
@@ -197,25 +197,25 @@ select *
 from codex_pikanteria_validation
 order by item_type, item_id;
 
-with approved_matches(match_id, pick) as (
+with chosen_matches(match_id, pick) as (
   values
     ('00000000-0000-0000-0000-000000000000'::uuid, '1')
 ),
-approved_pikanteria(pikanteria_id, pick) as (
+chosen_pikanteria(pikanteria_id, pick) as (
   values
     ('00000000-0000-0000-0000-000000000000'::uuid, '1')
 ),
 after_other_prediction_counts as (
   select p.match_id, count(*) as row_count, count(*) filter (where p.pick is not null) as pick_count
   from public.predictions p
-  join approved_matches am on am.match_id = p.match_id
+  join chosen_matches am on am.match_id = p.match_id
   where p.user_id <> '00000000-0000-0000-0000-000000000005'
   group by p.match_id
 ),
 after_other_pikanteria_counts as (
   select pa.pikanteria_id, count(*) as row_count, count(*) filter (where pa.pick is not null) as pick_count
   from public.pikanteria_answers pa
-  join approved_pikanteria ap on ap.pikanteria_id = pa.pikanteria_id
+  join chosen_pikanteria ap on ap.pikanteria_id = pa.pikanteria_id
   where pa.user_id <> '00000000-0000-0000-0000-000000000005'
   group by pa.pikanteria_id
 ),
@@ -229,7 +229,7 @@ match_other_validation as (
     coalesce(a.pick_count, 0) as after_picks,
     coalesce(b.row_count, 0) = coalesce(a.row_count, 0)
       and coalesce(b.pick_count, 0) = coalesce(a.pick_count, 0) as unchanged
-  from approved_matches am
+  from chosen_matches am
   left join before_other_prediction_counts b on b.match_id = am.match_id
   left join after_other_prediction_counts a on a.match_id = am.match_id
 ),
@@ -243,7 +243,7 @@ pikanteria_other_validation as (
     coalesce(a.pick_count, 0) as after_picks,
     coalesce(b.row_count, 0) = coalesce(a.row_count, 0)
       and coalesce(b.pick_count, 0) = coalesce(a.pick_count, 0) as unchanged
-  from approved_pikanteria ap
+  from chosen_pikanteria ap
   left join before_other_pikanteria_counts b on b.pikanteria_id = ap.pikanteria_id
   left join after_other_pikanteria_counts a on a.pikanteria_id = ap.pikanteria_id
 )
