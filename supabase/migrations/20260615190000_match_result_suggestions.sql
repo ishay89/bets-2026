@@ -14,9 +14,8 @@
 create table if not exists public.match_result_suggestions (
   match_id          uuid primary key
                     references public.matches (id) on delete cascade,
-  -- Computed 1 / X / 2 from the external full-time score. For knockout games
-  -- decided in extra time or on penalties this reflects the full-time (incl.
-  -- extra time) scoreline, so an admin should eyeball it before scoring.
+  -- Computed 1 / X / 2 from the external 90-minute score. For knockout games
+  -- decided in extra time or on penalties this remains the regulation result.
   suggested_result  text not null check (suggested_result in ('1', 'X', '2')),
   home_score        integer,
   away_score        integer,

@@ -37,15 +37,25 @@ function score(home: number | null, away: number | null, extra: Partial<FdScore>
 }
 
 describe('fdScoreToPick', () => {
-  it('maps home win / away win / draw from the full-time score', () => {
+  it('maps home win / away win / draw from the 90-minute score', () => {
     expect(fdScoreToPick(score(2, 1))).toBe('1')
     expect(fdScoreToPick(score(0, 3))).toBe('2')
     expect(fdScoreToPick(score(1, 1))).toBe('X')
   })
 
-  it('uses full-time even when a knockout is decided on penalties', () => {
-    // 1-1 after full time, home advances on penalties — the bet outcome is X.
+  it('uses a drawn 90-minute score even when a knockout is decided on penalties', () => {
+    // 1-1 after 90 minutes, home advances on penalties — the bet outcome is X.
     expect(fdScoreToPick(score(1, 1, { winner: 'HOME_TEAM', duration: 'PENALTY_SHOOTOUT' }))).toBe('X')
+  })
+
+  it('uses the regular-time score when the provider includes extra time or penalties in fullTime', () => {
+    expect(fdScoreToPick(score(4, 5, {
+      winner: null,
+      duration: 'PENALTY_SHOOTOUT',
+      regularTime: { home: 1, away: 1 },
+      extraTime: { home: 0, away: 0 },
+      penalties: { home: 4, away: 4 },
+    } as Partial<FdScore>))).toBe('X')
   })
 
   it('returns null when the score is incomplete', () => {

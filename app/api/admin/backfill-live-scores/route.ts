@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/server'
-import { fetchFinishedMatches, getFootballDataConfig, canonicalTeamKey } from '@/lib/football-data'
+import { fetchFinishedMatches, getFootballDataConfig, canonicalTeamKey, fdNinetyMinuteScore } from '@/lib/football-data'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -55,7 +55,8 @@ export async function GET() {
   const errors: string[] = []
 
   for (const m of finished) {
-    if (m.score.fullTime.home == null || m.score.fullTime.away == null) continue
+    const score = fdNinetyMinuteScore(m.score)
+    if (score.home == null || score.away == null) continue
 
     // 1. Exact external id match.
     let dbId = byExternalId.get(m.id)
@@ -84,8 +85,8 @@ export async function GET() {
       .from('matches')
       .update({
         live_status:     'FINISHED',
-        live_score_home: m.score.fullTime.home,
-        live_score_away: m.score.fullTime.away,
+        live_score_home: score.home,
+        live_score_away: score.away,
         live_minute:     null,
       })
       .eq('id', dbId)

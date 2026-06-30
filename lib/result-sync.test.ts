@@ -6,10 +6,28 @@ function score(home: number, away: number): FdScore {
   return { winner: home > away ? 'HOME_TEAM' : home < away ? 'AWAY_TEAM' : 'DRAW', duration: 'REGULAR', fullTime: { home, away } }
 }
 
+function shootoutScore(): FdScore {
+  return {
+    winner: null,
+    duration: 'PENALTY_SHOOTOUT',
+    fullTime: { home: 4, away: 5 },
+    regularTime: { home: 1, away: 1 },
+    extraTime: { home: 0, away: 0 },
+    penalties: { home: 4, away: 4 },
+  } as FdScore
+}
+
 function fd(id: number, home: string | null, away: string | null, utcDate: string, h: number, a: number): FdMatch {
   return {
     id, utcDate, status: 'FINISHED', stage: 'GROUP_STAGE', group: 'GROUP_A',
     homeTeam: { id: null, name: home }, awayTeam: { id: null, name: away }, score: score(h, a),
+  }
+}
+
+function fdWithScore(id: number, home: string, away: string, utcDate: string, fdScore: FdScore): FdMatch {
+  return {
+    id, utcDate, status: 'FINISHED', stage: 'LAST_32', group: null,
+    homeTeam: { id: null, name: home }, awayTeam: { id: null, name: away }, score: fdScore,
   }
 }
 
@@ -49,6 +67,20 @@ describe('reconcile — id matching', () => {
     const { suggestions } = reconcile(internal, fdMatches)
     expect(suggestions).toHaveLength(1)
     expect(suggestions[0].match_id).toBe('mapped')
+  })
+
+  it('suggests and records the regular-time result for knockout shootouts', () => {
+    const internal = [m('a', 'Germany', 'Paraguay', '2026-06-29T20:30:00Z', null, 537415)]
+    const fdMatches = [fdWithScore(537415, 'Germany', 'Paraguay', '2026-06-29T20:30:00Z', shootoutScore())]
+    const { suggestions } = reconcile(internal, fdMatches)
+    expect(suggestions).toHaveLength(1)
+    expect(suggestions[0]).toMatchObject({
+      match_id: 'a',
+      suggested_result: 'X',
+      home_score: 1,
+      away_score: 1,
+      duration: 'PENALTY_SHOOTOUT',
+    })
   })
 })
 
