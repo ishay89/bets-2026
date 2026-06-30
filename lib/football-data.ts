@@ -1,10 +1,10 @@
 // football-data.org v4 client + pure mapping helpers for the results sync.
 //
 // Free tier is enough for what we need: finished World Cup matches with a
-// full-time score. We read the competition's *current* season (the WC is the
+// settled score. We read the competition's *current* season (the WC is the
 // current WC season during the tournament), filter to FINISHED, and convert
-// each into a 1 / X / 2 suggestion. The HTTP layer is intentionally thin; all
-// the testable logic lives in the pure helpers below.
+// each into a 1 / X / 2 suggestion based on the 90-minute result. The HTTP
+// layer is intentionally thin; all the testable logic lives below.
 
 import type { Pick, Stage } from './types'
 
@@ -16,6 +16,9 @@ export interface FdScore {
   winner: 'HOME_TEAM' | 'AWAY_TEAM' | 'DRAW' | null
   duration: 'REGULAR' | 'EXTRA_TIME' | 'PENALTY_SHOOTOUT' | string
   fullTime: { home: number | null; away: number | null }
+  regularTime?: { home: number | null; away: number | null }
+  extraTime?: { home: number | null; away: number | null }
+  penalties?: { home: number | null; away: number | null }
 }
 
 export interface FdMatch {
@@ -76,12 +79,20 @@ export function canonicalTeamKey(name: string): string {
   return TEAM_ALIASES[norm] ?? norm
 }
 
+// football-data.org uses `fullTime` as the final settled score for knockouts,
+// which can include extra time / penalties. Our bets settle on the 90 minutes,
+// so prefer `regularTime` when the provider includes it.
+export function fdNinetyMinuteScore(score: FdScore): { home: number | null; away: number | null } {
+  const regular = score.regularTime
+  if (regular?.home != null && regular.away != null) return regular
+  return score.fullTime
+}
+
 // Convert a finished provider score into our 1 / X / 2 outcome. We compare the
-// full-time scoreline rather than score.winner, so a knockout drawn after 90'
-// but won on penalties still maps to 'X' at full time — the value bettors
-// actually predicted. Callers should still let an admin confirm knockouts.
+// 90-minute scoreline rather than score.winner or score.fullTime, so a knockout
+// drawn after 90' but won in extra time or penalties still maps to 'X'.
 export function fdScoreToPick(score: FdScore): Pick | null {
-  const { home, away } = score.fullTime
+  const { home, away } = fdNinetyMinuteScore(score)
   if (home == null || away == null) return null
   if (home > away) return '1'
   if (home < away) return '2'

@@ -12,7 +12,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createAdminClient } from './supabase/server'
-import { fetchAllMatches, getFootballDataConfig, type FootballDataConfig } from './football-data'
+import { fdNinetyMinuteScore, fetchAllMatches, getFootballDataConfig, type FootballDataConfig } from './football-data'
 import { runResultsSync } from './result-sync-runner'
 import type { LiveStatus } from './types'
 
@@ -74,12 +74,13 @@ async function syncLiveScores(config: FootballDataConfig): Promise<boolean> {
   let anyFinished = false
 
   for (const m of liveWindowMatches) {
+    const score = fdNinetyMinuteScore(m.score)
     const { error } = await supabase
       .from('matches')
       .update({
         live_status:     m.status as LiveStatus,
-        live_score_home: m.score.fullTime.home,
-        live_score_away: m.score.fullTime.away,
+        live_score_home: score.home,
+        live_score_away: score.away,
         live_minute:     m.minute ?? null,
         live_synced_at:  syncedAt,
       })

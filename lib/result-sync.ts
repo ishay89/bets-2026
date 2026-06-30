@@ -11,7 +11,7 @@
 // Supabase lives in result-sync-runner.ts.
 
 import type { Pick } from './types'
-import { canonicalTeamKey, fdScoreToPick, type FdMatch } from './football-data'
+import { canonicalTeamKey, fdNinetyMinuteScore, fdScoreToPick, type FdMatch } from './football-data'
 
 export interface InternalMatch {
   id: string
@@ -47,11 +47,12 @@ function pairKey(home: string, away: string): string {
 }
 
 function buildSuggestion(internal: InternalMatch, fd: FdMatch, pick: Pick): SuggestionWrite {
+  const score = fdNinetyMinuteScore(fd.score)
   return {
     match_id: internal.id,
     suggested_result: pick,
-    home_score: fd.score.fullTime.home,
-    away_score: fd.score.fullTime.away,
+    home_score: score.home,
+    away_score: score.away,
     external_match_id: fd.id,
     raw_winner: fd.score.winner,
     duration: fd.score.duration ?? null,
