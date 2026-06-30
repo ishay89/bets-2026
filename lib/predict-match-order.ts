@@ -26,8 +26,12 @@ function itemKickoffMs(item: Match | Pikanteria): number {
   return new Date(item.kickoff_time).getTime()
 }
 
+function isActiveLiveStatus(match: Pick<Match, 'live_status'>): boolean {
+  return match.live_status === 'IN_PLAY' || match.live_status === 'PAUSED'
+}
+
 function isLiveMatch(item: PredictDayBet): boolean {
-  return item.kind === 'match' && (item.bet.live_status === 'IN_PLAY' || item.bet.live_status === 'PAUSED')
+  return item.kind === 'match' && isActiveLiveStatus(item.bet)
 }
 
 export function sortPredictMatches<T extends Pick<Match, 'kickoff_time' | 'live_status' | 'result'>>(
@@ -86,7 +90,7 @@ export function getPredictLiveRefreshMatchIds(days: readonly FullMatchDay[], now
   return sortPredictMatchDays(days, now)
     .flatMap(day => sortPredictMatches(day.matches, now))
     .filter(match => {
-      if (match.result !== null) return false
+      if (match.result !== null && !isActiveLiveStatus(match)) return false
       const kickoff = kickoffMs(match)
       return kickoff >= windowStart && kickoff <= windowEnd
     })

@@ -1,7 +1,9 @@
-import { describe, it, expect } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   normalizeTeamName,
   canonicalTeamKey,
+  fetchFinishedMatches,
+  fdNinetyMinuteScore,
   fdScoreToPick,
   isScorableFdMatch,
   type FdMatch,
@@ -58,6 +60,18 @@ describe('fdScoreToPick', () => {
     } as Partial<FdScore>))).toBe('X')
   })
 
+  it('derives the 90-minute score by removing extra-time goals when regularTime is missing', () => {
+    const providerScore = score(2, 1, {
+      winner: 'HOME_TEAM',
+      duration: 'EXTRA_TIME',
+      regularTime: { home: null, away: null },
+      extraTime: { home: 1, away: 0 },
+    })
+
+    expect(fdNinetyMinuteScore(providerScore)).toEqual({ home: 1, away: 1 })
+    expect(fdScoreToPick(providerScore)).toBe('X')
+  })
+
   it('returns null when the score is incomplete', () => {
     expect(fdScoreToPick(score(null, null))).toBeNull()
     expect(fdScoreToPick(score(1, null))).toBeNull()
@@ -82,8 +96,48 @@ describe('isScorableFdMatch', () => {
     expect(isScorableFdMatch(fdMatch('FINISHED', 2, 1))).toBe(true)
   })
 
-  it('rejects in-play or score-less matches', () => {
+  it('accepts extra-time matches because our app settles after 90 minutes', () => {
+    expect(isScorableFdMatch({
+      ...fdMatch('PAUSED', 1, 1),
+      score: score(1, 1, {
+        winner: 'DRAW',
+        duration: 'EXTRA_TIME',
+        regularTime: { home: null, away: null },
+        extraTime: { home: 0, away: 0 },
+      }),
+    })).toBe(true)
+  })
+
+  it('rejects regular half-time pauses, in-play regular time, or score-less matches', () => {
+    expect(isScorableFdMatch(fdMatch('PAUSED', 1, 0))).toBe(false)
     expect(isScorableFdMatch(fdMatch('IN_PLAY', 1, 0))).toBe(false)
     expect(isScorableFdMatch(fdMatch('FINISHED', null, null))).toBe(false)
+  })
+})
+
+describe('fetchFinishedMatches', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('fetches all matches so post-regular-time games can settle before provider FINISHED', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify({
+        matches: [{
+          ...fdMatch('PAUSED', 1, 1),
+          score: score(1, 1, {
+            winner: 'DRAW',
+            duration: 'EXTRA_TIME',
+            regularTime: { home: null, away: null },
+            extraTime: { home: 0, away: 0 },
+          }),
+        }],
+      })),
+    )
+
+    const matches = await fetchFinishedMatches({ apiKey: 'test-key', competition: 'WC' })
+
+    expect(String(fetchMock.mock.calls[0][0])).not.toContain('status=FINISHED')
+    expect(matches.map(match => match.id)).toEqual([1])
   })
 })

@@ -6,13 +6,19 @@
 // These are entirely separate from matches.result, which is the admin-settled
 // outcome used for scoring; this code never touches that column.
 //
-// When a match transitions to FINISHED the function also calls runResultsSync()
-// — the same function the nightly cron uses — so settlement happens promptly
+// When a match transitions to FINISHED, or into the post-90-minute phase that
+// is final for our betting rules, the function also calls runResultsSync() —
+// the same function the nightly cron uses — so settlement happens promptly
 // rather than waiting until 3:30 AM UTC.
 
 import { revalidatePath } from 'next/cache'
 import { createAdminClient } from './supabase/server'
-import { fdNinetyMinuteScore, fetchAllMatches, getFootballDataConfig, type FootballDataConfig } from './football-data'
+import {
+  fetchAllMatches,
+  getFootballDataConfig,
+  isScorableFdMatch,
+  type FootballDataConfig,
+} from './football-data'
 import { runResultsSync } from './result-sync-runner'
 import type { LiveStatus } from './types'
 
@@ -71,17 +77,19 @@ async function syncLiveScores(config: FootballDataConfig): Promise<boolean> {
   if (liveWindowMatches.length === 0) return false
 
   const syncedAt = now.toISOString()
-  let anyFinished = false
+  let anySettleable = false
 
   for (const m of liveWindowMatches) {
-    const score = fdNinetyMinuteScore(m.score)
+    const liveScore = m.score.fullTime
+    const liveStatus = m.status as LiveStatus
+    const shouldSettle = isScorableFdMatch(m)
     const { error } = await supabase
       .from('matches')
       .update({
-        live_status:     m.status as LiveStatus,
-        live_score_home: score.home,
-        live_score_away: score.away,
-        live_minute:     m.minute ?? null,
+        live_status:     liveStatus,
+        live_score_home: liveScore.home,
+        live_score_away: liveScore.away,
+        live_minute:     liveStatus === 'FINISHED' ? null : m.minute ?? null,
         live_synced_at:  syncedAt,
       })
       .eq('external_match_id', m.id)
@@ -89,13 +97,13 @@ async function syncLiveScores(config: FootballDataConfig): Promise<boolean> {
     if (error) {
       console.error('[live-sync] failed to update external_match_id', m.id, error.message)
     }
-    if (m.status === 'FINISHED') anyFinished = true
+    if (shouldSettle) anySettleable = true
   }
 
-  // When any match has finished, trigger the existing settlement path so scores
-  // settle promptly. runResultsSync is idempotent — already-scored matches are
-  // skipped automatically.
-  if (anyFinished) {
+  // When any match has finished for our app's rules, trigger the existing
+  // settlement path so scores settle promptly. runResultsSync is idempotent —
+  // already-scored matches are skipped automatically.
+  if (anySettleable) {
     await runResultsSync(supabase, config)
   }
 

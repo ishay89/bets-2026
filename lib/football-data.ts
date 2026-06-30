@@ -1,10 +1,11 @@
 // football-data.org v4 client + pure mapping helpers for the results sync.
 //
-// Free tier is enough for what we need: finished World Cup matches with a
-// settled score. We read the competition's *current* season (the WC is the
-// current WC season during the tournament), filter to FINISHED, and convert
-// each into a 1 / X / 2 suggestion based on the 90-minute result. The HTTP
-// layer is intentionally thin; all the testable logic lives below.
+// Free tier is enough for what we need: World Cup matches with a settled
+// regular-time score. We read the competition's *current* season (the WC is
+// the current WC season during the tournament), filter to matches that are
+// finished or already past 90 minutes, and convert each into a 1 / X / 2
+// suggestion based on the 90-minute result. The HTTP layer is intentionally
+// thin; all the testable logic lives below.
 
 import type { Pick, Stage } from './types'
 
@@ -85,6 +86,18 @@ export function canonicalTeamKey(name: string): string {
 export function fdNinetyMinuteScore(score: FdScore): { home: number | null; away: number | null } {
   const regular = score.regularTime
   if (regular?.home != null && regular.away != null) return regular
+  const extra = score.extraTime
+  const full = score.fullTime
+  if (score.duration !== 'REGULAR'
+    && full.home != null
+    && full.away != null
+    && extra?.home != null
+    && extra.away != null) {
+    return {
+      home: full.home - extra.home,
+      away: full.away - extra.away,
+    }
+  }
   return score.fullTime
 }
 
@@ -99,9 +112,17 @@ export function fdScoreToPick(score: FdScore): Pick | null {
   return 'X'
 }
 
-// Is this match finished and safe to turn into a suggestion?
+function isPostRegularTimeDuration(duration: FdScore['duration']): boolean {
+  return duration === 'EXTRA_TIME' || duration === 'PENALTY_SHOOTOUT'
+}
+
+// Is this match safe to turn into an app result? The provider may keep knockout
+// games in PAUSED/IN_PLAY while extra time or penalties continue, but our bets
+// settle after 90 minutes.
 export function isScorableFdMatch(m: FdMatch): boolean {
-  return m.status === 'FINISHED' && fdScoreToPick(m.score) != null
+  const statusAllowsSettlement = m.status === 'FINISHED'
+    || ((m.status === 'IN_PLAY' || m.status === 'PAUSED') && isPostRegularTimeDuration(m.score.duration))
+  return statusAllowsSettlement && fdScoreToPick(m.score) != null
 }
 
 // ─── HTTP layer ──────────────────────────────────────────────────────────────
@@ -120,18 +141,20 @@ export function getFootballDataConfig(): FootballDataConfig | null {
   }
 }
 
-// Fetch finished matches for the competition's current season. Optional date
-// window narrows the call (and helps stay under the free-tier rate limit).
+// Fetch matches that are settleable for this app: provider-finished matches and
+// knockout games already past 90 minutes. Optional date window narrows the call
+// (and helps stay under the free-tier rate limit).
 export async function fetchFinishedMatches(
   config: FootballDataConfig,
   opts: { dateFrom?: string; dateTo?: string } = {},
 ): Promise<FdMatch[]> {
   const competition = config.competition || 'WC'
-  const params = new URLSearchParams({ status: 'FINISHED' })
+  const params = new URLSearchParams()
   if (opts.dateFrom) params.set('dateFrom', opts.dateFrom)
   if (opts.dateTo) params.set('dateTo', opts.dateTo)
 
-  const url = `${FD_BASE}/competitions/${competition}/matches?${params}`
+  const query = params.toString()
+  const url = `${FD_BASE}/competitions/${competition}/matches${query ? `?${query}` : ''}`
   const res = await fetch(url, {
     headers: { 'X-Auth-Token': config.apiKey },
     // Always hit the network; results change during match days.
