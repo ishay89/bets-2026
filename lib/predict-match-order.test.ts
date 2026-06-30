@@ -148,4 +148,27 @@ describe('getPredictLiveRefreshMatchIds', () => {
       'starting-soon',
     ].toSorted())
   })
+
+  it('keeps refreshing scored matches while their live status is still active', () => {
+    const refreshDay = day({
+      id: 'refresh-day',
+      date: '2026-06-17',
+      matches: [
+        match({
+          id: 'settled-extra-time',
+          kickoff_time: '2026-06-17T17:00:00Z',
+          result: 'X',
+          live_status: 'PAUSED',
+        }),
+        match({
+          id: 'provider-finished',
+          kickoff_time: '2026-06-17T17:00:00Z',
+          result: '1',
+          live_status: 'FINISHED',
+        }),
+      ],
+    })
+
+    expect(getPredictLiveRefreshMatchIds([refreshDay], NOW)).toEqual(['settled-extra-time'])
+  })
 })

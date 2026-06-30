@@ -14,7 +14,6 @@
 import { revalidatePath } from 'next/cache'
 import { createAdminClient } from './supabase/server'
 import {
-  fdNinetyMinuteScore,
   fetchAllMatches,
   getFootballDataConfig,
   isScorableFdMatch,
@@ -81,15 +80,16 @@ async function syncLiveScores(config: FootballDataConfig): Promise<boolean> {
   let anySettleable = false
 
   for (const m of liveWindowMatches) {
-    const score = fdNinetyMinuteScore(m.score)
-    const appLiveStatus: LiveStatus = isScorableFdMatch(m) ? 'FINISHED' : m.status as LiveStatus
+    const liveScore = m.score.fullTime
+    const liveStatus = m.status as LiveStatus
+    const shouldSettle = isScorableFdMatch(m)
     const { error } = await supabase
       .from('matches')
       .update({
-        live_status:     appLiveStatus,
-        live_score_home: score.home,
-        live_score_away: score.away,
-        live_minute:     appLiveStatus === 'FINISHED' ? null : m.minute ?? null,
+        live_status:     liveStatus,
+        live_score_home: liveScore.home,
+        live_score_away: liveScore.away,
+        live_minute:     liveStatus === 'FINISHED' ? null : m.minute ?? null,
         live_synced_at:  syncedAt,
       })
       .eq('external_match_id', m.id)
@@ -97,7 +97,7 @@ async function syncLiveScores(config: FootballDataConfig): Promise<boolean> {
     if (error) {
       console.error('[live-sync] failed to update external_match_id', m.id, error.message)
     }
-    if (appLiveStatus === 'FINISHED') anySettleable = true
+    if (shouldSettle) anySettleable = true
   }
 
   // When any match has finished for our app's rules, trigger the existing
