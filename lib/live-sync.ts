@@ -12,6 +12,7 @@
 // rather than waiting until 3:30 AM UTC.
 
 import { revalidatePath } from 'next/cache'
+import { after } from 'next/server'
 import { createAdminClient } from './supabase/server'
 import {
   fetchAllMatches,
@@ -57,7 +58,14 @@ async function needsLiveSync(): Promise<boolean> {
   return data !== null
 }
 
-async function syncLiveScores(config: FootballDataConfig): Promise<boolean> {
+// Fetch the live window and write live_status/score onto each match row. This
+// is the one piece both sync paths share, and it is intentionally free of cache
+// and settlement side effects (no revalidatePath, no runResultsSync) so it is
+// safe to await during a Server Component render. Returns whether any live-
+// window match was written and whether any of them is now settleable.
+async function writeLiveWindowScores(
+  config: FootballDataConfig,
+): Promise<{ wrote: boolean; anySettleable: boolean }> {
   const supabase = createAdminClient()
 
   // One API call fetches the entire WC season (~80 matches). Filtering to the
@@ -74,7 +82,7 @@ async function syncLiveScores(config: FootballDataConfig): Promise<boolean> {
     return ms >= windowStart && ms <= windowEnd
   })
 
-  if (liveWindowMatches.length === 0) return false
+  if (liveWindowMatches.length === 0) return { wrote: false, anySettleable: false }
 
   const syncedAt = now.toISOString()
   let anySettleable = false
@@ -100,20 +108,30 @@ async function syncLiveScores(config: FootballDataConfig): Promise<boolean> {
     if (shouldSettle) anySettleable = true
   }
 
-  // When any match has finished for our app's rules, trigger the existing
-  // settlement path so scores settle promptly. runResultsSync is idempotent —
-  // already-scored matches are skipped automatically.
-  if (anySettleable) {
-    await runResultsSync(supabase, config)
-  }
+  return { wrote: true, anySettleable }
+}
 
-  // Bust the page caches for pages that show live score data.
+// Bust the page caches for surfaces that show live score data.
+function revalidateLivePaths(): void {
   revalidatePath('/predict')
   revalidatePath('/board')
   revalidatePath('/leaderboard')
   revalidatePath('/u/[userId]', 'layout')
   revalidatePath('/h2h/[opponentId]', 'layout')
+}
 
+async function syncLiveScores(config: FootballDataConfig): Promise<boolean> {
+  const { wrote, anySettleable } = await writeLiveWindowScores(config)
+  if (!wrote) return false
+
+  // When any match has finished for our app's rules, trigger the existing
+  // settlement path so scores settle promptly. runResultsSync is idempotent —
+  // already-scored matches are skipped automatically.
+  if (anySettleable) {
+    await runResultsSync(createAdminClient(), config)
+  }
+
+  revalidateLivePaths()
   return true
 }
 
@@ -146,5 +164,35 @@ export async function maybeSyncLiveScores(): Promise<boolean> {
   } catch (err) {
     console.error('[live-sync] background sync error', err)
     return false
+  }
+}
+
+// Blocking, render-safe entry point for page Server Components. Awaited BEFORE
+// the page fetches its match data so the very first paint already contains live
+// scores instead of "VS": the page renders from data the sync just wrote,
+// rather than the pre-sync snapshot that after(maybeSyncLiveScores) only
+// refreshes on a later poll cycle.
+//
+// The cheap needsLiveSync() gate keeps non-live-window loads to a single indexed
+// read, so pages pay the provider round-trip only while a match is actually
+// live. Settlement and cache revalidation are deferred to after(): revalidatePath
+// throws if called during render, and scoring is non-urgent for this paint. The
+// existing after(maybeSyncLiveScores) call on each page still handles stuck-match
+// cleanup and acts as a fallback.
+export async function syncLiveScoresBeforeRender(): Promise<void> {
+  const config = getFootballDataConfig()
+  if (!config) return
+  try {
+    if (!await needsLiveSync()) return
+    const { wrote, anySettleable } = await writeLiveWindowScores(config)
+    if (!wrote) return
+    after(async () => {
+      if (anySettleable) {
+        await runResultsSync(createAdminClient(), config)
+      }
+      revalidateLivePaths()
+    })
+  } catch (err) {
+    console.error('[live-sync] render-blocking sync error', err)
   }
 }

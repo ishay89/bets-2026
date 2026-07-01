@@ -3,7 +3,7 @@ import { after } from 'next/server'
 import { createAdminClient, createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
-import { maybeSyncLiveScores } from '@/lib/live-sync'
+import { maybeSyncLiveScores, syncLiveScoresBeforeRender } from '@/lib/live-sync'
 import { BottomNav } from '@/components/bottom-nav'
 import type { Pick } from '@/lib/types'
 import type { CrowdTally } from '@/lib/crowd'
@@ -142,13 +142,18 @@ export default async function PredictPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  // Fire-and-forget live score sync after the response is sent.
+  // Fire-and-forget live score sync after the response is sent (stuck-match
+  // cleanup + fallback).
   after(maybeSyncLiveScores)
 
   const adminClient = createAdminClient()
+  // Block on a live-score refresh (only when a match is actually live) so the
+  // first paint shows the score instead of "VS"; runs in parallel with the lock
+  // persistence so it adds no serial latency beyond the provider round-trip.
   await Promise.all([
     persistDueMatchLocks(adminClient),
     persistDuePikanteriaLocks(adminClient),
+    syncLiveScoresBeforeRender(),
   ])
 
   const matchDays = await getPublishedMatchDaysWithAll(supabase)
