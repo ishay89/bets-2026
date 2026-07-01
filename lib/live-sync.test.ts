@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { FdMatch, FdScore } from './football-data'
 
 const updatePayloads: unknown[] = []
+const afterCallbacks: Array<() => Promise<void> | void> = []
 
 const extraTimeMatch: FdMatch = {
   id: 537418,
@@ -24,6 +25,12 @@ const extraTimeMatch: FdMatch = {
 
 vi.mock('next/cache', () => ({
   revalidatePath: vi.fn(),
+}))
+
+// after() defers work past the response; capture the callbacks so tests can run
+// them explicitly and assert the deferred settlement/revalidation.
+vi.mock('next/server', () => ({
+  after: (cb: () => Promise<void> | void) => { afterCallbacks.push(cb) },
 }))
 
 vi.mock('./result-sync-runner', () => ({
@@ -82,6 +89,7 @@ vi.mock('./supabase/server', () => ({
 describe('maybeSyncLiveScores', () => {
   beforeEach(() => {
     updatePayloads.length = 0
+    afterCallbacks.length = 0
     vi.setSystemTime(new Date('2026-06-17T18:00:00Z'))
   })
 
@@ -98,5 +106,40 @@ describe('maybeSyncLiveScores', () => {
       live_minute: null,
     }))
     expect(runResultsSync).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('syncLiveScoresBeforeRender', () => {
+  beforeEach(() => {
+    updatePayloads.length = 0
+    afterCallbacks.length = 0
+    vi.clearAllMocks()
+    vi.setSystemTime(new Date('2026-06-17T18:00:00Z'))
+  })
+
+  it('writes the live score synchronously so the first paint has it, and defers settlement/revalidation to after()', async () => {
+    const { syncLiveScoresBeforeRender } = await import('./live-sync')
+    const { runResultsSync } = await import('./result-sync-runner')
+    const { revalidatePath } = await import('next/cache')
+
+    await syncLiveScoresBeforeRender()
+
+    // The live-score write happens synchronously (before render reads the row).
+    expect(updatePayloads).toContainEqual(expect.objectContaining({
+      live_status: 'PAUSED',
+      live_score_home: 2,
+      live_score_away: 1,
+      live_minute: null,
+    }))
+
+    // Settlement and cache revalidation are deferred, not run during render.
+    expect(runResultsSync).not.toHaveBeenCalled()
+    expect(revalidatePath).not.toHaveBeenCalled()
+    expect(afterCallbacks).toHaveLength(1)
+
+    // Running the deferred callback settles and revalidates.
+    await afterCallbacks[0]()
+    expect(runResultsSync).toHaveBeenCalledTimes(1)
+    expect(revalidatePath).toHaveBeenCalledWith('/predict')
   })
 })
