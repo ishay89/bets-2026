@@ -2,7 +2,13 @@ import type { FullMatchDay } from './data'
 import type { Match, Pikanteria } from './types'
 
 type MatchBucket = 0 | 1 | 2
-const LIVE_REFRESH_WINDOW_PAST_MS = 145 * 60 * 1000
+// Keep these aligned with WINDOW_PAST_MS / WINDOW_FUTURE_MS in lib/live-sync.ts.
+// The client should keep auto-refreshing for exactly as long as the server keeps
+// syncing a match; a shorter client past-window (was 145 min) stopped refreshing
+// knockout games that ran into extra time or penalties while the server was
+// still writing live updates. 200 min = 90 regular + 30 extra + 30 penalties +
+// 50 buffer covers the worst-case knockout.
+const LIVE_REFRESH_WINDOW_PAST_MS = 200 * 60 * 1000
 const LIVE_REFRESH_WINDOW_FUTURE_MS = 10 * 60 * 1000
 const MISSING_KICKOFF_TIME = Number.MAX_SAFE_INTEGER
 

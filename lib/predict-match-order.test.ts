@@ -139,7 +139,7 @@ describe('getPredictLiveRefreshMatchIds', () => {
         match({ id: 'starting-soon', kickoff_time: '2026-06-17T18:08:00Z' }),
         match({ id: 'finished', kickoff_time: '2026-06-17T16:00:00Z', result: 'X' }),
         match({ id: 'too-late', kickoff_time: '2026-06-17T18:30:00Z' }),
-        match({ id: 'too-old', kickoff_time: '2026-06-17T15:00:00Z' }),
+        match({ id: 'too-old', kickoff_time: '2026-06-17T14:30:00Z' }),
       ],
     })
 
