@@ -35,6 +35,22 @@ const getCachedMatchDaysForViewer = unstable_cache(
   { revalidate: 60, tags: ['match-days'] },
 )
 
+// Caches the DERIVED view model, not just the raw fetch — Vercel's Active CPU
+// billing excludes I/O wait (the DB round-trip above), so the actual billed
+// cost per request is buildDays()'s loop over every match day. Without this,
+// that loop re-runs on every request even when getCachedMatchDaysForViewer
+// hits. nowBucket rounds down to the minute so the key stays stable within
+// the same 60s window as the underlying data; rounding down only ever delays
+// a lock transition by up to 60s, never reveals a pick early.
+const getCachedProfileDayVMs = unstable_cache(
+  async (viewerId: string, targetId: string, accessToken: string, nowBucket: number) => {
+    const days = await getCachedMatchDaysForViewer(viewerId, accessToken)
+    return buildDays(days, targetId, nowBucket)
+  },
+  ['profile-day-vms'],
+  { revalidate: 60, tags: ['match-days'] },
+)
+
 export const metadata = { title: 'Player history | Mondial Bets 2026', description: 'A player’s locked predictions' }
 
 const PICK_LABELS: Record<string, string> = { '1': '1', X: 'X', '2': '2' }
@@ -144,7 +160,10 @@ export default async function PlayerHistoryPage({
   // — getUser() above remains the authoritative identity check.
   const { data: { session } } = await supabase.auth.getSession()
 
-  const [profileRes, entries, matchDaysRaw, futuresLocked, futuresPick] = await Promise.all([
+  const now = nowMs()
+  const nowBucket = Math.floor(now / 60_000) * 60_000
+
+  const [profileRes, entries, dayVMs, futuresLocked, futuresPick] = await Promise.all([
     supabase
       .from('users')
       .select('id, display_name, avatar_emoji, is_monkey, automation_strategy, status')
@@ -152,8 +171,8 @@ export default async function PlayerHistoryPage({
       .maybeSingle(),
     getCachedLeaderboardEntries(),
     session
-      ? getCachedMatchDaysForViewer(user.id, session.access_token)
-      : getMatchDaysWithUserData(supabase),
+      ? getCachedProfileDayVMs(user.id, userId, session.access_token, nowBucket)
+      : getMatchDaysWithUserData(supabase).then(days => buildDays(days, userId, now)),
     isFuturesLocked(supabase),
     getUserFuturesPick(supabase, userId),
   ])
@@ -166,9 +185,6 @@ export default async function PlayerHistoryPage({
   const rank = entries.findIndex(e => e.id === userId) + 1
   const automationLabel = getAutomationLabel(profile)
   const avatar = getAvatar(profile)
-
-  const now = nowMs()
-  const dayVMs = buildDays(matchDaysRaw, userId, now)
 
   // Champion / top scorer stay hidden until futures lock — same rule the
   // player's own /predict reveal uses. pre_tournament_picks has no lock-aware
