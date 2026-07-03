@@ -39,6 +39,45 @@ export interface ReconcileResult {
   unmatched: { home: string; away: string; utcDate: string }[]
 }
 
+// A write onto the live-score display columns, applied by the runner after a
+// match is settled. See buildFinalLiveScoreUpdates below.
+export interface FinalLiveScoreUpdate {
+  match_id: string
+  live_status: 'FINISHED'
+  live_score_home: number | null
+  live_score_away: number | null
+  live_minute: null
+}
+
+// When a match auto-settles, reconcile its live-score display columns to the
+// SAME 90-minute scoreline that produced the result. The live poller only runs
+// on page views inside the match window and can freeze on a mid-game snapshot
+// (e.g. Portugal 1-1) if no view lands between the final goal and the game
+// leaving the window — leaving a settled card showing a score that contradicts
+// its own result chip. Settlement already holds the authoritative scoreline
+// (the same one written to the audit trail), so we push it onto the live columns
+// here. Only matches that actually scored are written (a match in a failed day
+// keeps result IS NULL and must not be shown as FINISHED).
+//
+// We deliberately use the 90-minute score (what `result` is derived from) rather
+// than the provider's full-time score, so the displayed score can never
+// disagree with the settled 1/X/2 outcome.
+export function buildFinalLiveScoreUpdates(
+  suggestions: SuggestionWrite[],
+  scoredMatchIds: string[],
+): FinalLiveScoreUpdate[] {
+  const scored = new Set(scoredMatchIds)
+  return suggestions
+    .filter(s => scored.has(s.match_id))
+    .map(s => ({
+      match_id: s.match_id,
+      live_status: 'FINISHED',
+      live_score_home: s.home_score,
+      live_score_away: s.away_score,
+      live_minute: null,
+    }))
+}
+
 // Default kickoff tolerance for the name/date fallback only.
 const DEFAULT_TOLERANCE_HOURS = 36
 

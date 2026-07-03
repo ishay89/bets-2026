@@ -13,7 +13,7 @@ import {
   getFootballDataConfig,
   type FootballDataConfig,
 } from './football-data'
-import { reconcile, type InternalMatch } from './result-sync'
+import { reconcile, buildFinalLiveScoreUpdates, type InternalMatch } from './result-sync'
 import { autoScoreMatches, type MatchToScore } from './score-matches'
 
 type AdminClient = ReturnType<typeof createAdminClient>
@@ -91,6 +91,26 @@ export async function runResultsSync(
       .from('match_result_suggestions')
       .upsert(auditRows, { onConflict: 'match_id' })
     if (error) throw error
+  }
+
+  // Reconcile the live-score display columns to the settled scoreline. Without
+  // this, a match whose live poll froze mid-game (e.g. Portugal 1-1 before the
+  // 2-1 winner) settles correctly but keeps showing the stale score. This is a
+  // display-only, best-effort write: a failure here must not fail the sync (the
+  // result is already committed), so we log and carry on rather than throw.
+  for (const u of buildFinalLiveScoreUpdates(suggestions, scoredMatchIds)) {
+    const { error } = await supabase
+      .from('matches')
+      .update({
+        live_status:     u.live_status,
+        live_score_home: u.live_score_home,
+        live_score_away: u.live_score_away,
+        live_minute:     u.live_minute,
+      })
+      .eq('id', u.match_id)
+    if (error) {
+      console.error('[result-sync] live-score writeback failed', u.match_id, error.message)
+    }
   }
 
   return {

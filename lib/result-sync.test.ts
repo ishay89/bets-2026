@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { reconcile, type InternalMatch } from './result-sync'
+import { reconcile, buildFinalLiveScoreUpdates, type InternalMatch, type SuggestionWrite } from './result-sync'
 import type { FdMatch, FdScore } from './football-data'
 
 function score(home: number, away: number): FdScore {
@@ -133,5 +133,41 @@ describe('reconcile — name/date fallback (unmapped rows)', () => {
     const { suggestions, unmatched } = reconcile(internal, fdMatches)
     expect(suggestions).toHaveLength(0)
     expect(unmatched[0]).toMatchObject({ home: 'Spain', away: 'Uruguay' })
+  })
+})
+
+describe('buildFinalLiveScoreUpdates', () => {
+  const suggestion = (
+    match_id: string, home_score: number | null, away_score: number | null,
+  ): SuggestionWrite => ({
+    match_id,
+    suggested_result: home_score != null && away_score != null && home_score > away_score ? '1' : 'X',
+    home_score,
+    away_score,
+    external_match_id: 1,
+    raw_winner: null,
+    duration: 'REGULAR',
+  })
+
+  it('reconciles each scored match to a FINISHED live score from its 90-minute scoreline', () => {
+    // The reported bug: Portugal won 2-1 but the live poller froze on a 1-1
+    // snapshot. Settlement must push the settled scoreline onto the live columns.
+    const suggestions = [suggestion('portugal', 2, 1)]
+    const updates = buildFinalLiveScoreUpdates(suggestions, ['portugal'])
+    expect(updates).toEqual([
+      { match_id: 'portugal', live_status: 'FINISHED', live_score_home: 2, live_score_away: 1, live_minute: null },
+    ])
+  })
+
+  it('only writes matches that were actually scored (skips failed-day suggestions)', () => {
+    const suggestions = [suggestion('scored', 1, 0), suggestion('failed-day', 3, 3)]
+    const updates = buildFinalLiveScoreUpdates(suggestions, ['scored'])
+    expect(updates).toHaveLength(1)
+    expect(updates[0].match_id).toBe('scored')
+  })
+
+  it('returns nothing when no matches were scored', () => {
+    const suggestions = [suggestion('a', 1, 0)]
+    expect(buildFinalLiveScoreUpdates(suggestions, [])).toEqual([])
   })
 })
