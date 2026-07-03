@@ -49,33 +49,43 @@ export interface FinalLiveScoreUpdate {
   live_minute: null
 }
 
-// When a match auto-settles, reconcile its live-score display columns to the
-// SAME 90-minute scoreline that produced the result. The live poller only runs
-// on page views inside the match window and can freeze on a mid-game snapshot
-// (e.g. Portugal 1-1) if no view lands between the final goal and the game
-// leaving the window — leaving a settled card showing a score that contradicts
-// its own result chip. Settlement already holds the authoritative scoreline
-// (the same one written to the audit trail), so we push it onto the live columns
-// here. Only matches that actually scored are written (a match in a failed day
-// keeps result IS NULL and must not be shown as FINISHED).
+// When a match auto-settles, reconcile its live-score DISPLAY columns to the
+// provider's actual full-time score. The live poller only runs on page views
+// inside the match window and can freeze on a mid-game snapshot (e.g. Portugal
+// 1-1) if no view lands between the final goal and the game leaving the window,
+// leaving a settled card showing a stale score. Settlement already fetched the
+// finished game, so we push the real final score onto the live columns here.
 //
-// We deliberately use the 90-minute score (what `result` is derived from) rather
-// than the provider's full-time score, so the displayed score can never
-// disagree with the settled 1/X/2 outcome.
+// Display vs. settlement are intentionally different scores:
+//   - live_score_* shows the actual full-time score (incl. extra time), so an
+//     extra-time knockout won 3-2 shows 3-2 — matching the live poller, which
+//     also writes fullTime, so the two paths never disagree.
+//   - `result` (the 1/X/2 chip) stays on the 90-minute score, so that same game
+//     still settles as a draw. That divergence is by design: bets settle on 90'.
+//
+// Only matches that actually scored are written (a match in a failed day keeps
+// result IS NULL and must not be shown as FINISHED). fullTime is matched to each
+// suggestion by the provider match id; if it is somehow absent we fall back to
+// the 90-minute score rather than blanking the card.
 export function buildFinalLiveScoreUpdates(
   suggestions: SuggestionWrite[],
   scoredMatchIds: string[],
+  fdMatches: FdMatch[],
 ): FinalLiveScoreUpdate[] {
   const scored = new Set(scoredMatchIds)
+  const fullTimeByExtId = new Map(fdMatches.map(m => [m.id, m.score.fullTime]))
   return suggestions
     .filter(s => scored.has(s.match_id))
-    .map(s => ({
-      match_id: s.match_id,
-      live_status: 'FINISHED',
-      live_score_home: s.home_score,
-      live_score_away: s.away_score,
-      live_minute: null,
-    }))
+    .map(s => {
+      const fullTime = fullTimeByExtId.get(s.external_match_id)
+      return {
+        match_id: s.match_id,
+        live_status: 'FINISHED' as const,
+        live_score_home: fullTime?.home ?? s.home_score,
+        live_score_away: fullTime?.away ?? s.away_score,
+        live_minute: null,
+      }
+    })
 }
 
 // Default kickoff tolerance for the name/date fallback only.

@@ -93,12 +93,12 @@ export async function runResultsSync(
     if (error) throw error
   }
 
-  // Reconcile the live-score display columns to the settled scoreline. Without
-  // this, a match whose live poll froze mid-game (e.g. Portugal 1-1 before the
-  // 2-1 winner) settles correctly but keeps showing the stale score. This is a
-  // display-only, best-effort write: a failure here must not fail the sync (the
-  // result is already committed), so we log and carry on rather than throw.
-  for (const u of buildFinalLiveScoreUpdates(suggestions, scoredMatchIds)) {
+  // Reconcile the live-score display columns to the provider's actual full-time
+  // score. Without this, a match whose live poll froze mid-game (e.g. Portugal
+  // 1-1 before the 2-1 winner) settles correctly but keeps showing the stale
+  // score. This is a display-only, best-effort write: a failure here must not
+  // fail the sync (the result is already committed), so we log and carry on.
+  for (const u of buildFinalLiveScoreUpdates(suggestions, scoredMatchIds, fdMatches)) {
     const { error } = await supabase
       .from('matches')
       .update({
