@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { reconcile, type InternalMatch } from './result-sync'
+import { reconcile, buildFinalLiveScoreUpdates, type InternalMatch, type SuggestionWrite } from './result-sync'
 import type { FdMatch, FdScore } from './football-data'
 
 function score(home: number, away: number): FdScore {
@@ -133,5 +133,67 @@ describe('reconcile — name/date fallback (unmapped rows)', () => {
     const { suggestions, unmatched } = reconcile(internal, fdMatches)
     expect(suggestions).toHaveLength(0)
     expect(unmatched[0]).toMatchObject({ home: 'Spain', away: 'Uruguay' })
+  })
+})
+
+describe('buildFinalLiveScoreUpdates', () => {
+  // A suggestion carries the 90-minute score (what `result` settles on).
+  const suggestion = (
+    match_id: string, ninetyHome: number, ninetyAway: number, extId: number,
+  ): SuggestionWrite => ({
+    match_id,
+    suggested_result: ninetyHome > ninetyAway ? '1' : ninetyHome < ninetyAway ? '2' : 'X',
+    home_score: ninetyHome,
+    away_score: ninetyAway,
+    external_match_id: extId,
+    raw_winner: null,
+    duration: 'REGULAR',
+  })
+
+  // A finished provider match whose fullTime is the actual final (incl. ET).
+  const fdFull = (id: number, fullHome: number, fullAway: number, fdScore?: FdScore): FdMatch => ({
+    id, utcDate: '2026-07-02T23:00:00Z', status: 'FINISHED', stage: 'GROUP_STAGE', group: null,
+    homeTeam: { id: null, name: 'H' }, awayTeam: { id: null, name: 'A' },
+    score: fdScore ?? ({ winner: 'HOME_TEAM', duration: 'REGULAR', fullTime: { home: fullHome, away: fullAway } } as FdScore),
+  })
+
+  it('reconciles each scored match to its actual full-time score', () => {
+    // The reported bug: Portugal won 2-1 but the live poller froze on a 1-1
+    // snapshot. Settlement must push the real final score onto the live columns.
+    const suggestions = [suggestion('portugal', 2, 1, 537419)]
+    const updates = buildFinalLiveScoreUpdates(suggestions, ['portugal'], [fdFull(537419, 2, 1)])
+    expect(updates).toEqual([
+      { match_id: 'portugal', live_status: 'FINISHED', live_score_home: 2, live_score_away: 1, live_minute: null },
+    ])
+  })
+
+  it('shows the extra-time final score even though the bet settles on 90 minutes', () => {
+    // Knockout drawn 2-2 at 90' (suggestion => X) but won 3-2 in extra time.
+    // The card must show the actual 3-2; only the 1/X/2 result stays on 90'.
+    const etScore = {
+      winner: 'HOME_TEAM', duration: 'EXTRA_TIME',
+      fullTime: { home: 3, away: 2 }, regularTime: { home: 2, away: 2 }, extraTime: { home: 1, away: 0 },
+    } as FdScore
+    const suggestions = [suggestion('belgium', 2, 2, 999)] // 90' draw -> suggested_result 'X'
+    const updates = buildFinalLiveScoreUpdates(suggestions, ['belgium'], [fdFull(999, 3, 2, etScore)])
+    expect(updates[0]).toMatchObject({ match_id: 'belgium', live_score_home: 3, live_score_away: 2, live_status: 'FINISHED' })
+  })
+
+  it('falls back to the 90-minute score when the provider match is missing', () => {
+    const suggestions = [suggestion('orphan', 1, 0, 42)]
+    const updates = buildFinalLiveScoreUpdates(suggestions, ['orphan'], []) // no fd match with id 42
+    expect(updates[0]).toMatchObject({ live_score_home: 1, live_score_away: 0 })
+  })
+
+  it('only writes matches that were actually scored (skips failed-day suggestions)', () => {
+    const suggestions = [suggestion('scored', 1, 0, 1), suggestion('failed-day', 3, 3, 2)]
+    const updates = buildFinalLiveScoreUpdates(suggestions, ['scored'], [fdFull(1, 1, 0), fdFull(2, 3, 3)])
+    expect(updates).toHaveLength(1)
+    expect(updates[0].match_id).toBe('scored')
+  })
+
+  it('returns nothing when no matches were scored', () => {
+    const suggestions = [suggestion('a', 1, 0, 1)]
+    expect(buildFinalLiveScoreUpdates(suggestions, [], [fdFull(1, 1, 0)])).toEqual([])
   })
 })

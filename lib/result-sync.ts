@@ -39,6 +39,55 @@ export interface ReconcileResult {
   unmatched: { home: string; away: string; utcDate: string }[]
 }
 
+// A write onto the live-score display columns, applied by the runner after a
+// match is settled. See buildFinalLiveScoreUpdates below.
+export interface FinalLiveScoreUpdate {
+  match_id: string
+  live_status: 'FINISHED'
+  live_score_home: number | null
+  live_score_away: number | null
+  live_minute: null
+}
+
+// When a match auto-settles, reconcile its live-score DISPLAY columns to the
+// provider's actual full-time score. The live poller only runs on page views
+// inside the match window and can freeze on a mid-game snapshot (e.g. Portugal
+// 1-1) if no view lands between the final goal and the game leaving the window,
+// leaving a settled card showing a stale score. Settlement already fetched the
+// finished game, so we push the real final score onto the live columns here.
+//
+// Display vs. settlement are intentionally different scores:
+//   - live_score_* shows the actual full-time score (incl. extra time), so an
+//     extra-time knockout won 3-2 shows 3-2 — matching the live poller, which
+//     also writes fullTime, so the two paths never disagree.
+//   - `result` (the 1/X/2 chip) stays on the 90-minute score, so that same game
+//     still settles as a draw. That divergence is by design: bets settle on 90'.
+//
+// Only matches that actually scored are written (a match in a failed day keeps
+// result IS NULL and must not be shown as FINISHED). fullTime is matched to each
+// suggestion by the provider match id; if it is somehow absent we fall back to
+// the 90-minute score rather than blanking the card.
+export function buildFinalLiveScoreUpdates(
+  suggestions: SuggestionWrite[],
+  scoredMatchIds: string[],
+  fdMatches: FdMatch[],
+): FinalLiveScoreUpdate[] {
+  const scored = new Set(scoredMatchIds)
+  const fullTimeByExtId = new Map(fdMatches.map(m => [m.id, m.score.fullTime]))
+  return suggestions
+    .filter(s => scored.has(s.match_id))
+    .map(s => {
+      const fullTime = fullTimeByExtId.get(s.external_match_id)
+      return {
+        match_id: s.match_id,
+        live_status: 'FINISHED' as const,
+        live_score_home: fullTime?.home ?? s.home_score,
+        live_score_away: fullTime?.away ?? s.away_score,
+        live_minute: null,
+      }
+    })
+}
+
 // Default kickoff tolerance for the name/date fallback only.
 const DEFAULT_TOLERANCE_HOURS = 36
 
