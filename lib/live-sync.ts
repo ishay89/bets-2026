@@ -15,6 +15,7 @@ import { revalidatePath } from 'next/cache'
 import { after } from 'next/server'
 import { createAdminClient } from './supabase/server'
 import {
+  fdDisplayScore,
   fetchAllMatches,
   getFootballDataConfig,
   isScorableFdMatch,
@@ -88,7 +89,9 @@ async function writeLiveWindowScores(
   let anySettleable = false
 
   for (const m of liveWindowMatches) {
-    const liveScore = m.score.fullTime
+    // Display the actual match score (fdDisplayScore strips penalty-shootout
+    // pollution); raw fullTime can read e.g. 3-5 for a 1-1 game won on pens.
+    const liveScore = fdDisplayScore(m.score)
     const liveStatus = m.status as LiveStatus
     const shouldSettle = isScorableFdMatch(m)
     const { error } = await supabase

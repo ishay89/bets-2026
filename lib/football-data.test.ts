@@ -4,6 +4,7 @@ import {
   canonicalTeamKey,
   fetchFinishedMatches,
   fdNinetyMinuteScore,
+  fdDisplayScore,
   fdScoreToPick,
   isScorableFdMatch,
   type FdMatch,
@@ -89,6 +90,34 @@ describe('fdScoreToPick', () => {
   it('returns null when the score is incomplete', () => {
     expect(fdScoreToPick(score(null, null))).toBeNull()
     expect(fdScoreToPick(score(1, null))).toBeNull()
+  })
+})
+
+describe('fdDisplayScore', () => {
+  it('shows fullTime for regular-time and extra-time games', () => {
+    expect(fdDisplayScore(score(2, 1))).toEqual({ home: 2, away: 1 })
+    // Extra-time winner: the card shows the real final incl. ET (3-2).
+    expect(fdDisplayScore(score(3, 2, {
+      duration: 'EXTRA_TIME', regularTime: { home: 2, away: 2 }, extraTime: { home: 1, away: 0 },
+    }))).toEqual({ home: 3, away: 2 })
+  })
+
+  it('shows the pre-shootout draw, not the penalty-inflated fullTime', () => {
+    // Provider reports fullTime 3-5 for a 1-1 game decided on penalties.
+    expect(fdDisplayScore(score(3, 5, {
+      duration: 'PENALTY_SHOOTOUT',
+      regularTime: { home: 1, away: 1 },
+      extraTime: { home: 0, away: 0 },
+      penalties: { home: 4, away: 4 },
+    }))).toEqual({ home: 1, away: 1 })
+  })
+
+  it('blanks a shootout score when the breakdown is missing and fullTime looks penalty-inflated', () => {
+    expect(fdDisplayScore(score(3, 5, { duration: 'PENALTY_SHOOTOUT' }))).toEqual({ home: null, away: null })
+  })
+
+  it('trusts a level fullTime for a shootout when no breakdown is given', () => {
+    expect(fdDisplayScore(score(1, 1, { duration: 'PENALTY_SHOOTOUT' }))).toEqual({ home: 1, away: 1 })
   })
 })
 

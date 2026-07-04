@@ -179,6 +179,19 @@ describe('buildFinalLiveScoreUpdates', () => {
     expect(updates[0]).toMatchObject({ match_id: 'belgium', live_score_home: 3, live_score_away: 2, live_status: 'FINISHED' })
   })
 
+  it('writes the pre-shootout draw, not the penalty-inflated fullTime', () => {
+    // Australia v Egypt: provider reports fullTime 3-5 for a 1-1 shootout. The
+    // card must show 1-1 (the actual match score), never 3-5.
+    const shootout = {
+      winner: null, duration: 'PENALTY_SHOOTOUT',
+      fullTime: { home: 3, away: 5 }, regularTime: { home: 1, away: 1 },
+      extraTime: { home: 0, away: 0 }, penalties: { home: 4, away: 4 },
+    } as FdScore
+    const suggestions = [suggestion('australia', 1, 1, 537428)] // 90' draw -> X
+    const updates = buildFinalLiveScoreUpdates(suggestions, ['australia'], [fdFull(537428, 3, 5, shootout)])
+    expect(updates[0]).toMatchObject({ match_id: 'australia', live_score_home: 1, live_score_away: 1 })
+  })
+
   it('falls back to the 90-minute score when the provider match is missing', () => {
     const suggestions = [suggestion('orphan', 1, 0, 42)]
     const updates = buildFinalLiveScoreUpdates(suggestions, ['orphan'], []) // no fd match with id 42
