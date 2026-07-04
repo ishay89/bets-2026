@@ -101,10 +101,45 @@ export function fdNinetyMinuteScore(score: FdScore): { home: number | null; away
   return score.fullTime
 }
 
-// Convert a finished provider score into our 1 / X / 2 outcome. We compare the
-// 90-minute scoreline rather than score.winner or score.fullTime, so a knockout
-// drawn after 90' but won in extra time or penalties still maps to 'X'.
+// The actual match scoreline to DISPLAY on a card: goals scored, excluding any
+// penalty shootout. Distinct from fdNinetyMinuteScore (the 90-minute SETTLEMENT
+// score) and from raw fullTime, which the provider can pollute with the shootout
+// result (e.g. reporting 3-5 for a game that was 1-1 and decided on penalties).
+//   - REGULAR / EXTRA_TIME: fullTime is the real final score (incl. extra time),
+//     so an extra-time winner shows e.g. 3-2.
+//   - PENALTY_SHOOTOUT: the match itself was a draw, so show the pre-shootout
+//     score (regularTime + extraTime). Fall back to fullTime only when it is
+//     level, otherwise leave it blank rather than show a penalty-inflated score.
+export function fdDisplayScore(score: FdScore): { home: number | null; away: number | null } {
+  if (score.duration === 'PENALTY_SHOOTOUT') {
+    const reg = score.regularTime
+    if (reg?.home != null && reg.away != null) {
+      const extra = score.extraTime
+      return { home: reg.home + (extra?.home ?? 0), away: reg.away + (extra?.away ?? 0) }
+    }
+    const full = score.fullTime
+    if (full.home != null && full.away != null && full.home === full.away) return full
+    return { home: null, away: null }
+  }
+  return score.fullTime
+}
+
+// Convert a finished provider score into our 1 / X / 2 outcome. Our bets settle
+// on the 90-minute result, so a knockout drawn after 90' but decided in extra
+// time or on penalties maps to 'X'.
+//
+// A single-leg knockout only reaches extra time or a shootout because it was
+// level after 90 minutes, so ANY post-regulation duration settles as a draw —
+// no matter the extra-time scoreline, and crucially without depending on the
+// regularTime/extraTime breakdown, which the free tier sometimes omits entirely
+// (it returned only duration=EXTRA_TIME + fullTime for Argentina v Cape Verde,
+// which previously fell through to fullTime and mis-settled as a home win).
 export function fdScoreToPick(score: FdScore): Pick | null {
+  if (isPostRegularTimeDuration(score.duration)) {
+    // Only settle once we actually have a finished scoreline to anchor on.
+    const { home, away } = score.fullTime
+    return home == null || away == null ? null : 'X'
+  }
   const { home, away } = fdNinetyMinuteScore(score)
   if (home == null || away == null) return null
   if (home > away) return '1'

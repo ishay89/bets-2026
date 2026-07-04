@@ -11,7 +11,7 @@
 // Supabase lives in result-sync-runner.ts.
 
 import type { Pick } from './types'
-import { canonicalTeamKey, fdNinetyMinuteScore, fdScoreToPick, type FdMatch } from './football-data'
+import { canonicalTeamKey, fdDisplayScore, fdNinetyMinuteScore, fdScoreToPick, type FdMatch } from './football-data'
 
 export interface InternalMatch {
   id: string
@@ -57,14 +57,15 @@ export interface FinalLiveScoreUpdate {
 // finished game, so we push the real final score onto the live columns here.
 //
 // Display vs. settlement are intentionally different scores:
-//   - live_score_* shows the actual full-time score (incl. extra time), so an
+//   - live_score_* shows the actual match score via fdDisplayScore (fullTime for
+//     regular/extra-time games, the pre-shootout draw for penalties), so an
 //     extra-time knockout won 3-2 shows 3-2 — matching the live poller, which
-//     also writes fullTime, so the two paths never disagree.
+//     also uses fdDisplayScore, so the two paths never disagree.
 //   - `result` (the 1/X/2 chip) stays on the 90-minute score, so that same game
 //     still settles as a draw. That divergence is by design: bets settle on 90'.
 //
 // Only matches that actually scored are written (a match in a failed day keeps
-// result IS NULL and must not be shown as FINISHED). fullTime is matched to each
+// result IS NULL and must not be shown as FINISHED). The score is matched to each
 // suggestion by the provider match id; if it is somehow absent we fall back to
 // the 90-minute score rather than blanking the card.
 export function buildFinalLiveScoreUpdates(
@@ -73,16 +74,16 @@ export function buildFinalLiveScoreUpdates(
   fdMatches: FdMatch[],
 ): FinalLiveScoreUpdate[] {
   const scored = new Set(scoredMatchIds)
-  const fullTimeByExtId = new Map(fdMatches.map(m => [m.id, m.score.fullTime]))
+  const displayByExtId = new Map(fdMatches.map(m => [m.id, fdDisplayScore(m.score)]))
   return suggestions
     .filter(s => scored.has(s.match_id))
     .map(s => {
-      const fullTime = fullTimeByExtId.get(s.external_match_id)
+      const display = displayByExtId.get(s.external_match_id)
       return {
         match_id: s.match_id,
         live_status: 'FINISHED' as const,
-        live_score_home: fullTime?.home ?? s.home_score,
-        live_score_away: fullTime?.away ?? s.away_score,
+        live_score_home: display?.home ?? s.home_score,
+        live_score_away: display?.away ?? s.away_score,
         live_minute: null,
       }
     })

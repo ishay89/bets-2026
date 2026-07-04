@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/server'
-import { fetchFinishedMatches, getFootballDataConfig, canonicalTeamKey, fdNinetyMinuteScore } from '@/lib/football-data'
+import { fetchFinishedMatches, getFootballDataConfig, canonicalTeamKey, fdDisplayScore } from '@/lib/football-data'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -55,7 +55,9 @@ export async function GET() {
   const errors: string[] = []
 
   for (const m of finished) {
-    const score = fdNinetyMinuteScore(m.score)
+    // Backfill the DISPLAY score (actual match score, shootout pollution
+    // stripped) — consistent with the live poller and settlement writeback.
+    const score = fdDisplayScore(m.score)
     if (score.home == null || score.away == null) continue
 
     // 1. Exact external id match.
