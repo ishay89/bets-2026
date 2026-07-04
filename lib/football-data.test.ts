@@ -72,6 +72,20 @@ describe('fdScoreToPick', () => {
     expect(fdScoreToPick(providerScore)).toBe('X')
   })
 
+  it('settles extra time as a draw even when the provider omits the whole breakdown', () => {
+    // Argentina v Cape Verde: the free tier returned duration=EXTRA_TIME with
+    // only fullTime (2-1) — no regularTime, no extraTime. A knockout only reaches
+    // extra time if it was level at 90', so the bet must settle X regardless of
+    // the extra-time scoreline. (Previously this fell through to fullTime -> '1'.)
+    expect(fdScoreToPick(score(2, 1, { winner: 'HOME_TEAM', duration: 'EXTRA_TIME' }))).toBe('X')
+  })
+
+  it('settles a shootout as a draw even when only fullTime is present', () => {
+    // Provider sometimes reports a shootout with a penalty-inflated fullTime and
+    // no breakdown; it is still a 90-minute draw for our rules.
+    expect(fdScoreToPick(score(3, 5, { winner: null, duration: 'PENALTY_SHOOTOUT' }))).toBe('X')
+  })
+
   it('returns null when the score is incomplete', () => {
     expect(fdScoreToPick(score(null, null))).toBeNull()
     expect(fdScoreToPick(score(1, null))).toBeNull()

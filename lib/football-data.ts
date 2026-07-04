@@ -101,10 +101,22 @@ export function fdNinetyMinuteScore(score: FdScore): { home: number | null; away
   return score.fullTime
 }
 
-// Convert a finished provider score into our 1 / X / 2 outcome. We compare the
-// 90-minute scoreline rather than score.winner or score.fullTime, so a knockout
-// drawn after 90' but won in extra time or penalties still maps to 'X'.
+// Convert a finished provider score into our 1 / X / 2 outcome. Our bets settle
+// on the 90-minute result, so a knockout drawn after 90' but decided in extra
+// time or on penalties maps to 'X'.
+//
+// A single-leg knockout only reaches extra time or a shootout because it was
+// level after 90 minutes, so ANY post-regulation duration settles as a draw —
+// no matter the extra-time scoreline, and crucially without depending on the
+// regularTime/extraTime breakdown, which the free tier sometimes omits entirely
+// (it returned only duration=EXTRA_TIME + fullTime for Argentina v Cape Verde,
+// which previously fell through to fullTime and mis-settled as a home win).
 export function fdScoreToPick(score: FdScore): Pick | null {
+  if (isPostRegularTimeDuration(score.duration)) {
+    // Only settle once we actually have a finished scoreline to anchor on.
+    const { home, away } = score.fullTime
+    return home == null || away == null ? null : 'X'
+  }
   const { home, away } = fdNinetyMinuteScore(score)
   if (home == null || away == null) return null
   if (home > away) return '1'
