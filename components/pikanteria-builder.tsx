@@ -38,7 +38,7 @@ export function PicanteriaBuilder({ defaults }: Props) {
         <span className="text-xs font-bold w-4 text-center" style={{ color: 'var(--color-amber)' }}>1</span>
         <input name="pik_label_1" aria-label="Outcome 1 label" type="text" placeholder="Yes"
           defaultValue={defaults?.label1 ?? ''} style={inputBase} className={labelCls} />
-        <input name="pik_odds_1" aria-label="Outcome 1 odds" type="number" step="0.01" placeholder="1.80"
+        <input name="pik_odds_1" aria-label="Outcome 1 odds" type="number" step="any" placeholder="1.80"
           defaultValue={defaults?.odds1 ?? ''} style={oddsStyle} className={oddsCls} />
       </div>
 
@@ -52,7 +52,7 @@ export function PicanteriaBuilder({ defaults }: Props) {
           <span className="text-xs font-bold w-4 text-center" style={{ color: 'var(--color-amber)' }}>X</span>
           <input name="pik_label_x" aria-label="Outcome X label" type="text" placeholder="Draw"
             defaultValue={defaults?.labelX ?? ''} style={inputBase} className={labelCls} />
-          <input name="pik_odds_x" aria-label="Outcome X odds" type="number" step="0.01" placeholder="3.20"
+          <input name="pik_odds_x" aria-label="Outcome X odds" type="number" step="any" placeholder="3.20"
             defaultValue={defaults?.oddsX ?? ''} style={oddsStyle} className={oddsCls} />
         </div>
       )}
@@ -62,7 +62,7 @@ export function PicanteriaBuilder({ defaults }: Props) {
         <span className="text-xs font-bold w-4 text-center" style={{ color: 'var(--color-amber)' }}>2</span>
         <input name="pik_label_2" aria-label="Outcome 2 label" type="text" placeholder="No"
           defaultValue={defaults?.label2 ?? ''} style={inputBase} className={labelCls} />
-        <input name="pik_odds_2" aria-label="Outcome 2 odds" type="number" step="0.01" placeholder="2.10"
+        <input name="pik_odds_2" aria-label="Outcome 2 odds" type="number" step="any" placeholder="2.10"
           defaultValue={defaults?.odds2 ?? ''} style={oddsStyle} className={oddsCls} />
       </div>
     </div>

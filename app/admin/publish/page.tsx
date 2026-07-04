@@ -745,9 +745,9 @@ function MatchCard({ match, date }: { match: DayMatch; date: string }) {
               <input
                 id={`publish_odds_${k}_${match.id}`}
                 aria-label={`Odds ${k}`}
-                type="number" step="0.01" name={`odds_${k}`}
+                type="number" step="any" name={`odds_${k}`}
                 required
-                defaultValue={(k === 'home' ? match.odds_home : k === 'draw' ? match.odds_draw : match.odds_away).toFixed(2)}
+                defaultValue={(k === 'home' ? match.odds_home : k === 'draw' ? match.odds_draw : match.odds_away).toFixed(3)}
                 disabled={scored}
                 style={{ ...inputBase, color: 'var(--color-accent)', fontFamily: 'var(--font-mono)' }}
                 className={`${cls} disabled:opacity-50`}
@@ -866,9 +866,9 @@ function PikanteriaCard({ pika, date, matches }: { pika: DayPika; date: string; 
               />
             </div>
             <PicanteriaBuilder defaults={{
-              label1: pika.label_1, odds1: Number(pika.odds_1).toFixed(2),
-              label2: pika.label_2, odds2: Number(pika.odds_2).toFixed(2),
-              labelX: pika.label_x, oddsX: pika.odds_x == null ? null : Number(pika.odds_x).toFixed(2),
+              label1: pika.label_1, odds1: Number(pika.odds_1).toFixed(3),
+              label2: pika.label_2, odds2: Number(pika.odds_2).toFixed(3),
+              labelX: pika.label_x, oddsX: pika.odds_x == null ? null : Number(pika.odds_x).toFixed(3),
             }} />
             <KickoffSelect matches={matches} defaultMatchId={pikaKickoffMatchId(matches, pika.kickoff_time)} />
             <div className={published ? '' : 'grid grid-cols-2 gap-2'}>
