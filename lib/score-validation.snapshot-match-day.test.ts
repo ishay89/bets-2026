@@ -29,11 +29,16 @@ function getPath(row: Row, path: string): unknown {
   return row[leaf]
 }
 
+// PostgREST caps un-paged responses at max_rows (1000 in supabase/config.toml).
+// The fake enforces the same cap so tests catch reads that skip fetchAllRows.
+const POSTGREST_MAX_ROWS = 1000
+
 class FakeQuery implements PromiseLike<{ data: Row[] | Row | null; error: null; count?: number }> {
   private rows: Row[]
   private singleMode: 'single' | 'maybeSingle' | null = null
   private countMode: 'exact' | null = null
   private headOnly = false
+  private rangeApplied = false
 
   constructor(private db: Db, private table: keyof Db, rows?: Row[]) {
     this.rows = rows ?? [...db[this.table]]
@@ -91,6 +96,7 @@ class FakeQuery implements PromiseLike<{ data: Row[] | Row | null; error: null; 
   }
 
   range(from: number, to: number): this {
+    this.rangeApplied = true
     this.rows = this.rows.slice(from, to + 1)
     return this
   }
@@ -117,7 +123,8 @@ class FakeQuery implements PromiseLike<{ data: Row[] | Row | null; error: null; 
     } else if (this.singleMode === 'maybeSingle') {
       result = { data: this.rows[0] ?? null, error: null }
     } else {
-      result = { data: this.rows, error: null }
+      const capped = this.rangeApplied ? this.rows : this.rows.slice(0, POSTGREST_MAX_ROWS)
+      result = { data: capped, error: null }
     }
     return Promise.resolve(result).then(onfulfilled, onrejected)
   }
@@ -251,6 +258,73 @@ function buildScenario(): Db {
     ],
   }
 }
+
+describe('snapshotMatchDay with more than 1000 existing snapshot rows', () => {
+  // Regression for the 2026-07-05 production incident: once score_snapshots
+  // crossed PostgREST's 1000-row cap, the un-paged existingSnapshots read in
+  // snapshotMatchDay missed the current day's rows (they were the newest, past
+  // the cap), classified every user as "insert" instead of "update", and the
+  // whole batch aborted on the (user_id, match_day_id) unique index — leaving
+  // today_points stale for all users after a pikanteria was scored.
+  it('updates the existing day row in place instead of inserting a duplicate', async () => {
+    const filler: Row[] = Array.from({ length: POSTGREST_MAX_ROWS }, (_, i) => ({
+      id: `snap-filler-${i}`,
+      user_id: `filler-user-${i}`,
+      match_day_id: 'old-day',
+      stage: 'group',
+      match_points: 0,
+      pikanteria_points: 0,
+      pre_tournament_winner_pts: 0,
+      pre_tournament_scorer_pts: 0,
+      day_points: 0,
+      cumulative_points: 0,
+      is_valid: true,
+      discrepancy: null,
+      calculated_at: '2026-06-01T00:00:00.000Z',
+    }))
+
+    const db: Db = {
+      users: [{ id: 'u1' }],
+      match_days: [{ id: 'day-1', stage: 'r16' }],
+      predictions: [
+        { id: 'pred-1', user_id: 'u1', points: 3, match_day_id: 'day-1' },
+      ],
+      // Scored after the day row below was written — the refresh under test
+      // must fold these 2.75 points into the existing row.
+      pikanteria_answers: [
+        { id: 'ans-1', user_id: 'u1', points: 2.75, match_day_id: 'day-1' },
+      ],
+      pre_tournament_picks: [],
+      score_snapshots: [
+        ...filler,
+        // The current day's row sits past the 1000-row cap (newest rows last).
+        {
+          id: 'snap-day1',
+          user_id: 'u1',
+          match_day_id: 'day-1',
+          stage: 'r16',
+          match_points: 3,
+          pikanteria_points: 0,
+          pre_tournament_winner_pts: 0,
+          pre_tournament_scorer_pts: 0,
+          day_points: 3,
+          cumulative_points: 3,
+          is_valid: true,
+          discrepancy: null,
+          calculated_at: '2026-06-01T00:00:00.000Z',
+        },
+      ],
+    }
+
+    await snapshotMatchDay(createFakeSupabase(db), 'day-1')
+
+    const dayRows = db.score_snapshots.filter(s => s.user_id === 'u1' && s.match_day_id === 'day-1')
+    expect(dayRows).toHaveLength(1)
+    expect(dayRows[0].day_points).toBe(5.75)
+    expect(dayRows[0].pikanteria_points).toBe(2.75)
+    expect(dayRows[0].is_valid).toBe(true)
+  })
+})
 
 describe('snapshotMatchDay vs recalculateAllSnapshots after a match-day correction', () => {
   it('refreshes the pre-tournament snapshot row so cumulative_points/is_valid stay correct (regression)', async () => {

@@ -336,28 +336,37 @@ export async function snapshotMatchDay(
   supabase: SupabaseClient,
   matchDayId: string,
 ): Promise<void> {
+  // Every read that can grow past PostgREST's max_rows cap (1000) must page
+  // via fetchAllRows: score_snapshots crossed the cap on 2026-07-05, the
+  // un-paged read missed the current day's rows, and the refresh misclassified
+  // every user as a fresh insert — aborting the whole batch on the
+  // (user_id, match_day_id) unique index.
   const [
     { data: users },
     { data: matchDay },
-    { data: matchPredRows },
-    { data: pikAnswerRows },
+    matchPredRows,
+    pikAnswerRows,
     allPredRows,
     allPikaRows,
     { data: preTournRows },
-    { data: existingSnapshots },
+    existingSnapshots,
   ] = await Promise.all([
     supabase.from('users').select('id'),
     supabase.from('match_days').select('stage').eq('id', matchDayId).single(),
-    supabase
-      .from('predictions')
-      .select('user_id, points, matches!inner(match_day_id)')
-      .eq('matches.match_day_id', matchDayId)
-      .not('points', 'is', null),
-    supabase
-      .from('pikanteria_answers')
-      .select('user_id, points, pikanteria!inner(match_day_id)')
-      .eq('pikanteria.match_day_id', matchDayId)
-      .not('points', 'is', null),
+    fetchAllRows<{ user_id: string; points: number | null }>(() =>
+      supabase
+        .from('predictions')
+        .select('user_id, points, matches!inner(match_day_id)')
+        .eq('matches.match_day_id', matchDayId)
+        .not('points', 'is', null),
+    ),
+    fetchAllRows<{ user_id: string; points: number | null }>(() =>
+      supabase
+        .from('pikanteria_answers')
+        .select('user_id, points, pikanteria!inner(match_day_id)')
+        .eq('pikanteria.match_day_id', matchDayId)
+        .not('points', 'is', null),
+    ),
     fetchAllRows<{ user_id: string; points: number | null }>(() =>
       supabase.from('predictions').select('user_id, points').not('points', 'is', null),
     ),
@@ -365,7 +374,9 @@ export async function snapshotMatchDay(
       supabase.from('pikanteria_answers').select('user_id, points').not('points', 'is', null),
     ),
     supabase.from('pre_tournament_picks').select('user_id, winner_points, top_scorer_points'),
-    supabase.from('score_snapshots').select('id, user_id, match_day_id, day_points'),
+    fetchAllRows<{ id: string; user_id: string; match_day_id: string | null; day_points: number }>(() =>
+      supabase.from('score_snapshots').select('id, user_id, match_day_id, day_points'),
+    ),
   ])
 
   const stage = (matchDay as { stage: string } | null)?.stage ?? 'group'
@@ -374,12 +385,12 @@ export async function snapshotMatchDay(
     users: (users ?? []) as { id: string }[],
     matchDayId,
     stage,
-    matchPredRows: (matchPredRows ?? []) as { user_id: string; points: number | null }[],
-    pikAnswerRows: (pikAnswerRows ?? []) as { user_id: string; points: number | null }[],
+    matchPredRows,
+    pikAnswerRows,
     allPredRows,
     allPikaRows,
     preTournRows: (preTournRows ?? []) as { user_id: string; winner_points: number | null; top_scorer_points: number | null }[],
-    existingSnapshots: (existingSnapshots ?? []) as { id: string; user_id: string; match_day_id: string | null; day_points: number }[],
+    existingSnapshots,
     now: new Date().toISOString(),
   })
 
