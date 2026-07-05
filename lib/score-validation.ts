@@ -27,6 +27,18 @@ export type SnapshotScoredDay = {
   pikanteria: ResultRow[]
 }
 
+// Runs every task to completion (never lets one rejection abort the rest, so a
+// partial-batch failure can't leave some users refreshed and others silently
+// stale) and throws an aggregated error afterward if anything failed.
+async function settleAllOrThrow(label: string, tasks: (() => Promise<void>)[]): Promise<void> {
+  const results = await Promise.allSettled(tasks.map(t => t()))
+  const failures = results.filter((r): r is PromiseRejectedResult => r.status === 'rejected')
+  if (failures.length > 0) {
+    const reasons = failures.map(f => (f.reason instanceof Error ? f.reason.message : String(f.reason)))
+    throw new Error(`${label}: ${failures.length}/${tasks.length} failed - ${reasons.join('; ')}`)
+  }
+}
+
 function sumByUserId(rows: { user_id: string; points: number | null }[]): Map<string, number> {
   const map = new Map<string, number>()
   for (const r of rows) {
@@ -264,18 +276,18 @@ async function upsertMatchDaySnapshot(
   }
 
   // Use manual upsert to work around partial-index limitation with Supabase JS client
-  const { data: existing } = await supabase
+  const { data: existing, error: lookupError } = await supabase
     .from('score_snapshots')
     .select('id')
     .eq('user_id', userId)
     .eq('match_day_id', matchDayId)
     .maybeSingle()
+  if (lookupError) throw new Error(`snapshot lookup failed for user ${userId}: ${lookupError.message}`)
 
-  if (existing) {
-    await supabase.from('score_snapshots').update(payload).eq('id', existing.id)
-  } else {
-    await supabase.from('score_snapshots').insert(payload)
-  }
+  const { error: writeError } = existing
+    ? await supabase.from('score_snapshots').update(payload).eq('id', existing.id)
+    : await supabase.from('score_snapshots').insert(payload)
+  if (writeError) throw new Error(`snapshot write failed for user ${userId}: ${writeError.message}`)
 }
 
 export async function upsertPreTournamentSnapshot(
@@ -306,18 +318,18 @@ export async function upsertPreTournamentSnapshot(
     calculated_at: new Date().toISOString(),
   }
 
-  const { data: existing } = await supabase
+  const { data: existing, error: lookupError } = await supabase
     .from('score_snapshots')
     .select('id')
     .eq('user_id', userId)
     .is('match_day_id', null)
     .maybeSingle()
+  if (lookupError) throw new Error(`pre-tournament snapshot lookup failed for user ${userId}: ${lookupError.message}`)
 
-  if (existing) {
-    await supabase.from('score_snapshots').update(payload).eq('id', existing.id)
-  } else {
-    await supabase.from('score_snapshots').insert(payload)
-  }
+  const { error: writeError } = existing
+    ? await supabase.from('score_snapshots').update(payload).eq('id', existing.id)
+    : await supabase.from('score_snapshots').insert(payload)
+  if (writeError) throw new Error(`pre-tournament snapshot write failed for user ${userId}: ${writeError.message}`)
 }
 
 export async function snapshotMatchDay(
@@ -371,10 +383,12 @@ export async function snapshotMatchDay(
     now: new Date().toISOString(),
   })
 
-  await Promise.all([
-    toUpdate.length > 0 ? supabase.from('score_snapshots').upsert(toUpdate) : Promise.resolve(),
-    toInsert.length > 0 ? supabase.from('score_snapshots').insert(toInsert) : Promise.resolve(),
+  const [updateResult, insertResult] = await Promise.all([
+    toUpdate.length > 0 ? supabase.from('score_snapshots').upsert(toUpdate) : Promise.resolve({ error: null }),
+    toInsert.length > 0 ? supabase.from('score_snapshots').insert(toInsert) : Promise.resolve({ error: null }),
   ])
+  if (updateResult.error) throw new Error(`snapshot batch update failed for match day ${matchDayId}: ${updateResult.error.message}`)
+  if (insertResult.error) throw new Error(`snapshot batch insert failed for match day ${matchDayId}: ${insertResult.error.message}`)
 
   // Refresh pre-tournament snapshot rows so getSnapshotSum's .or() clause and
   // is_valid/discrepancy/cumulative_points stay correct after this match day's
@@ -386,7 +400,10 @@ export async function snapshotMatchDay(
   // upsertPreTournamentSnapshot sums all match-day snapshot rows via
   // getSnapshotSum.
   const preTournUserIds = (preTournRows ?? []).map(r => (r as { user_id: string }).user_id)
-  await Promise.all(preTournUserIds.map(userId => upsertPreTournamentSnapshot(supabase, userId)))
+  await settleAllOrThrow(
+    `pre-tournament snapshot refresh after match day ${matchDayId}`,
+    preTournUserIds.map(userId => () => upsertPreTournamentSnapshot(supabase, userId)),
+  )
 }
 
 export async function recalculateAllSnapshots(
@@ -414,7 +431,10 @@ export async function recalculateAllSnapshots(
   // via getSnapshotSum's .or() clause. Without this, is_valid on match-day snapshots would
   // be false for any user with pre-tournament points (computeCumulativeFromRaw includes them
   // but getSnapshotSum would find no NULL row to sum against).
-  await Promise.all(allPicks.map(p => upsertPreTournamentSnapshot(supabase, p.user_id)))
+  // Every task runs to completion (settleAllOrThrow) rather than aborting on the first
+  // rejection, so a single bad row can't leave the rest of the batch un-refreshed and
+  // silently stale - the aggregated error surfaces only after all writes have landed.
+  await settleAllOrThrow('pre-tournament snapshot refresh (pass 1)', allPicks.map(p => () => upsertPreTournamentSnapshot(supabase, p.user_id)))
   written += allPicks.length
 
   // Pass 2: match-day snapshots in chronological order (pre-tournament rows now exist).
@@ -422,14 +442,17 @@ export async function recalculateAllSnapshots(
   // the previous day's rows. Per-day user work is parallelized inside each step.
   await scoredDays.reduce(
     (p, day) => p.then(() =>
-      Promise.all(allUsers.map((u: { id: string }) => upsertMatchDaySnapshot(supabase, u.id, day.id, day.stage)))
+      settleAllOrThrow(
+        `match-day snapshot refresh (${day.id})`,
+        allUsers.map((u: { id: string }) => () => upsertMatchDaySnapshot(supabase, u.id, day.id, day.stage)),
+      )
     ),
     Promise.resolve<unknown>(undefined)
   )
   written += scoredDays.length * allUsers.length
 
   // Pass 3: re-run pre-tournament so is_valid reflects the now-present match-day rows
-  await Promise.all(allPicks.map(p => upsertPreTournamentSnapshot(supabase, p.user_id)))
+  await settleAllOrThrow('pre-tournament snapshot refresh (pass 3)', allPicks.map(p => () => upsertPreTournamentSnapshot(supabase, p.user_id)))
   written += allPicks.length
 
   // Count invalids
