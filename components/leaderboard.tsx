@@ -74,8 +74,12 @@ function formatPrize(amount: number): string {
 function FuturesPicksLine({ pick }: { pick: LeaderboardFuturesPick | undefined }) {
   if (!pick) return null
   return (
-    <div className="text-[10px] font-semibold truncate not-italic" style={{ color: 'var(--color-muted)' }}>
-      🏆 {getFlag(pick.winner)} {pick.winner} · ⚽ {pick.scorer}
+    <div
+      className="mt-0.5 flex min-w-0 flex-col gap-0.5 text-[10px] font-semibold leading-tight not-italic"
+      style={{ color: 'var(--color-muted)' }}
+    >
+      <span className="min-w-0 whitespace-normal break-words">🏆 {getFlag(pick.winner)} {pick.winner}</span>
+      <span className="min-w-0 whitespace-normal break-words">⚽ {pick.scorer}</span>
     </div>
   )
 }
