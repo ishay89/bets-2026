@@ -2,14 +2,15 @@
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Leaderboard } from './leaderboard'
-import type { LeaderboardEntry } from '@/lib/types'
+import type { LeaderboardEntry, LeaderboardFuturesPick } from '@/lib/types'
 
 interface Props {
   initialEntries: LeaderboardEntry[]
   currentUserId: string
+  futuresPicks?: Record<string, LeaderboardFuturesPick> | null
 }
 
-export function LeaderboardRealtime({ initialEntries, currentUserId }: Props) {
+export function LeaderboardRealtime({ initialEntries, currentUserId, futuresPicks = null }: Props) {
   const [entries, setEntries] = useState(initialEntries)
 
   useEffect(() => {
@@ -33,5 +34,5 @@ export function LeaderboardRealtime({ initialEntries, currentUserId }: Props) {
     return () => { channel.unsubscribe() }
   }, [])
 
-  return <Leaderboard entries={entries} currentUserId={currentUserId} />
+  return <Leaderboard entries={entries} currentUserId={currentUserId} futuresPicks={futuresPicks} />
 }
