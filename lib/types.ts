@@ -119,6 +119,12 @@ export interface LeaderboardEntry {
   today_scored_picks: number
 }
 
+/** A player's futures picks as shown on the leaderboard (post-lock only). */
+export interface LeaderboardFuturesPick {
+  winner: string
+  scorer: string
+}
+
 export interface ScoredLeaderboardDay {
   id: string
   date: string

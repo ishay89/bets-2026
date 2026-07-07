@@ -5,8 +5,9 @@ import { LeaderboardRealtime } from '@/components/leaderboard-realtime'
 import { Leaderboard } from '@/components/leaderboard'
 import { LeaderboardDaySelector } from '@/components/leaderboard-day-selector'
 import { BottomNav } from '@/components/bottom-nav'
-import { getHistoricalLeaderboardEntries, getLeaderboardEntries, getScoredLeaderboardDays } from '@/lib/data'
+import { getHistoricalLeaderboardEntries, getLeaderboardEntries, getScoredLeaderboardDays, isFuturesLocked } from '@/lib/data'
 import { maybeSyncLiveScores } from '@/lib/live-sync'
+import type { LeaderboardFuturesPick } from '@/lib/types'
 
 const getCachedLeaderboardEntries = unstable_cache(
   () => getLeaderboardEntries(createAdminClient()),
@@ -37,6 +38,26 @@ const getCachedLiveMatchCount = unstable_cache(
   { revalidate: 60 },
 )
 
+// Everyone's futures picks (champion + top scorer) for the picks line under
+// each leaderboard name. Only exposed once futures are locked — the same
+// gating as the reveal sheets on /predict — and immutable after that, so a
+// 30 min cache is safe. Small table (one row per player), no pagination risk.
+const getCachedFuturesPicks = unstable_cache(
+  async (): Promise<Record<string, LeaderboardFuturesPick> | null> => {
+    const supabase = createAdminClient()
+    if (!(await isFuturesLocked(supabase))) return null
+    const { data, error } = await supabase
+      .from('pre_tournament_picks')
+      .select('user_id, winner_team, top_scorer')
+    if (error) throw error
+    return Object.fromEntries(
+      (data ?? []).map(p => [p.user_id, { winner: p.winner_team, scorer: p.top_scorer }]),
+    )
+  },
+  ['leaderboard-futures-picks'],
+  { revalidate: 1800, tags: ['leaderboard'] },
+)
+
 // Historical snapshots are immutable after scoring; cache per day for 30 min.
 // Fetches its own scored-days list so the entry is self-contained at 30 min TTL.
 const getCachedHistoricalEntries = unstable_cache(
@@ -60,11 +81,12 @@ export default async function LeaderboardPage({
 
   after(maybeSyncLiveScores)
 
-  const [{ data: { user } }, liveEntries, scoredDays, liveMatchCount] = await Promise.all([
+  const [{ data: { user } }, liveEntries, scoredDays, liveMatchCount, futuresPicks] = await Promise.all([
     supabase.auth.getUser(),
     getCachedLeaderboardEntries(),
     getCachedScoredDays(),
     getCachedLiveMatchCount(),
+    getCachedFuturesPicks(),
   ])
   const selectedDay = scoredDays.find(scoredDay => scoredDay.id === day) ?? null
   const entries = selectedDay
@@ -105,12 +127,13 @@ export default async function LeaderboardPage({
           <Leaderboard
             entries={entries}
             currentUserId={user?.id ?? ''}
+            futuresPicks={futuresPicks}
             todayModeLabel="Day"
             movementPointsLabel="day"
             todayEmptyMessage="No results scored for this selected day"
           />
         ) : (
-          <LeaderboardRealtime initialEntries={entries} currentUserId={user?.id ?? ''} />
+          <LeaderboardRealtime initialEntries={entries} currentUserId={user?.id ?? ''} futuresPicks={futuresPicks} />
         )}
       </main>
 

@@ -1,18 +1,21 @@
 'use client'
 import React, { useState } from 'react'
 import Link from 'next/link'
-import type { LeaderboardEntry } from '@/lib/types'
+import type { LeaderboardEntry, LeaderboardFuturesPick } from '@/lib/types'
 import { formatRankDelta, formatTodayMovementPoints } from '@/lib/leaderboard-movement'
+import { computePotAssignments } from '@/lib/leaderboard-prizes'
 import {
   hasLeaderboardResults,
   sortLeaderboardEntries,
   type LeaderboardScoreMode,
   type LeaderboardSortMode,
 } from '@/lib/leaderboard-sort'
+import { getFlag } from '@/lib/display'
 
 interface Props {
   entries: LeaderboardEntry[]
   currentUserId: string
+  futuresPicks?: Record<string, LeaderboardFuturesPick> | null
   todayModeLabel?: string
   movementPointsLabel?: string
   todayEmptyMessage?: string
@@ -64,6 +67,19 @@ function deltaColor(delta: number | null | undefined): string {
   return delta && delta < 0 ? 'var(--color-danger)' : 'var(--color-accent)'
 }
 
+function formatPrize(amount: number): string {
+  return `₪${amount.toLocaleString('en-US')}`
+}
+
+function FuturesPicksLine({ pick }: { pick: LeaderboardFuturesPick | undefined }) {
+  if (!pick) return null
+  return (
+    <div className="text-[10px] font-semibold truncate not-italic" style={{ color: 'var(--color-muted)' }}>
+      🏆 {getFlag(pick.winner)} {pick.winner} · ⚽ {pick.scorer}
+    </div>
+  )
+}
+
 function successLabel(entry: LeaderboardEntry, mode: 'total' | 'today'): string {
   const rate = mode === 'today' ? entry.today_success_rate : entry.total_success_rate
   const successful = mode === 'today' ? entry.today_successful_picks : entry.total_successful_picks
@@ -76,6 +92,7 @@ function successLabel(entry: LeaderboardEntry, mode: 'total' | 'today'): string 
 export function Leaderboard({
   entries,
   currentUserId,
+  futuresPicks = null,
   todayModeLabel = 'Today',
   movementPointsLabel = 'today',
   todayEmptyMessage = 'No results scored yet for the latest day',
@@ -97,15 +114,14 @@ export function Leaderboard({
   const top3 = sorted.slice(0, 3)
   const rest = sorted.slice(3)
 
-  // Fines per the rules: the player finishing LAST pays ₪200, second-to-last
-  // pays ₪100. Automated baselines are not eligible for prizes or fines, so
-  // the fines target the bottom two human players.
-  const humans = sortMode === 'score' ? sorted.filter(e => !isAutomated(e)) : []
-  const fineByEntryId = new Map<string, string>()
-  if (humans.length >= 2) {
-    fineByEntryId.set(humans[humans.length - 1].id, '+₪200')
-    fineByEntryId.set(humans[humans.length - 2].id, '+₪100')
-  }
+  // Pot money per the rules: the top five real players earn prizes, the
+  // bottom two pay fines. Automated baselines and the AI players (Claude,
+  // Codex) are not eligible. Amounts only make sense against the real
+  // standings, so chips render only on the Total + Score view.
+  const showPot = scoreMode === 'total' && sortMode === 'score'
+  const { prizeByEntryId, fineByEntryId } = showPot
+    ? computePotAssignments(sorted)
+    : { prizeByEntryId: new Map<string, number>(), fineByEntryId: new Map<string, number>() }
   const firstDangerIndex = rest.findIndex(e => fineByEntryId.has(e.id))
 
   const hasToday = hasLeaderboardResults(entries, 'today')
@@ -199,6 +215,7 @@ export function Leaderboard({
             const av = getAvatar(entry)
             const isMe = entry.id === currentUserId
             const profileHref = isMe ? '/history' : `/u/${entry.id}`
+            const prize = prizeByEntryId.get(entry.id)
             return (
               <div key={entry.id} style={{ width: idx === 0 ? '36%' : '32%', textAlign: 'center' }}>
                 <Link href={profileHref} prefetch={false} style={{ textDecoration: 'none', color: 'inherit' }}>
@@ -208,12 +225,18 @@ export function Leaderboard({
                   >{av}</div>
                   <div className="font-extrabold text-[13px] text-text truncate">{entry.display_name}</div>
                 </Link>
+                <FuturesPicksLine pick={futuresPicks?.[entry.id]} />
                 <div className="font-mono text-[11px] text-sub mb-1" style={{ fontFamily: 'var(--font-mono)' }}>
                   {primaryMetric(entry)}
                 </div>
                 <div className="text-[10px] font-bold text-sub mb-1" style={{ fontFamily: 'var(--font-mono)' }}>
                   {secondaryMetric(entry)}
                 </div>
+                {prize != null && (
+                  <div className="mb-1 text-[11px] font-bold" style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-accent)' }}>
+                    {formatPrize(prize)}
+                  </div>
+                )}
                 {(rankDelta || todayMovement) && (
                   <div className="mb-1 flex min-h-[16px] items-center justify-center gap-1.5 text-[10px] font-bold">
                     {rankDelta && (
@@ -259,7 +282,8 @@ export function Leaderboard({
           const av = getAvatar(entry)
           const automationLabel = getAutomationLabel(entry)
           const isDanger = fineByEntryId.has(entry.id)
-          const fine = fineByEntryId.get(entry.id) ?? null
+          const fine = fineByEntryId.get(entry.id)
+          const prize = prizeByEntryId.get(entry.id)
           // Show the "danger zone" banner once, right above the first fined row.
           const isFirstAtDangerStart = i === firstDangerIndex
           return (
@@ -316,16 +340,19 @@ export function Leaderboard({
                     className="flex items-center justify-center rounded-full text-base shrink-0"
                     style={{ width: 28, height: 28, background: 'var(--color-elev)', fontSize: 14 }}
                   >{av}</div>
-                  <div
-                    className="flex-1 font-bold text-[13px] truncate"
-                    style={{ color: isMe ? 'var(--color-accent)' : 'var(--color-text)' }}
-                  >
-                    {entry.display_name}
-                    {automationLabel && (
-                      <span className="ml-1 text-[12px] not-italic" style={{ color: 'var(--color-muted)' }}>
-                        · {automationLabel}
-                      </span>
-                    )}
+                  <div className="flex-1 min-w-0">
+                    <div
+                      className="font-bold text-[13px] truncate"
+                      style={{ color: isMe ? 'var(--color-accent)' : 'var(--color-text)' }}
+                    >
+                      {entry.display_name}
+                      {automationLabel && (
+                        <span className="ml-1 text-[12px] not-italic" style={{ color: 'var(--color-muted)' }}>
+                          · {automationLabel}
+                        </span>
+                      )}
+                    </div>
+                    <FuturesPicksLine pick={futuresPicks?.[entry.id]} />
                   </div>
                 </Link>
                 {!isMe && (
@@ -354,11 +381,17 @@ export function Leaderboard({
                     <div className="text-[10px] font-semibold text-sub">{todayMovement}</div>
                   )}
                 </div>
-                {fine && (
+                {prize != null && (
                   <div
-                    className="font-bold text-[11px] w-12 text-right"
+                    className="font-bold text-[11px] w-12 text-right shrink-0"
+                    style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-accent)' }}
+                  >{formatPrize(prize)}</div>
+                )}
+                {fine != null && (
+                  <div
+                    className="font-bold text-[11px] w-12 text-right shrink-0"
                     style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-danger)' }}
-                  >{fine}</div>
+                  >+₪{fine}</div>
                 )}
               </div>
             </div>
