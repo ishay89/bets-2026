@@ -57,17 +57,19 @@ function render(picks: Record<string, LeaderboardFuturesPick> | null) {
 }
 
 describe('Leaderboard futures picks line', () => {
-  it('shows champion flag + team and top scorer under podium and row names', () => {
+  it('stacks champion and top scorer under podium and row names', () => {
     const markup = render(futuresPicks)
     // real-1 is on the podium, real-8 is a list row.
-    expect(markup).toContain('🏆 🇫🇷 France · ⚽ Kylian Mbappé')
-    expect(markup).toContain('🏆 🇧🇷 Brazil · ⚽ Vinícius Júnior')
+    expect(markup).toMatch(/🏆 🇫🇷 France<\/span><span[^>]*>⚽ Kylian Mbappé/)
+    expect(markup).toMatch(/🏆 🇧🇷 Brazil<\/span><span[^>]*>⚽ Vinícius Júnior/)
+    expect(markup).not.toContain('France · ⚽')
+    expect(markup).not.toContain('Brazil · ⚽')
   })
 
   it('renders nothing pick-related pre-lock (null prop) or for players without a pick', () => {
-    expect(render(null)).not.toContain('· ⚽')
+    expect(render(null)).not.toContain('⚽')
     // Only two players have picks — exactly two picks lines.
-    expect(render(futuresPicks).match(/· ⚽/g)).toHaveLength(2)
+    expect(render(futuresPicks).match(/⚽/g)).toHaveLength(2)
   })
 })
 
