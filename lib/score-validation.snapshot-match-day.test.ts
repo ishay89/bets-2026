@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { snapshotMatchDay, recalculateAllSnapshots } from './score-validation'
+import { snapshotMatchDay, recalculateAllSnapshots, buildPreTournamentSnapshotPayloads } from './score-validation'
 
 // ---------------------------------------------------------------------------
 // Minimal in-memory fake of the subset of the Supabase JS / PostgREST query
@@ -380,5 +380,123 @@ describe('snapshotMatchDay vs recalculateAllSnapshots after a match-day correcti
     expect(autoDay1.cumulative_points).toBe(manualDay1.cumulative_points)
     expect(autoDay1.is_valid).toBe(manualDay1.is_valid)
     expect(autoDay1.day_points).toBe(manualDay1.day_points)
+  })
+})
+
+describe('buildPreTournamentSnapshotPayloads (batched pre-tournament refresh)', () => {
+  it('updates users with an existing NULL row and inserts users without one, in one pass', () => {
+    const { toInsert, toUpdate } = buildPreTournamentSnapshotPayloads({
+      preTournRows: [
+        { user_id: 'u1', winner_points: 10, top_scorer_points: 5 },
+        { user_id: 'u2', winner_points: 0, top_scorer_points: 0 },
+        { user_id: 'u3', winner_points: 4, top_scorer_points: null }, // null scorer -> 0
+      ],
+      // Cumulative raw points per user (all scored predictions / answers).
+      allPredRows: [
+        { user_id: 'u1', points: 3 },
+        { user_id: 'u1', points: 7 },
+        { user_id: 'u2', points: 2 },
+      ],
+      allPikaRows: [
+        { user_id: 'u1', points: 2.75 },
+        { user_id: 'u3', points: 1 },
+      ],
+      // Post-write snapshot state: match-day rows feed otherDaysSum; the NULL row
+      // (when present) is the one to update in place.
+      snapshots: [
+        { id: 'n1', user_id: 'u1', match_day_id: null, day_points: 15 },
+        { id: 'd1', user_id: 'u1', match_day_id: 'day-1', day_points: 5.75 },
+        { id: 'd2', user_id: 'u1', match_day_id: 'day-2', day_points: 7 },
+        { id: 'd3', user_id: 'u2', match_day_id: 'day-1', day_points: 2 }, // u2 has no NULL row -> insert
+        { id: 'n3', user_id: 'u3', match_day_id: null, day_points: 99 },
+        { id: 'd4', user_id: 'u3', match_day_id: 'day-1', day_points: 1 },
+      ],
+      now: '2026-07-10T00:00:00.000Z',
+    })
+
+    // u1 + u3 have NULL rows -> update; u2 has none -> insert.
+    expect(toUpdate.map(r => r.id).sort()).toEqual(['n1', 'n3'])
+    expect(toInsert).toHaveLength(1)
+
+    const u1 = toUpdate.find(r => r.user_id === 'u1')!
+    // cumulative = 3+7 (pred) + 2.75 (pika) + 10 + 5 = 27.75; otherDaysSum = 5.75+7 = 12.75; +day 15 = 27.75 -> valid
+    expect(u1.cumulative_points).toBe(27.75)
+    expect(u1.day_points).toBe(15)
+    expect(u1.pre_tournament_winner_pts).toBe(10)
+    expect(u1.pre_tournament_scorer_pts).toBe(5)
+    expect(u1.match_day_id).toBeNull()
+    expect(u1.is_valid).toBe(true)
+    expect(u1.discrepancy).toBeNull()
+
+    const u3 = toUpdate.find(r => r.user_id === 'u3')!
+    // null scorer coerces to 0; cumulative = 1 (pika) + 4 + 0 = 5; otherDaysSum 1 + day 4 = 5 -> valid
+    expect(u3.cumulative_points).toBe(5)
+    expect(u3.day_points).toBe(4)
+    expect(u3.pre_tournament_scorer_pts).toBe(0)
+    expect(u3.is_valid).toBe(true)
+
+    const u2 = toInsert[0]
+    expect(u2.user_id).toBe('u2')
+    expect(u2).not.toHaveProperty('id')
+    // cumulative = 2 (pred) + 0 = 2; otherDaysSum 2 + day 0 = 2 -> valid
+    expect(u2.cumulative_points).toBe(2)
+    expect(u2.day_points).toBe(0)
+    expect(u2.is_valid).toBe(true)
+  })
+})
+
+describe('snapshotMatchDay refreshes pre-tournament rows for every user (batched)', () => {
+  it('updates one user\'s NULL row and inserts a NULL row for a user who lacked one', async () => {
+    const db: Db = {
+      users: [{ id: 'u1' }, { id: 'u2' }],
+      match_days: [{ id: 'day-1', stage: 'group' }],
+      predictions: [
+        { id: 'p1', user_id: 'u1', points: 7, match_day_id: 'day-1' },
+        { id: 'p2', user_id: 'u2', points: 3, match_day_id: 'day-1' },
+      ],
+      pikanteria_answers: [],
+      pre_tournament_picks: [
+        { user_id: 'u1', winner_points: 10, top_scorer_points: 5 },
+        { user_id: 'u2', winner_points: 0, top_scorer_points: 0 }, // has picks but no NULL snapshot yet
+      ],
+      score_snapshots: [
+        // u1 already has a (stale) pre-tournament row + day row.
+        {
+          id: 'snap-pre-u1', user_id: 'u1', match_day_id: null, stage: null,
+          match_points: 0, pikanteria_points: 0, pre_tournament_winner_pts: 10,
+          pre_tournament_scorer_pts: 5, day_points: 15, cumulative_points: 18,
+          is_valid: true, discrepancy: null, calculated_at: '2026-06-01T00:00:00.000Z',
+        },
+        {
+          id: 'snap-d1-u1', user_id: 'u1', match_day_id: 'day-1', stage: 'group',
+          match_points: 3, pikanteria_points: 0, pre_tournament_winner_pts: 0,
+          pre_tournament_scorer_pts: 0, day_points: 3, cumulative_points: 18,
+          is_valid: true, discrepancy: null, calculated_at: '2026-06-01T00:00:00.000Z',
+        },
+        // u2 has only a day row, no pre-tournament NULL row.
+        {
+          id: 'snap-d1-u2', user_id: 'u2', match_day_id: 'day-1', stage: 'group',
+          match_points: 3, pikanteria_points: 0, pre_tournament_winner_pts: 0,
+          pre_tournament_scorer_pts: 0, day_points: 3, cumulative_points: 3,
+          is_valid: true, discrepancy: null, calculated_at: '2026-06-01T00:00:00.000Z',
+        },
+      ],
+    }
+
+    await snapshotMatchDay(createFakeSupabase(db), 'day-1')
+
+    const u1Null = db.score_snapshots.filter(s => s.user_id === 'u1' && s.match_day_id === null)
+    const u2Null = db.score_snapshots.filter(s => s.user_id === 'u2' && s.match_day_id === null)
+
+    // u1's NULL row updated in place (no duplicate); cumulative reflects the 7-pt day.
+    expect(u1Null).toHaveLength(1)
+    expect(u1Null[0].cumulative_points).toBe(22) // 7 + 10 + 5
+    expect(u1Null[0].is_valid).toBe(true)
+
+    // u2's NULL row created exactly once, cumulative = 3 (day) + 0 pre-tournament.
+    expect(u2Null).toHaveLength(1)
+    expect(u2Null[0].day_points).toBe(0)
+    expect(u2Null[0].cumulative_points).toBe(3)
+    expect(u2Null[0].is_valid).toBe(true)
   })
 })

@@ -17,6 +17,13 @@ import type { Pick, Match, Pikanteria, MatchDay } from '@/lib/types'
 import { parseUUID, parsePick } from '@/lib/validation'
 import { syncResultsAction, dismissSuggestionAction } from './actions'
 
+// Scoring a result fans out reads/writes across score_snapshots for every
+// player, and that work grows with the tournament. The Vercel default for this
+// segment was 10s, which the knockout-stage scoring path began exceeding
+// (France vs Morocco QF, 2026-07-10) — the write committed but the request was
+// killed mid-revalidate. Match the sync routes' ceiling so the redirect lands.
+export const maxDuration = 60
+
 type Suggestion = {
   match_id: string
   suggested_result: Pick
