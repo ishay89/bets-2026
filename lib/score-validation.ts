@@ -27,24 +27,18 @@ export type SnapshotScoredDay = {
   pikanteria: ResultRow[]
 }
 
-// Runs every task to completion (never lets one rejection abort the rest, so a
-// partial-batch failure can't leave some users refreshed and others silently
-// stale) and throws an aggregated error afterward if anything failed.
-async function settleAllOrThrow(label: string, tasks: (() => Promise<void>)[]): Promise<void> {
-  const results = await Promise.allSettled(tasks.map(t => t()))
-  const failures = results.filter((r): r is PromiseRejectedResult => r.status === 'rejected')
-  if (failures.length > 0) {
-    const reasons = failures.map(f => (f.reason instanceof Error ? f.reason.message : String(f.reason)))
-    throw new Error(`${label}: ${failures.length}/${tasks.length} failed - ${reasons.join('; ')}`)
-  }
-}
-
 function sumByUserId(rows: { user_id: string; points: number | null }[]): Map<string, number> {
   const map = new Map<string, number>()
   for (const r of rows) {
     map.set(r.user_id, (map.get(r.user_id) ?? 0) + Number(r.points ?? 0))
   }
   return map
+}
+
+// One snapshot row per (user, match day); the pre-tournament row uses a null
+// match day. Keys the "which existing row is this" lookup during a full rebuild.
+function snapshotKey(userId: string, matchDayId: string | null): string {
+  return `${userId}::${matchDayId ?? ''}`
 }
 
 export function selectScoredSnapshotDays(days: SnapshotScoredDay[]): SnapshotScoredDay[] {
@@ -63,7 +57,10 @@ export function buildMatchDaySnapshotPayloads(params: {
   allPredRows: { user_id: string; points: number | null }[]
   allPikaRows: { user_id: string; points: number | null }[]
   preTournRows: { user_id: string; winner_points: number | null; top_scorer_points: number | null }[]
-  existingSnapshots: { id: string; user_id: string; match_day_id: string | null; day_points: number }[]
+  // `id` is optional so recalculateAllSnapshots can pass a fully-fresh view of
+  // every snapshot row (real ids for rows that already exist, undefined for
+  // rows about to be inserted). Rows without an id are classified as inserts.
+  existingSnapshots: { id?: string; user_id: string; match_day_id: string | null; day_points: number }[]
   now: string
 }): { toInsert: SnapshotPayload[]; toUpdate: (SnapshotPayload & { id: string })[] } {
   const { users, matchDayId, stage, matchPredRows, pikAnswerRows, allPredRows, allPikaRows, preTournRows, existingSnapshots, now } = params
@@ -85,7 +82,7 @@ export function buildMatchDaySnapshotPayloads(params: {
   const existingIdByUser = new Map<string, string>()
   for (const snap of existingSnapshots) {
     if (snap.match_day_id === matchDayId) {
-      existingIdByUser.set(snap.user_id, snap.id)
+      if (snap.id !== undefined) existingIdByUser.set(snap.user_id, snap.id)
     } else {
       otherDaysSumByUser.set(snap.user_id, (otherDaysSumByUser.get(snap.user_id) ?? 0) + Number(snap.day_points))
     }
@@ -173,15 +170,18 @@ interface PreTournamentSnapshotPayload {
  * ~7 round-trips *per pre-tournament user*) collapses into in-memory aggregation
  * over rows the caller already holds.
  *
- * `snapshots` MUST be the *post-write* score_snapshots state (read after this
- * match day's rows have landed), because otherDaysSum sums every non-null
- * match_day_id row — exactly what getSnapshotSum(userId, null) did per user.
+ * `snapshots` carries every match-day row's day_points (otherDaysSum sums the
+ * non-null match_day_id rows — exactly what getSnapshotSum(userId, null) did per
+ * user) plus the pre-tournament (NULL) row's id for in-place updates. Callers
+ * pass either the *post-write* score_snapshots state (snapshotMatchDay) or a
+ * fully-fresh in-memory view (recalculateAllSnapshots). `id` is optional so the
+ * fresh view can include rows that don't exist yet; those are inserted.
  */
 export function buildPreTournamentSnapshotPayloads(params: {
   preTournRows: { user_id: string; winner_points: number | null; top_scorer_points: number | null }[]
   allPredRows: { user_id: string; points: number | null }[]
   allPikaRows: { user_id: string; points: number | null }[]
-  snapshots: { id: string; user_id: string; match_day_id: string | null; day_points: number }[]
+  snapshots: { id?: string; user_id: string; match_day_id: string | null; day_points: number }[]
   now: string
 }): { toInsert: PreTournamentSnapshotPayload[]; toUpdate: (PreTournamentSnapshotPayload & { id: string })[] } {
   const { preTournRows, allPredRows, allPikaRows, snapshots, now } = params
@@ -189,13 +189,13 @@ export function buildPreTournamentSnapshotPayloads(params: {
   const cumulativePredPts = sumByUserId(allPredRows)
   const cumulativePikaPts = sumByUserId(allPikaRows)
 
-  // Split the post-write snapshot rows once: the pre-tournament (NULL) row gives
-  // us the id to update in place; every match-day row feeds otherDaysSum.
+  // Split the snapshot rows once: the pre-tournament (NULL) row gives us the id
+  // to update in place; every match-day row feeds otherDaysSum.
   const otherDaysSumByUser = new Map<string, number>()
   const existingNullIdByUser = new Map<string, string>()
   for (const snap of snapshots) {
     if (snap.match_day_id === null) {
-      existingNullIdByUser.set(snap.user_id, snap.id)
+      if (snap.id !== undefined) existingNullIdByUser.set(snap.user_id, snap.id)
     } else {
       otherDaysSumByUser.set(snap.user_id, (otherDaysSumByUser.get(snap.user_id) ?? 0) + Number(snap.day_points))
     }
@@ -241,36 +241,6 @@ export function buildPreTournamentSnapshotPayloads(params: {
   }
 
   return { toInsert, toUpdate }
-}
-
-async function computeMatchPoints(
-  supabase: SupabaseClient,
-  userId: string,
-  matchDayId: string,
-): Promise<number> {
-  const { data } = await supabase
-    .from('predictions')
-    .select('points, matches!inner(match_day_id)')
-    .eq('user_id', userId)
-    .eq('matches.match_day_id', matchDayId)
-    .not('points', 'is', null)
-
-  return (data ?? []).reduce((sum, row: { points: number | null }) => sum + Number(row.points), 0)
-}
-
-async function computePicanteriaPoints(
-  supabase: SupabaseClient,
-  userId: string,
-  matchDayId: string,
-): Promise<number> {
-  const { data } = await supabase
-    .from('pikanteria_answers')
-    .select('points, pikanteria!inner(match_day_id)')
-    .eq('user_id', userId)
-    .eq('pikanteria.match_day_id', matchDayId)
-    .not('points', 'is', null)
-
-  return (data ?? []).reduce((sum, row: { points: number | null }) => sum + Number(row.points), 0)
 }
 
 async function computePreTournamentPoints(
@@ -334,52 +304,6 @@ async function getSnapshotSum(
 
   const { data } = await query
   return (data ?? []).reduce((s, r: { day_points: number }) => s + Number(r.day_points), 0)
-}
-
-async function upsertMatchDaySnapshot(
-  supabase: SupabaseClient,
-  userId: string,
-  matchDayId: string,
-  stage: string,
-): Promise<void> {
-  const [matchPts, pikanteriaPts, freshCumulative] = await Promise.all([
-    computeMatchPoints(supabase, userId, matchDayId),
-    computePicanteriaPoints(supabase, userId, matchDayId),
-    computeCumulativeFromRaw(supabase, userId),
-  ])
-
-  const dayPoints = matchPts + pikanteriaPts
-  const otherDaysSum = await getSnapshotSum(supabase, userId, matchDayId)
-  const { isValid, discrepancy } = computeSnapshotValidity(freshCumulative, dayPoints, otherDaysSum)
-
-  const payload = {
-    user_id: userId,
-    match_day_id: matchDayId,
-    stage,
-    match_points: matchPts,
-    pikanteria_points: pikanteriaPts,
-    pre_tournament_winner_pts: 0,
-    pre_tournament_scorer_pts: 0,
-    day_points: dayPoints,
-    cumulative_points: freshCumulative,
-    is_valid: isValid,
-    discrepancy,
-    calculated_at: new Date().toISOString(),
-  }
-
-  // Use manual upsert to work around partial-index limitation with Supabase JS client
-  const { data: existing, error: lookupError } = await supabase
-    .from('score_snapshots')
-    .select('id')
-    .eq('user_id', userId)
-    .eq('match_day_id', matchDayId)
-    .maybeSingle()
-  if (lookupError) throw new Error(`snapshot lookup failed for user ${userId}: ${lookupError.message}`)
-
-  const { error: writeError } = existing
-    ? await supabase.from('score_snapshots').update(payload).eq('id', existing.id)
-    : await supabase.from('score_snapshots').insert(payload)
-  if (writeError) throw new Error(`snapshot write failed for user ${userId}: ${writeError.message}`)
 }
 
 export async function upsertPreTournamentSnapshot(
@@ -530,51 +454,149 @@ export async function snapshotMatchDay(
 export async function recalculateAllSnapshots(
   supabase: SupabaseClient,
 ): Promise<{ written: number; invalid: number }> {
-  // Fetch everything in parallel
-  const [{ data: matchDays }, { data: users }, { data: picks }] = await Promise.all([
+  const now = new Date().toISOString()
+
+  // Bulk reads. Every table that grows past PostgREST's 1000-row cap
+  // (predictions, pikanteria_answers, score_snapshots) is paged via
+  // fetchAllRows - an un-paged read silently truncates and would corrupt the
+  // cumulative totals and existing-row lookup below.
+  const [
+    { data: matchDays },
+    { data: users },
+    { data: picks },
+    allPredRows,
+    allPikaRows,
+    existingSnapshots,
+  ] = await Promise.all([
     supabase
       .from('match_days')
       .select('id, stage, matches(result), pikanteria(result)')
       .not('published_at', 'is', null)
       .order('date', { ascending: true }),
     supabase.from('users').select('id'),
-    supabase.from('pre_tournament_picks').select('user_id'),
+    supabase.from('pre_tournament_picks').select('user_id, winner_points, top_scorer_points'),
+    fetchAllRows<{ user_id: string; points: number | null }>(() =>
+      supabase.from('predictions').select('user_id, points').not('points', 'is', null),
+    ),
+    fetchAllRows<{ user_id: string; points: number | null }>(() =>
+      supabase.from('pikanteria_answers').select('user_id, points').not('points', 'is', null),
+    ),
+    fetchAllRows<{ id: string; user_id: string; match_day_id: string | null; day_points: number }>(() =>
+      supabase.from('score_snapshots').select('id, user_id, match_day_id, day_points'),
+    ),
   ])
 
   const scoredDays = selectScoredSnapshotDays((matchDays ?? []) as SnapshotScoredDay[])
-  const allUsers = users ?? []
-  const allPicks = picks ?? []
+  const allUsers = (users ?? []) as { id: string }[]
+  const allPicks = (picks ?? []) as {
+    user_id: string
+    winner_points: number | null
+    top_scorer_points: number | null
+  }[]
 
-  let written = 0
-  let invalid = 0
-
-  // Pass 1: write pre-tournament snapshot rows so match-day validation can include them
-  // via getSnapshotSum's .or() clause. Without this, is_valid on match-day snapshots would
-  // be false for any user with pre-tournament points (computeCumulativeFromRaw includes them
-  // but getSnapshotSum would find no NULL row to sum against).
-  // Every task runs to completion (settleAllOrThrow) rather than aborting on the first
-  // rejection, so a single bad row can't leave the rest of the batch un-refreshed and
-  // silently stale - the aggregated error surfaces only after all writes have landed.
-  await settleAllOrThrow('pre-tournament snapshot refresh (pass 1)', allPicks.map(p => () => upsertPreTournamentSnapshot(supabase, p.user_id)))
-  written += allPicks.length
-
-  // Pass 2: match-day snapshots in chronological order (pre-tournament rows now exist).
-  // Days must be processed sequentially: each day's cumulative snapshot builds on
-  // the previous day's rows. Per-day user work is parallelized inside each step.
-  await scoredDays.reduce(
-    (p, day) => p.then(() =>
-      settleAllOrThrow(
-        `match-day snapshot refresh (${day.id})`,
-        allUsers.map((u: { id: string }) => () => upsertMatchDaySnapshot(supabase, u.id, day.id, day.stage)),
-      )
+  // Per-day scored predictions/pikanteria, fetched once per day (all users in a
+  // single query - the old code did one query *per user per day*). Paged for the
+  // 1000-row cap and run in parallel across days.
+  const perDay = await Promise.all(
+    scoredDays.map(day =>
+      Promise.all([
+        fetchAllRows<{ user_id: string; points: number | null }>(() =>
+          supabase
+            .from('predictions')
+            .select('user_id, points, matches!inner(match_day_id)')
+            .eq('matches.match_day_id', day.id)
+            .not('points', 'is', null),
+        ),
+        fetchAllRows<{ user_id: string; points: number | null }>(() =>
+          supabase
+            .from('pikanteria_answers')
+            .select('user_id, points, pikanteria!inner(match_day_id)')
+            .eq('pikanteria.match_day_id', day.id)
+            .not('points', 'is', null),
+        ),
+      ]).then(([matchPredRows, pikAnswerRows]) => ({ day, matchPredRows, pikAnswerRows })),
     ),
-    Promise.resolve<unknown>(undefined)
   )
-  written += scoredDays.length * allUsers.length
 
-  // Pass 3: re-run pre-tournament so is_valid reflects the now-present match-day rows
-  await settleAllOrThrow('pre-tournament snapshot refresh (pass 3)', allPicks.map(p => () => upsertPreTournamentSnapshot(supabase, p.user_id)))
-  written += allPicks.length
+  // A fully-fresh view of every snapshot row keyed by (user, match day),
+  // carrying the recomputed day_points and each row's real id (undefined for
+  // rows that don't exist yet). Feeding this to every builder call makes each
+  // row's is_valid consistent against all *other* rows' fresh day_points - so a
+  // correction to one day can't leave another day's is_valid computed against a
+  // stale value, regardless of write order.
+  const existingIdByKey = new Map<string, string>()
+  for (const snap of existingSnapshots) {
+    existingIdByKey.set(snapshotKey(snap.user_id, snap.match_day_id), snap.id)
+  }
+
+  const freshExisting: {
+    id?: string
+    user_id: string
+    match_day_id: string | null
+    day_points: number
+  }[] = []
+
+  for (const { day, matchPredRows, pikAnswerRows } of perDay) {
+    const matchPts = sumByUserId(matchPredRows)
+    const pikPts = sumByUserId(pikAnswerRows)
+    for (const u of allUsers) {
+      freshExisting.push({
+        id: existingIdByKey.get(snapshotKey(u.id, day.id)),
+        user_id: u.id,
+        match_day_id: day.id,
+        day_points: (matchPts.get(u.id) ?? 0) + (pikPts.get(u.id) ?? 0),
+      })
+    }
+  }
+  for (const p of allPicks) {
+    freshExisting.push({
+      id: existingIdByKey.get(snapshotKey(p.user_id, null)),
+      user_id: p.user_id,
+      match_day_id: null,
+      day_points: Number(p.winner_points ?? 0) + Number(p.top_scorer_points ?? 0),
+    })
+  }
+
+  // Build all payloads in-memory (pure), then write them in a single batched
+  // upsert + insert - two round-trips instead of thousands.
+  const toInsert: (SnapshotPayload | PreTournamentSnapshotPayload)[] = []
+  const toUpdate: ((SnapshotPayload | PreTournamentSnapshotPayload) & { id: string })[] = []
+
+  for (const { day, matchPredRows, pikAnswerRows } of perDay) {
+    const dayPayloads = buildMatchDaySnapshotPayloads({
+      users: allUsers,
+      matchDayId: day.id,
+      stage: day.stage,
+      matchPredRows,
+      pikAnswerRows,
+      allPredRows,
+      allPikaRows,
+      preTournRows: allPicks,
+      existingSnapshots: freshExisting,
+      now,
+    })
+    toInsert.push(...dayPayloads.toInsert)
+    toUpdate.push(...dayPayloads.toUpdate)
+  }
+
+  const prePayloads = buildPreTournamentSnapshotPayloads({
+    preTournRows: allPicks,
+    allPredRows,
+    allPikaRows,
+    snapshots: freshExisting,
+    now,
+  })
+  toInsert.push(...prePayloads.toInsert)
+  toUpdate.push(...prePayloads.toUpdate)
+
+  const [updateResult, insertResult] = await Promise.all([
+    toUpdate.length > 0 ? supabase.from('score_snapshots').upsert(toUpdate) : Promise.resolve({ error: null }),
+    toInsert.length > 0 ? supabase.from('score_snapshots').insert(toInsert) : Promise.resolve({ error: null }),
+  ])
+  if (updateResult.error) throw new Error(`snapshot batch update failed: ${updateResult.error.message}`)
+  if (insertResult.error) throw new Error(`snapshot batch insert failed: ${insertResult.error.message}`)
+
+  const written = toInsert.length + toUpdate.length
 
   // Count invalids
   const { count } = await supabase
@@ -582,7 +604,5 @@ export async function recalculateAllSnapshots(
     .select('id', { count: 'exact', head: true })
     .eq('is_valid', false)
 
-  invalid = count ?? 0
-
-  return { written, invalid }
+  return { written, invalid: count ?? 0 }
 }
