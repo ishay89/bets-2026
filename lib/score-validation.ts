@@ -151,6 +151,98 @@ export function computeSnapshotValidity(
   return { isValid, discrepancy }
 }
 
+interface PreTournamentSnapshotPayload {
+  user_id: string
+  match_day_id: null
+  stage: null
+  match_points: 0
+  pikanteria_points: 0
+  pre_tournament_winner_pts: number
+  pre_tournament_scorer_pts: number
+  day_points: number
+  cumulative_points: number
+  is_valid: boolean
+  discrepancy: number | null
+  calculated_at: string
+}
+
+/**
+ * Batched equivalent of upsertPreTournamentSnapshot for every pre-tournament
+ * user at once. Mirrors buildMatchDaySnapshotPayloads: it's pure, so the old
+ * per-user fan-out (computeCumulativeFromRaw + getSnapshotSum + lookup + write,
+ * ~7 round-trips *per pre-tournament user*) collapses into in-memory aggregation
+ * over rows the caller already holds.
+ *
+ * `snapshots` MUST be the *post-write* score_snapshots state (read after this
+ * match day's rows have landed), because otherDaysSum sums every non-null
+ * match_day_id row — exactly what getSnapshotSum(userId, null) did per user.
+ */
+export function buildPreTournamentSnapshotPayloads(params: {
+  preTournRows: { user_id: string; winner_points: number | null; top_scorer_points: number | null }[]
+  allPredRows: { user_id: string; points: number | null }[]
+  allPikaRows: { user_id: string; points: number | null }[]
+  snapshots: { id: string; user_id: string; match_day_id: string | null; day_points: number }[]
+  now: string
+}): { toInsert: PreTournamentSnapshotPayload[]; toUpdate: (PreTournamentSnapshotPayload & { id: string })[] } {
+  const { preTournRows, allPredRows, allPikaRows, snapshots, now } = params
+
+  const cumulativePredPts = sumByUserId(allPredRows)
+  const cumulativePikaPts = sumByUserId(allPikaRows)
+
+  // Split the post-write snapshot rows once: the pre-tournament (NULL) row gives
+  // us the id to update in place; every match-day row feeds otherDaysSum.
+  const otherDaysSumByUser = new Map<string, number>()
+  const existingNullIdByUser = new Map<string, string>()
+  for (const snap of snapshots) {
+    if (snap.match_day_id === null) {
+      existingNullIdByUser.set(snap.user_id, snap.id)
+    } else {
+      otherDaysSumByUser.set(snap.user_id, (otherDaysSumByUser.get(snap.user_id) ?? 0) + Number(snap.day_points))
+    }
+  }
+
+  const toInsert: PreTournamentSnapshotPayload[] = []
+  const toUpdate: (PreTournamentSnapshotPayload & { id: string })[] = []
+
+  for (const row of preTournRows) {
+    const winnerPts = Number(row.winner_points ?? 0)
+    const scorerPts = Number(row.top_scorer_points ?? 0)
+    const dayPoints = winnerPts + scorerPts
+    const freshCumulative =
+      (cumulativePredPts.get(row.user_id) ?? 0) +
+      (cumulativePikaPts.get(row.user_id) ?? 0) +
+      winnerPts +
+      scorerPts
+
+    const otherDaysSum = otherDaysSumByUser.get(row.user_id) ?? 0
+    const { isValid, discrepancy } = computeSnapshotValidity(freshCumulative, dayPoints, otherDaysSum)
+
+    const payload: PreTournamentSnapshotPayload = {
+      user_id: row.user_id,
+      match_day_id: null,
+      stage: null,
+      match_points: 0,
+      pikanteria_points: 0,
+      pre_tournament_winner_pts: winnerPts,
+      pre_tournament_scorer_pts: scorerPts,
+      day_points: dayPoints,
+      cumulative_points: freshCumulative,
+      is_valid: isValid,
+      discrepancy,
+      calculated_at: now,
+    }
+
+    const existingId = existingNullIdByUser.get(row.user_id)
+    if (existingId) {
+      toUpdate.push({ ...payload, id: existingId })
+    } else {
+      toInsert.push(payload)
+    }
+  }
+
+  return { toInsert, toUpdate }
+}
+
 async function computeMatchPoints(
   supabase: SupabaseClient,
   userId: string,
@@ -407,14 +499,32 @@ export async function snapshotMatchDay(
   // without it, the pre-tournament row's cumulative_points (which includes
   // every match day's points) would be stale, and its is_valid/discrepancy
   // would no longer reflect the freshly written match-day day_points above.
-  // Must run *after* the match-day rows above are written, since
-  // upsertPreTournamentSnapshot sums all match-day snapshot rows via
-  // getSnapshotSum.
-  const preTournUserIds = (preTournRows ?? []).map(r => (r as { user_id: string }).user_id)
-  await settleAllOrThrow(
-    `pre-tournament snapshot refresh after match day ${matchDayId}`,
-    preTournUserIds.map(userId => () => upsertPreTournamentSnapshot(supabase, userId)),
+  //
+  // Must run *after* the match-day rows above are written: otherDaysSum sums
+  // every match-day snapshot row, so we re-read score_snapshots here to see this
+  // day's fresh day_points. This replaced a per-user fan-out (upsertPreTournament
+  // Snapshot × every pre-tournament user, ~7 round-trips each) that scaled with
+  // the tournament and pushed the /admin/results scoring action past its function
+  // timeout at the knockout stage (France vs Morocco QF, 2026-07-10). The batched
+  // form is one paged read + one upsert + one insert regardless of user count.
+  const postWriteSnapshots = await fetchAllRows<{ id: string; user_id: string; match_day_id: string | null; day_points: number }>(() =>
+    supabase.from('score_snapshots').select('id, user_id, match_day_id, day_points'),
   )
+
+  const preTourn = buildPreTournamentSnapshotPayloads({
+    preTournRows: (preTournRows ?? []) as { user_id: string; winner_points: number | null; top_scorer_points: number | null }[],
+    allPredRows,
+    allPikaRows,
+    snapshots: postWriteSnapshots,
+    now: new Date().toISOString(),
+  })
+
+  const [preUpdateResult, preInsertResult] = await Promise.all([
+    preTourn.toUpdate.length > 0 ? supabase.from('score_snapshots').upsert(preTourn.toUpdate) : Promise.resolve({ error: null }),
+    preTourn.toInsert.length > 0 ? supabase.from('score_snapshots').insert(preTourn.toInsert) : Promise.resolve({ error: null }),
+  ])
+  if (preUpdateResult.error) throw new Error(`pre-tournament snapshot batch update failed for match day ${matchDayId}: ${preUpdateResult.error.message}`)
+  if (preInsertResult.error) throw new Error(`pre-tournament snapshot batch insert failed for match day ${matchDayId}: ${preInsertResult.error.message}`)
 }
 
 export async function recalculateAllSnapshots(
