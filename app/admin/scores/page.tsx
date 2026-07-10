@@ -4,6 +4,10 @@ import { redirect } from 'next/navigation'
 import { recalculateAllSnapshots } from '@/lib/score-validation'
 import Link from 'next/link'
 
+// recalculateAllSnapshots reads every scored day + user in bulk and writes a
+// large batched upsert; give it headroom past the default 10s function timeout.
+export const maxDuration = 60
+
 async function revalidateAll() {
   'use server'
   await assertAdmin()

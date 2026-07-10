@@ -500,3 +500,107 @@ describe('snapshotMatchDay refreshes pre-tournament rows for every user (batched
     expect(u2Null[0].is_valid).toBe(true)
   })
 })
+
+// ---------------------------------------------------------------------------
+// Multi-day / multi-user rebuild. Three players across two scored days, mixed
+// futures picks (u3 has none), fractional pikanteria. Exercises the batched
+// recalculateAllSnapshots path: bulk reads + pure builders + one upsert/insert.
+// ---------------------------------------------------------------------------
+
+function buildMultiScenario(): Db {
+  return {
+    users: [{ id: 'u1' }, { id: 'u2' }, { id: 'u3' }],
+    match_days: [
+      {
+        id: 'day-1', stage: 'group', date: '2026-06-11',
+        published_at: '2026-06-01T00:00:00.000Z',
+        matches: [{ result: '1' }], pikanteria: [{ result: '1' }],
+      },
+      {
+        id: 'day-2', stage: 'r16', date: '2026-06-28',
+        published_at: '2026-06-01T00:00:00.000Z',
+        matches: [{ result: '2' }], pikanteria: [{ result: 'x' }],
+      },
+    ],
+    predictions: [
+      { id: 'p-u1-d1', user_id: 'u1', points: 3, match_day_id: 'day-1' },
+      { id: 'p-u2-d1', user_id: 'u2', points: 1, match_day_id: 'day-1' },
+      { id: 'p-u3-d1', user_id: 'u3', points: 0, match_day_id: 'day-1' },
+      { id: 'p-u1-d2', user_id: 'u1', points: 5, match_day_id: 'day-2' },
+      { id: 'p-u2-d2', user_id: 'u2', points: 2, match_day_id: 'day-2' },
+      { id: 'p-u3-d2', user_id: 'u3', points: 4, match_day_id: 'day-2' },
+    ],
+    pikanteria_answers: [
+      { id: 'a-u1-d1', user_id: 'u1', points: 2.75, match_day_id: 'day-1' },
+      { id: 'a-u2-d2', user_id: 'u2', points: 1.5, match_day_id: 'day-2' },
+    ],
+    pre_tournament_picks: [
+      { user_id: 'u1', winner_points: 10, top_scorer_points: 5 },
+      { user_id: 'u2', winner_points: 0, top_scorer_points: 8 },
+    ],
+    score_snapshots: [],
+  }
+}
+
+describe('recalculateAllSnapshots across multiple days and users', () => {
+  const findSnap = (db: Db, userId: string, matchDayId: string | null) =>
+    db.score_snapshots.find(s => s.user_id === userId && (s.match_day_id ?? null) === matchDayId)
+
+  it('rebuilds every row valid from scratch (one row per user per scored day + a futures row per picker)', async () => {
+    const db = buildMultiScenario()
+    await recalculateAllSnapshots(createFakeSupabase(db))
+
+    const snaps = db.score_snapshots
+    // 3 users x 2 days = 6 match-day rows + 2 futures rows (u3 made no pick).
+    expect(snaps).toHaveLength(8)
+    expect(snaps.filter(s => s.match_day_id === null)).toHaveLength(2)
+    expect(findSnap(db, 'u3', null)).toBeUndefined()
+
+    // Everything reconciles against the raw source → all valid.
+    expect(snaps.every(s => s.is_valid === true)).toBe(true)
+    expect(snaps.every(s => s.discrepancy === null)).toBe(true)
+
+    // Cumulative is the user's true total, identical across all of that user's rows.
+    expect(db.score_snapshots.filter(s => s.user_id === 'u1').every(s => s.cumulative_points === 25.75)).toBe(true)
+    expect(db.score_snapshots.filter(s => s.user_id === 'u2').every(s => s.cumulative_points === 12.5)).toBe(true)
+    expect(db.score_snapshots.filter(s => s.user_id === 'u3').every(s => s.cumulative_points === 4)).toBe(true)
+
+    // Per-day breakdown (match + pikanteria) and futures totals.
+    expect(findSnap(db, 'u1', 'day-1')!.day_points).toBe(5.75)
+    expect(findSnap(db, 'u1', 'day-2')!.day_points).toBe(5)
+    expect(findSnap(db, 'u1', null)!.day_points).toBe(15)
+    expect(findSnap(db, 'u2', 'day-2')!.day_points).toBe(3.5)
+    expect(findSnap(db, 'u2', null)!.day_points).toBe(8)
+    expect(findSnap(db, 'u3', 'day-2')!.day_points).toBe(4)
+  })
+
+  it('updates rows in place after a later-day correction and keeps earlier days valid (no duplicates)', async () => {
+    const db = buildMultiScenario()
+    await recalculateAllSnapshots(createFakeSupabase(db))
+    const rowCount = db.score_snapshots.length
+
+    // Admin re-scores u1's day-2 prediction upward (5 -> 9): u1's cumulative
+    // moves 25.75 -> 29.75. A naive sequential rebuild would recompute day-1
+    // *before* day-2's row was refreshed and flag day-1 invalid; the batched
+    // builder validates every row against a fully-fresh day_points view.
+    db.predictions.find(p => p.id === 'p-u1-d2')!.points = 9
+    await recalculateAllSnapshots(createFakeSupabase(db))
+
+    const snaps = db.score_snapshots
+    // Rows updated in place — no duplicate (user, match_day) rows appended.
+    expect(snaps).toHaveLength(rowCount)
+    expect(snaps.every(s => s.is_valid === true)).toBe(true)
+
+    expect(findSnap(db, 'u1', 'day-2')!.day_points).toBe(9)
+    expect(db.score_snapshots.filter(s => s.user_id === 'u1').every(s => s.cumulative_points === 29.75)).toBe(true)
+
+    // The earlier, unchanged day stays valid after the later-day correction.
+    const day1 = findSnap(db, 'u1', 'day-1')!
+    expect(day1.day_points).toBe(5.75)
+    expect(day1.is_valid).toBe(true)
+    expect(day1.cumulative_points).toBe(29.75)
+
+    // Other users are untouched and remain valid.
+    expect(db.score_snapshots.filter(s => s.user_id === 'u2').every(s => s.cumulative_points === 12.5)).toBe(true)
+  })
+})
