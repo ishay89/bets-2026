@@ -92,3 +92,15 @@ describe('Leaderboard pot chips', () => {
     expect(markup).toContain('Danger zone · pays extra')
   })
 })
+
+describe('Leaderboard scenario mode', () => {
+  it('uses the existing leaderboard without its live sorting controls', () => {
+    const markup = renderToStaticMarkup(
+      <Leaderboard entries={standings} currentUserId="real-3" scenarioMode />,
+    )
+
+    expect(markup).toContain('Scenario standings')
+    expect(markup).not.toContain('Rank by')
+    expect(markup).not.toContain('>Today<')
+  })
+})

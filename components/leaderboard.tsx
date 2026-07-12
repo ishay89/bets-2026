@@ -19,6 +19,7 @@ interface Props {
   todayModeLabel?: string
   movementPointsLabel?: string
   todayEmptyMessage?: string
+  scenarioMode?: boolean
 }
 
 const AVATARS = ['🦁','🐯','🦊','🐺','🦅','🐻','🐼','🦝','🦄','🐉','🦋','🌟','🔥','⚡','🎯']
@@ -100,6 +101,7 @@ export function Leaderboard({
   todayModeLabel = 'Today',
   movementPointsLabel = 'today',
   todayEmptyMessage = 'No results scored yet for the latest day',
+  scenarioMode = false,
 }: Props) {
   const [scoreMode, setScoreMode] = useState<LeaderboardScoreMode>('total')
   const [sortMode, setSortMode] = useState<LeaderboardSortMode>('score')
@@ -134,7 +136,7 @@ export function Leaderboard({
   return (
     <div className="pb-28 px-4">
       {/* Mode toggles */}
-      <div className="mb-5 mt-1 flex flex-col items-center gap-2">
+      {!scenarioMode && <div className="mb-5 mt-1 flex flex-col items-center gap-2">
         <div
           className="relative flex rounded-full p-[3px]"
           style={{ background: 'var(--color-elev)', border: '1px solid var(--border-base)' }}
@@ -195,7 +197,13 @@ export function Leaderboard({
             ))}
           </div>
         </div>
-      </div>
+      </div>}
+
+      {scenarioMode && (
+        <div className="mb-4 text-center text-[11px] font-extrabold uppercase tracking-wide" style={{ color: 'var(--color-accent)' }}>
+          Scenario standings
+        </div>
+      )}
 
       {/* No today data notice */}
       {scoreMode === 'today' && !hasToday && (

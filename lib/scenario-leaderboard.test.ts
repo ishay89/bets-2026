@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { buildScenarioLeaderboard, type ScenarioFuturesPick } from './scenario-leaderboard'
+import {
+  buildScenarioLeaderboard,
+  buildScenarioLeaderboardEntries,
+  type ScenarioFuturesPick,
+} from './scenario-leaderboard'
 import type { LeaderboardEntry } from './types'
 
 function entry(id: string, totalPoints: number, currentRank: number): LeaderboardEntry {
@@ -76,5 +80,23 @@ describe('buildScenarioLeaderboard', () => {
     )
 
     expect(rows.map(row => row.projectedRank)).toEqual([1, 1, 3])
+  })
+
+  it('projects into canonical leaderboard entries for the existing UI', () => {
+    const rows = buildScenarioLeaderboardEntries(
+      [entry('Bob', 20, 1), entry('Alice', 18, 2)],
+      [pick({ user_id: 'Alice' })],
+      { winner: 'France', runnerUp: 'Spain', topScorer: 'Kylian Mbappé' },
+    )
+
+    expect(rows[0]).toMatchObject({
+      id: 'Alice',
+      total_points: 29.75,
+      today_points: 11.75,
+      current_rank: 1,
+      previous_rank: 2,
+      rank_delta: 1,
+    })
+    expect(rows[1]).toMatchObject({ id: 'Bob', current_rank: 2, previous_rank: 1, rank_delta: -1 })
   })
 })

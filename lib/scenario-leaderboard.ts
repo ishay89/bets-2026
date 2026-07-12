@@ -94,3 +94,27 @@ export function buildScenarioLeaderboard(
     }
   })
 }
+
+/** Converts a scenario projection back into the canonical leaderboard shape. */
+export function buildScenarioLeaderboardEntries(
+  entries: readonly LeaderboardEntry[],
+  picks: readonly ScenarioFuturesPick[],
+  scenario: TournamentScenario,
+): LeaderboardEntry[] {
+  const entriesById = new Map(entries.map(entry => [entry.id, entry]))
+
+  return buildScenarioLeaderboard(entries, picks, scenario).map(row => {
+    const entry = entriesById.get(row.id)
+    if (!entry) throw new Error(`Missing leaderboard entry for scenario row ${row.id}`)
+
+    return {
+      ...entry,
+      total_points: row.projectedPoints,
+      today_points: round4(row.projectedPoints - row.currentPoints),
+      previous_total_points: row.currentPoints,
+      current_rank: row.projectedRank,
+      previous_rank: row.currentRank,
+      rank_delta: row.rankChange,
+    }
+  })
+}

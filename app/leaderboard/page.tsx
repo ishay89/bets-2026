@@ -8,7 +8,6 @@ import { BottomNav } from '@/components/bottom-nav'
 import { getHistoricalLeaderboardEntries, getLeaderboardEntries, getScoredLeaderboardDays, isFuturesLocked } from '@/lib/data'
 import { maybeSyncLiveScores } from '@/lib/live-sync'
 import type { LeaderboardFuturesPick } from '@/lib/types'
-import { ScenarioSimulator } from '@/components/scenario-simulator'
 import { withCurrentFuturesOdds } from '@/lib/pre-tournament'
 import type { ScenarioFuturesPick } from '@/lib/scenario-leaderboard'
 
@@ -136,15 +135,6 @@ export default async function LeaderboardPage({
       )}
 
       <main className="pb-24">
-        {!selectedDay && futuresData && (
-          <div className="px-4 pb-4">
-            <ScenarioSimulator
-              entries={liveEntries}
-              picks={futuresData.scenarioPicks}
-              currentUserId={user?.id ?? ''}
-            />
-          </div>
-        )}
         {selectedDay ? (
           <Leaderboard
             entries={entries}
@@ -155,7 +145,12 @@ export default async function LeaderboardPage({
             todayEmptyMessage="No results scored for this selected day"
           />
         ) : (
-          <LeaderboardRealtime initialEntries={entries} currentUserId={user?.id ?? ''} futuresPicks={futuresPicks} />
+          <LeaderboardRealtime
+            initialEntries={entries}
+            currentUserId={user?.id ?? ''}
+            futuresPicks={futuresPicks}
+            scenarioPicks={futuresData?.scenarioPicks ?? null}
+          />
         )}
       </main>
 
