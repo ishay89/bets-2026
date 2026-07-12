@@ -34,7 +34,7 @@ const selectStyle = {
 }
 
 export function ScenarioSimulator({ entries, picks, currentUserId }: Props) {
-  const [isOpen, setIsOpen] = useState(false)
+  const [isOpen, setIsOpen] = useState(true)
   const [winner, setWinner] = useState('')
   const [runnerUp, setRunnerUp] = useState('')
   const [topScorer, setTopScorer] = useState('')
