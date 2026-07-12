@@ -59,7 +59,6 @@ export function LeaderboardRealtime({
         </div>
       )}
       <Leaderboard
-        key={scenario ? 'scenario' : 'live'}
         entries={displayedEntries}
         currentUserId={currentUserId}
         futuresPicks={futuresPicks}
