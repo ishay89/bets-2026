@@ -5,6 +5,8 @@ import { unstable_cache } from 'next/cache'
 import { BottomNav } from '@/components/bottom-nav'
 import { isMatchLocked } from '@/lib/lock'
 import { getAvatar, getAutomationLabel, getFlagUrl, ordinal, stageLabel } from '@/lib/display'
+import { calcPreTournamentWinnerPoints, calcTopScorerPoints } from '@/lib/scoring'
+import { withCurrentFuturesOdds } from '@/lib/pre-tournament'
 import {
   getLeaderboardEntries,
   getMatchDaysWithUserData,
@@ -173,7 +175,14 @@ export default async function PlayerHistoryPage({
   // Champion / top scorer stay hidden until futures lock — same rule the
   // player's own /predict reveal uses. pre_tournament_picks has no lock-aware
   // RLS, so this gate is the only thing protecting open futures picks.
-  const showFutures = futuresLocked && futuresPick !== null
+  const displayFuturesPick = futuresPick ? withCurrentFuturesOdds(futuresPick) : null
+  const showFutures = futuresLocked && displayFuturesPick !== null
+  const expectedWinnerPoints = displayFuturesPick
+    ? calcPreTournamentWinnerPoints(displayFuturesPick.winner_odds, 'winner')
+    : 0
+  const expectedTopScorerPoints = displayFuturesPick
+    ? calcTopScorerPoints(displayFuturesPick.top_scorer_odds, true)
+    : 0
 
   const allPicks: ('W' | 'L')[] = []
   for (const day of dayVMs.toReversed()) {
@@ -263,42 +272,38 @@ export default async function PlayerHistoryPage({
         )}
 
         {/* Futures (only once locked) */}
-        {showFutures && futuresPick && (
+        {showFutures && displayFuturesPick && (
           <>
             <div className="text-[10px] font-bold uppercase tracking-[1.2px] px-0.5 text-muted">
               🏆 Futures
             </div>
             <div className="rounded-[14px] p-4 space-y-3"
               style={{ background: 'var(--color-panel)', border: '1px solid var(--border-base)' }}>
-              <div className="flex items-center justify-between py-1">
-                <span className="text-[12px] text-sub">🏆 Champion</span>
-                <div className="flex items-center gap-2">
-                  <span className="flex items-center gap-1.5 text-[13px] font-semibold text-text">
-                    {getFlagUrl(futuresPick.winner_team) ? (
+              <div className="flex items-center justify-between gap-3 py-1">
+                <span className="text-[12px] text-sub shrink-0">🏆 Champion</span>
+                <div className="min-w-0 text-right">
+                  <div className="flex min-w-0 items-center justify-end gap-1.5 text-[13px] font-semibold text-text">
+                    {getFlagUrl(displayFuturesPick.winner_team) ? (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={getFlagUrl(futuresPick.winner_team)!} alt={futuresPick.winner_team} width={20} height={13} style={{ borderRadius: 2, objectFit: 'cover' }} />
+                      <img src={getFlagUrl(displayFuturesPick.winner_team)!} alt={displayFuturesPick.winner_team} width={20} height={13} style={{ borderRadius: 2, objectFit: 'cover', flexShrink: 0 }} />
                     ) : null}
-                    {futuresPick.winner_team}
-                  </span>
-                  {futuresPick.winner_points !== null && (
-                    <span className="font-bold text-[12px]"
-                      style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-gold)' }}>
-                      +{futuresPick.winner_points.toFixed(2)}
-                    </span>
-                  )}
+                    <span className="truncate">{displayFuturesPick.winner_team}</span>
+                  </div>
+                  <div className="mt-1 font-bold text-[11px]"
+                    style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-gold)' }}>
+                    if wins +{expectedWinnerPoints.toFixed(2)} pts
+                  </div>
                 </div>
               </div>
-              <div className="flex items-center justify-between py-1"
+              <div className="flex items-center justify-between gap-3 py-1"
                 style={{ borderTop: '1px solid var(--border-base)' }}>
-                <span className="text-[12px] text-sub">⚽ Top scorer</span>
-                <div className="flex items-center gap-2">
-                  <span className="text-[13px] font-semibold text-text">{futuresPick.top_scorer}</span>
-                  {futuresPick.top_scorer_points !== null && (
-                    <span className="font-bold text-[12px]"
-                      style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-accent)' }}>
-                      +{futuresPick.top_scorer_points.toFixed(2)}
-                    </span>
-                  )}
+                <span className="text-[12px] text-sub shrink-0">⚽ Top scorer</span>
+                <div className="min-w-0 text-right">
+                  <div className="text-[13px] font-semibold text-text truncate">{displayFuturesPick.top_scorer}</div>
+                  <div className="mt-1 font-bold text-[11px]"
+                    style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-accent)' }}>
+                    if wins +{expectedTopScorerPoints.toFixed(2)} pts
+                  </div>
                 </div>
               </div>
             </div>
