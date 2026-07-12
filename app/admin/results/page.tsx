@@ -15,7 +15,7 @@ import {
 } from '@/lib/scoring-writes'
 import type { Pick, Match, Pikanteria, MatchDay } from '@/lib/types'
 import { parseUUID, parsePick } from '@/lib/validation'
-import { syncResultsAction, dismissSuggestionAction } from './actions'
+import { backfillLiveScoresAction, dismissSuggestionAction } from './actions'
 
 // Scoring a result fans out reads/writes across score_snapshots for every
 // player, and that work grows with the tournament. The Vercel default for this
@@ -296,10 +296,10 @@ export default async function ResultsPage() {
           </div>
         </div>
         {fdConfigured && (
-          <form action={syncResultsAction}>
+          <form action={backfillLiveScoresAction}>
             <button type="submit" className={`${scoreBtn} py-2`}
               style={{ background: 'var(--color-panel)', color: 'var(--color-text)', border: '1px solid var(--border-base)' }}>
-              🔄 Sync from football-data.org
+              🛠️ Repair live scores
             </button>
           </form>
         )}
