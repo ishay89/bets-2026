@@ -6,6 +6,11 @@ import { BottomNav } from '@/components/bottom-nav'
 import { createAdminClient, createClient } from '@/lib/supabase/server'
 import { LiveScoreStrip, type LiveMatchRow } from '@/components/live-score-strip'
 import { maybeSyncLiveScores } from '@/lib/live-sync'
+import { ScenarioSimulator } from '@/components/scenario-simulator'
+import { getLeaderboardEntries, isFuturesLocked } from '@/lib/data'
+import { withCurrentFuturesOdds } from '@/lib/pre-tournament'
+import type { ScenarioFuturesPick } from '@/lib/scenario-leaderboard'
+import type { LeaderboardEntry } from '@/lib/types'
 
 // Live matches are the same for all users. 60s TTL keeps data fresh during
 // active matches; revalidatePath('/board') in the live-sync flushes it sooner.
@@ -44,6 +49,36 @@ const getBoardPosts = unstable_cache(
   { revalidate: 900, tags: ['board-posts'] },
 )
 
+type BoardScenarioData = {
+  entries: LeaderboardEntry[]
+  picks: ScenarioFuturesPick[]
+}
+
+// Futures picks must stay hidden until the tournament market is locked. Once
+// revealed, cache this shared read alongside the leaderboard and refresh it
+// whenever score changes invalidate the leaderboard tag.
+const getBoardScenarioData = unstable_cache(
+  async (): Promise<BoardScenarioData | null> => {
+    const supabase = createAdminClient()
+    if (!(await isFuturesLocked(supabase))) return null
+
+    const [entries, { data: picks, error }] = await Promise.all([
+      getLeaderboardEntries(supabase),
+      supabase
+        .from('pre_tournament_picks')
+        .select('user_id, winner_team, winner_odds, top_scorer, top_scorer_odds, winner_points, top_scorer_points'),
+    ])
+    if (error) throw error
+
+    return {
+      entries,
+      picks: (picks ?? []).map(withCurrentFuturesOdds),
+    }
+  },
+  ['board-scenario-data'],
+  { revalidate: 300, tags: ['leaderboard'] },
+)
+
 export const metadata = {
   title: 'Message Board | Mondial Bets 2026',
   description: 'Player posts and match-day banter',
@@ -56,10 +91,11 @@ export default async function BoardPage() {
 
   after(maybeSyncLiveScores)
 
-  const [posts, { data: profile, error: profileError }, liveMatches] = await Promise.all([
+  const [posts, { data: profile, error: profileError }, liveMatches, scenarioData] = await Promise.all([
     getBoardPosts(),
     supabase.from('users').select('is_admin').eq('id', user.id).single(),
     getCachedLiveMatches(),
+    getBoardScenarioData(),
   ])
 
   if (profileError) throw profileError
@@ -75,7 +111,14 @@ export default async function BoardPage() {
 
       <LiveScoreStrip matches={liveMatches} />
 
-      <main className="px-4 pb-28">
+      <main className="space-y-4 px-4 pb-28">
+        {scenarioData && (
+          <ScenarioSimulator
+            entries={scenarioData.entries}
+            picks={scenarioData.picks}
+            currentUserId={user.id}
+          />
+        )}
         <BoardFeed initialPosts={posts} currentUserId={user.id} currentUserIsAdmin={profile.is_admin}
           giphyApiKey={process.env.NEXT_PUBLIC_GIPHY_API_KEY ?? ''} />
       </main>
