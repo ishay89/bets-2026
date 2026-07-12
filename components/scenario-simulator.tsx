@@ -1,29 +1,12 @@
 'use client'
 
 import { useState } from 'react'
-import { SCORERS, TEAMS } from '@/lib/pre-tournament'
-import {
-  buildScenarioLeaderboard,
-  type ScenarioFuturesPick,
-} from '@/lib/scenario-leaderboard'
-import type { LeaderboardEntry } from '@/lib/types'
+import { SCORERS } from '@/lib/pre-tournament'
+import type { TournamentScenario } from '@/lib/scenario-leaderboard'
 
 interface Props {
-  entries: LeaderboardEntry[]
-  picks: ScenarioFuturesPick[]
-  currentUserId: string
-}
-
-function rankChangeLabel(change: number): string {
-  if (change > 0) return `↑${change}`
-  if (change < 0) return `↓${Math.abs(change)}`
-  return '—'
-}
-
-function rankChangeColor(change: number): string {
-  if (change > 0) return 'var(--color-accent)'
-  if (change < 0) return 'var(--color-danger)'
-  return 'var(--color-muted)'
+  availableTeams: string[]
+  onScenarioChange: (scenario: TournamentScenario | null) => void
 }
 
 const selectClass = 'w-full rounded-[10px] px-3 py-2.5 text-[13px] font-semibold outline-none'
@@ -33,16 +16,32 @@ const selectStyle = {
   border: '1px solid var(--border-base)',
 }
 
-export function ScenarioSimulator({ entries, picks, currentUserId }: Props) {
+export function ScenarioSimulator({ availableTeams, onScenarioChange }: Props) {
   const [isOpen, setIsOpen] = useState(true)
   const [winner, setWinner] = useState('')
   const [runnerUp, setRunnerUp] = useState('')
   const [topScorer, setTopScorer] = useState('')
 
-  const isComplete = Boolean(winner && runnerUp && topScorer)
-  const rows = isComplete
-    ? buildScenarioLeaderboard(entries, picks, { winner, runnerUp, topScorer })
-    : []
+  const hasSelection = Boolean(winner || runnerUp || topScorer)
+
+  function updateScenario(nextWinner: string, nextRunnerUp: string, nextTopScorer: string) {
+    if (nextWinner || nextRunnerUp || nextTopScorer) {
+      onScenarioChange({
+        winner: nextWinner || null,
+        runnerUp: nextRunnerUp || null,
+        topScorer: nextTopScorer || null,
+      })
+    } else {
+      onScenarioChange(null)
+    }
+  }
+
+  function resetScenario() {
+    setWinner('')
+    setRunnerUp('')
+    setTopScorer('')
+    onScenarioChange(null)
+  }
 
   return (
     <section
@@ -76,12 +75,14 @@ export function ScenarioSimulator({ entries, picks, currentUserId }: Props) {
                 value={winner}
                 onChange={event => {
                   const nextWinner = event.target.value
+                  const nextRunnerUp = runnerUp === nextWinner ? '' : runnerUp
                   setWinner(nextWinner)
-                  if (runnerUp === nextWinner) setRunnerUp('')
+                  if (nextRunnerUp !== runnerUp) setRunnerUp(nextRunnerUp)
+                  updateScenario(nextWinner, nextRunnerUp, topScorer)
                 }}
               >
                 <option value="">Choose team…</option>
-                {TEAMS.map(team => <option key={team.name} value={team.name}>{team.name}</option>)}
+                {availableTeams.map(team => <option key={team} value={team}>{team}</option>)}
               </select>
             </label>
 
@@ -92,11 +93,15 @@ export function ScenarioSimulator({ entries, picks, currentUserId }: Props) {
                 className={selectClass}
                 style={selectStyle}
                 value={runnerUp}
-                onChange={event => setRunnerUp(event.target.value)}
+                onChange={event => {
+                  const nextRunnerUp = event.target.value
+                  setRunnerUp(nextRunnerUp)
+                  updateScenario(winner, nextRunnerUp, topScorer)
+                }}
               >
                 <option value="">Choose team…</option>
-                {TEAMS.map(team => (
-                  <option key={team.name} value={team.name} disabled={team.name === winner}>{team.name}</option>
+                {availableTeams.map(team => (
+                  <option key={team} value={team} disabled={team === winner}>{team}</option>
                 ))}
               </select>
             </label>
@@ -108,7 +113,11 @@ export function ScenarioSimulator({ entries, picks, currentUserId }: Props) {
                 className={selectClass}
                 style={selectStyle}
                 value={topScorer}
-                onChange={event => setTopScorer(event.target.value)}
+                onChange={event => {
+                  const nextTopScorer = event.target.value
+                  setTopScorer(nextTopScorer)
+                  updateScenario(winner, runnerUp, nextTopScorer)
+                }}
               >
                 <option value="">Choose player…</option>
                 {SCORERS.map(scorer => <option key={scorer.name} value={scorer.name}>{scorer.name}</option>)}
@@ -116,49 +125,21 @@ export function ScenarioSimulator({ entries, picks, currentUserId }: Props) {
             </label>
           </div>
 
-          <p className="text-[10px] font-semibold text-muted">
-            Preview only — no picks or results are changed.
-          </p>
-
-          {isComplete ? (
-            <div className="max-h-[420px] overflow-y-auto rounded-[10px]" style={{ border: '1px solid var(--border-base)' }}>
-              <div
-                className="sticky top-0 grid grid-cols-[32px_minmax(0,1fr)_70px_52px] gap-2 px-3 py-2 text-[10px] font-extrabold uppercase tracking-wide text-muted"
-                style={{ background: 'var(--color-elev)' }}
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-[10px] font-semibold text-muted">
+              Choose any result to update the leaderboard below. Preview only — nothing is saved.
+            </p>
+            {hasSelection && (
+              <button
+                type="button"
+                onClick={resetScenario}
+                className="shrink-0 rounded-full px-3 py-1.5 text-[11px] font-bold"
+                style={{ color: 'var(--color-sub)', background: 'var(--color-elev)', border: '1px solid var(--border-base)' }}
               >
-                <span>#</span><span>Player</span><span className="text-right">Points</span><span className="text-right">Move</span>
-              </div>
-              {rows.map(row => {
-                const isMe = row.id === currentUserId
-                return (
-                  <div
-                    key={row.id}
-                    className="grid grid-cols-[32px_minmax(0,1fr)_70px_52px] items-center gap-2 px-3 py-2 text-[12px]"
-                    style={{
-                      background: isMe ? 'var(--color-accent-soft)' : 'transparent',
-                      borderTop: '1px solid var(--border-base)',
-                    }}
-                  >
-                    <span className="font-mono font-bold text-sub">{row.projectedRank}</span>
-                    <span className="truncate font-bold text-text">
-                      {row.displayName}{isMe ? ' (you)' : ''}
-                    </span>
-                    <span className="text-right font-mono font-bold text-text">{row.projectedPoints.toFixed(2)}</span>
-                    <span
-                      className="text-right font-mono font-extrabold"
-                      style={{ color: rankChangeColor(row.rankChange) }}
-                    >
-                      {rankChangeLabel(row.rankChange)}
-                    </span>
-                  </div>
-                )
-              })}
-            </div>
-          ) : (
-            <div className="rounded-[10px] px-3 py-4 text-center text-[12px] font-semibold text-sub" style={{ background: 'var(--color-elev)' }}>
-              Choose all three results to calculate the projected table.
-            </div>
-          )}
+                Reset
+              </button>
+            )}
+          </div>
         </div>
       )}
     </section>

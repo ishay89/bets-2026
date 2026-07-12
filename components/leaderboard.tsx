@@ -19,6 +19,7 @@ interface Props {
   todayModeLabel?: string
   movementPointsLabel?: string
   todayEmptyMessage?: string
+  scenarioMode?: boolean
 }
 
 const AVATARS = ['🦁','🐯','🦊','🐺','🦅','🐻','🐼','🦝','🦄','🐉','🦋','🌟','🔥','⚡','🎯']
@@ -100,20 +101,23 @@ export function Leaderboard({
   todayModeLabel = 'Today',
   movementPointsLabel = 'today',
   todayEmptyMessage = 'No results scored yet for the latest day',
+  scenarioMode = false,
 }: Props) {
   const [scoreMode, setScoreMode] = useState<LeaderboardScoreMode>('total')
   const [sortMode, setSortMode] = useState<LeaderboardSortMode>('score')
+  const effectiveScoreMode = scenarioMode ? 'total' : scoreMode
+  const effectiveSortMode = scenarioMode ? 'score' : sortMode
 
-  const sorted = sortLeaderboardEntries(entries, scoreMode, sortMode)
+  const sorted = sortLeaderboardEntries(entries, effectiveScoreMode, effectiveSortMode)
 
   const score = (e: LeaderboardEntry) =>
-    scoreMode === 'today' ? e.today_points : e.total_points
+    effectiveScoreMode === 'today' ? e.today_points : e.total_points
 
   const primaryMetric = (entry: LeaderboardEntry) =>
-    sortMode === 'successRate' ? successLabel(entry, scoreMode) : score(entry).toFixed(2)
+    effectiveSortMode === 'successRate' ? successLabel(entry, effectiveScoreMode) : score(entry).toFixed(2)
 
   const secondaryMetric = (entry: LeaderboardEntry) =>
-    sortMode === 'successRate' ? `${score(entry).toFixed(2)} pts` : successLabel(entry, scoreMode)
+    effectiveSortMode === 'successRate' ? `${score(entry).toFixed(2)} pts` : successLabel(entry, effectiveScoreMode)
 
   const top3 = sorted.slice(0, 3)
   const rest = sorted.slice(3)
@@ -122,19 +126,19 @@ export function Leaderboard({
   // bottom two pay fines. Automated baselines and the AI players (Claude,
   // Codex) are not eligible. Amounts only make sense against the real
   // standings, so chips render only on the Total + Score view.
-  const showPot = scoreMode === 'total' && sortMode === 'score'
+  const showPot = effectiveScoreMode === 'total' && effectiveSortMode === 'score'
   const { prizeByEntryId, fineByEntryId } = showPot
     ? computePotAssignments(sorted)
     : { prizeByEntryId: new Map<string, number>(), fineByEntryId: new Map<string, number>() }
   const firstDangerIndex = rest.findIndex(e => fineByEntryId.has(e.id))
 
   const hasToday = hasLeaderboardResults(entries, 'today')
-  const showScoreRankDetails = scoreMode === 'total' && sortMode === 'score'
+  const showScoreRankDetails = effectiveScoreMode === 'total' && effectiveSortMode === 'score'
 
   return (
     <div className="pb-28 px-4">
       {/* Mode toggles */}
-      <div className="mb-5 mt-1 flex flex-col items-center gap-2">
+      {!scenarioMode && <div className="mb-5 mt-1 flex flex-col items-center gap-2">
         <div
           className="relative flex rounded-full p-[3px]"
           style={{ background: 'var(--color-elev)', border: '1px solid var(--border-base)' }}
@@ -195,7 +199,13 @@ export function Leaderboard({
             ))}
           </div>
         </div>
-      </div>
+      </div>}
+
+      {scenarioMode && (
+        <div className="mb-4 text-center text-[11px] font-extrabold uppercase tracking-wide" style={{ color: 'var(--color-accent)' }}>
+          Scenario standings
+        </div>
+      )}
 
       {/* No today data notice */}
       {scoreMode === 'today' && !hasToday && (
