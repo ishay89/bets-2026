@@ -82,6 +82,22 @@ describe('buildScenarioLeaderboard', () => {
     expect(rows.map(row => row.projectedRank)).toEqual([1, 1, 3])
   })
 
+  it('projects partial scenarios without requiring all three selections', () => {
+    const winnerOnly = buildScenarioLeaderboard(
+      [entry('Alice', 18, 1)],
+      [pick({ user_id: 'Alice' })],
+      { winner: 'France', runnerUp: null, topScorer: null },
+    )
+    const scorerOnly = buildScenarioLeaderboard(
+      [entry('Alice', 18, 1)],
+      [pick({ user_id: 'Alice' })],
+      { winner: null, runnerUp: null, topScorer: 'Kylian Mbappé' },
+    )
+
+    expect(winnerOnly[0].projectedPoints).toBe(24.75)
+    expect(scorerOnly[0].projectedPoints).toBe(23)
+  })
+
   it('projects into canonical leaderboard entries for the existing UI', () => {
     const rows = buildScenarioLeaderboardEntries(
       [entry('Bob', 20, 1), entry('Alice', 18, 2)],

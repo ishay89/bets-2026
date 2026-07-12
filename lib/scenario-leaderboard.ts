@@ -15,9 +15,9 @@ export interface ScenarioFuturesPick {
 }
 
 export interface TournamentScenario {
-  winner: string
-  runnerUp: string
-  topScorer: string
+  winner: string | null
+  runnerUp: string | null
+  topScorer: string | null
 }
 
 export interface ScenarioLeaderboardRow {
@@ -54,14 +54,17 @@ export function buildScenarioLeaderboard(
     const basePoints = entry.total_points - currentFuturesPoints
 
     let placement: 'winner' | 'runner-up' | 'other' = 'other'
-    if (pick?.winner_team === scenario.winner) placement = 'winner'
-    else if (pick?.winner_team === scenario.runnerUp) placement = 'runner-up'
+    if (scenario.winner && pick?.winner_team === scenario.winner) placement = 'winner'
+    else if (scenario.runnerUp && pick?.winner_team === scenario.runnerUp) placement = 'runner-up'
 
     const winnerBonus = pick
       ? calcPreTournamentWinnerPoints(pick.winner_odds, placement)
       : 0
     const scorerBonus = pick
-      ? calcTopScorerPoints(pick.top_scorer_odds, pick.top_scorer === scenario.topScorer)
+      ? calcTopScorerPoints(
+        pick.top_scorer_odds,
+        Boolean(scenario.topScorer && pick.top_scorer === scenario.topScorer),
+      )
       : 0
     const projectedBonus = round4(winnerBonus + scorerBonus)
 

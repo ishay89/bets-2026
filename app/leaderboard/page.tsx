@@ -10,6 +10,7 @@ import { maybeSyncLiveScores } from '@/lib/live-sync'
 import type { LeaderboardFuturesPick } from '@/lib/types'
 import { withCurrentFuturesOdds } from '@/lib/pre-tournament'
 import type { ScenarioFuturesPick } from '@/lib/scenario-leaderboard'
+import { getEligibleScenarioTeams, type ScenarioKnockoutMatch } from '@/lib/scenario-teams'
 
 const getCachedLeaderboardEntries = unstable_cache(
   () => getLeaderboardEntries(createAdminClient()),
@@ -40,33 +41,52 @@ const getCachedLiveMatchCount = unstable_cache(
   { revalidate: 60 },
 )
 
-// Everyone's futures picks (champion + top scorer) for the picks line under
-// each leaderboard name. Only exposed once futures are locked — the same
-// gating as the reveal sheets on /predict — and immutable after that, so a
-// 30 min cache is safe. Small table (one row per player), no pagination risk.
+// Everyone's locked futures picks plus the teams still eligible for a scenario.
+// Picks are immutable after lock, while eligible teams change as knockout
+// results land, so this shared payload refreshes on the leaderboard's 5-minute
+// cadence. The picks table is small (one row per player), with no pagination risk.
 type CachedFuturesData = {
   leaderboardPicks: Record<string, LeaderboardFuturesPick>
   scenarioPicks: ScenarioFuturesPick[]
+  scenarioTeams: string[]
 }
 
-const getCachedFuturesPicks = unstable_cache(
+type ScenarioRoundRow = {
+  stage: ScenarioKnockoutMatch['stage']
+  matches: Omit<ScenarioKnockoutMatch, 'stage'>[]
+}
+
+const getCachedFuturesData = unstable_cache(
   async (): Promise<CachedFuturesData | null> => {
     const supabase = createAdminClient()
     if (!(await isFuturesLocked(supabase))) return null
-    const { data, error } = await supabase
-      .from('pre_tournament_picks')
-      .select('user_id, winner_team, winner_odds, top_scorer, top_scorer_odds, winner_points, top_scorer_points')
-    if (error) throw error
-    const scenarioPicks = (data ?? []).map(withCurrentFuturesOdds)
+    const [picksResult, roundsResult] = await Promise.all([
+      supabase
+        .from('pre_tournament_picks')
+        .select('user_id, winner_team, winner_odds, top_scorer, top_scorer_odds, winner_points, top_scorer_points'),
+      supabase
+        .from('match_days')
+        .select('stage, matches(home_team, away_team, result, live_score_home, live_score_away)')
+        .in('stage', ['r32', 'r16', 'qf', 'sf', 'final'])
+        .returns<ScenarioRoundRow[]>(),
+    ])
+    if (picksResult.error) throw picksResult.error
+    if (roundsResult.error) throw roundsResult.error
+
+    const scenarioPicks = (picksResult.data ?? []).map(withCurrentFuturesOdds)
+    const knockoutMatches = (roundsResult.data ?? []).flatMap(day => (
+      day.matches.map(match => ({ ...match, stage: day.stage }))
+    ))
     return {
       leaderboardPicks: Object.fromEntries(
         scenarioPicks.map(p => [p.user_id, { winner: p.winner_team, scorer: p.top_scorer }]),
       ),
       scenarioPicks,
+      scenarioTeams: getEligibleScenarioTeams(knockoutMatches),
     }
   },
   ['leaderboard-futures-picks'],
-  { revalidate: 1800, tags: ['leaderboard'] },
+  { revalidate: 300, tags: ['leaderboard'] },
 )
 
 // Historical snapshots are immutable after scoring; cache per day for 30 min.
@@ -97,7 +117,7 @@ export default async function LeaderboardPage({
     getCachedLeaderboardEntries(),
     getCachedScoredDays(),
     getCachedLiveMatchCount(),
-    getCachedFuturesPicks(),
+    getCachedFuturesData(),
   ])
   const selectedDay = scoredDays.find(scoredDay => scoredDay.id === day) ?? null
   const futuresPicks = futuresData?.leaderboardPicks ?? null
@@ -150,6 +170,7 @@ export default async function LeaderboardPage({
             currentUserId={user?.id ?? ''}
             futuresPicks={futuresPicks}
             scenarioPicks={futuresData?.scenarioPicks ?? null}
+            scenarioTeams={futuresData?.scenarioTeams ?? []}
           />
         )}
       </main>

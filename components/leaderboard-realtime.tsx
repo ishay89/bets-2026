@@ -15,6 +15,7 @@ interface Props {
   currentUserId: string
   futuresPicks?: Record<string, LeaderboardFuturesPick> | null
   scenarioPicks?: ScenarioFuturesPick[] | null
+  scenarioTeams?: string[]
 }
 
 export function LeaderboardRealtime({
@@ -22,6 +23,7 @@ export function LeaderboardRealtime({
   currentUserId,
   futuresPicks = null,
   scenarioPicks = null,
+  scenarioTeams = [],
 }: Props) {
   const [entries, setEntries] = useState(initialEntries)
   const [scenario, setScenario] = useState<TournamentScenario | null>(null)
@@ -55,7 +57,7 @@ export function LeaderboardRealtime({
     <>
       {scenarioPicks && (
         <div className="px-4 pb-4">
-          <ScenarioSimulator onScenarioChange={setScenario} />
+          <ScenarioSimulator availableTeams={scenarioTeams} onScenarioChange={setScenario} />
         </div>
       )}
       <Leaderboard

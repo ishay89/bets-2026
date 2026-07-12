@@ -1,10 +1,11 @@
 'use client'
 
 import { useState } from 'react'
-import { SCORERS, TEAMS } from '@/lib/pre-tournament'
+import { SCORERS } from '@/lib/pre-tournament'
 import type { TournamentScenario } from '@/lib/scenario-leaderboard'
 
 interface Props {
+  availableTeams: string[]
   onScenarioChange: (scenario: TournamentScenario | null) => void
 }
 
@@ -15,7 +16,7 @@ const selectStyle = {
   border: '1px solid var(--border-base)',
 }
 
-export function ScenarioSimulator({ onScenarioChange }: Props) {
+export function ScenarioSimulator({ availableTeams, onScenarioChange }: Props) {
   const [isOpen, setIsOpen] = useState(true)
   const [winner, setWinner] = useState('')
   const [runnerUp, setRunnerUp] = useState('')
@@ -24,8 +25,12 @@ export function ScenarioSimulator({ onScenarioChange }: Props) {
   const hasSelection = Boolean(winner || runnerUp || topScorer)
 
   function updateScenario(nextWinner: string, nextRunnerUp: string, nextTopScorer: string) {
-    if (nextWinner && nextRunnerUp && nextTopScorer) {
-      onScenarioChange({ winner: nextWinner, runnerUp: nextRunnerUp, topScorer: nextTopScorer })
+    if (nextWinner || nextRunnerUp || nextTopScorer) {
+      onScenarioChange({
+        winner: nextWinner || null,
+        runnerUp: nextRunnerUp || null,
+        topScorer: nextTopScorer || null,
+      })
     } else {
       onScenarioChange(null)
     }
@@ -77,7 +82,7 @@ export function ScenarioSimulator({ onScenarioChange }: Props) {
                 }}
               >
                 <option value="">Choose team…</option>
-                {TEAMS.map(team => <option key={team.name} value={team.name}>{team.name}</option>)}
+                {availableTeams.map(team => <option key={team} value={team}>{team}</option>)}
               </select>
             </label>
 
@@ -95,8 +100,8 @@ export function ScenarioSimulator({ onScenarioChange }: Props) {
                 }}
               >
                 <option value="">Choose team…</option>
-                {TEAMS.map(team => (
-                  <option key={team.name} value={team.name} disabled={team.name === winner}>{team.name}</option>
+                {availableTeams.map(team => (
+                  <option key={team} value={team} disabled={team === winner}>{team}</option>
                 ))}
               </select>
             </label>
@@ -122,7 +127,7 @@ export function ScenarioSimulator({ onScenarioChange }: Props) {
 
           <div className="flex items-center justify-between gap-3">
             <p className="text-[10px] font-semibold text-muted">
-              Choose all three to update the leaderboard below. Preview only — nothing is saved.
+              Choose any result to update the leaderboard below. Preview only — nothing is saved.
             </p>
             {hasSelection && (
               <button
