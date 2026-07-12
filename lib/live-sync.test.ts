@@ -3,6 +3,7 @@ import type { FdMatch, FdScore } from './football-data'
 
 const updatePayloads: unknown[] = []
 const afterCallbacks: Array<() => Promise<void> | void> = []
+const staleQueryFilters: string[] = []
 
 const extraTimeMatch: FdMatch = {
   id: 537418,
@@ -70,13 +71,14 @@ vi.mock('./supabase/server', () => ({
           gte: () => ({
             lte: () => ({
               not: () => ({
-                or: () => ({
-                  or: () => ({
+                or: (filter: string) => {
+                  staleQueryFilters.push(filter)
+                  return {
                     limit: () => ({
                       maybeSingle: vi.fn(async () => ({ data: { id: 'active-match' } })),
                     }),
-                  }),
-                }),
+                  }
+                },
               }),
             }),
           }),
@@ -90,6 +92,7 @@ describe('maybeSyncLiveScores', () => {
   beforeEach(() => {
     updatePayloads.length = 0
     afterCallbacks.length = 0
+    staleQueryFilters.length = 0
     vi.setSystemTime(new Date('2026-06-17T18:00:00Z'))
   })
 
@@ -106,6 +109,10 @@ describe('maybeSyncLiveScores', () => {
       live_minute: null,
     }))
     expect(runResultsSync).toHaveBeenCalledTimes(1)
+    expect(staleQueryFilters).toEqual([
+      expect.stringMatching(/^live_synced_at\.is\.null,live_synced_at\.lt\./),
+    ])
+    expect(staleQueryFilters[0]).not.toContain('live_status')
   })
 })
 
@@ -113,6 +120,7 @@ describe('syncLiveScoresBeforeRender', () => {
   beforeEach(() => {
     updatePayloads.length = 0
     afterCallbacks.length = 0
+    staleQueryFilters.length = 0
     vi.clearAllMocks()
     vi.setSystemTime(new Date('2026-06-17T18:00:00Z'))
   })

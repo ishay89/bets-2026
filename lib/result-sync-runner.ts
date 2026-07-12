@@ -106,6 +106,7 @@ export async function runResultsSync(
         live_score_home: u.live_score_home,
         live_score_away: u.live_score_away,
         live_minute:     u.live_minute,
+        live_synced_at:  new Date().toISOString(),
       })
       .eq('id', u.match_id)
     if (error) {
