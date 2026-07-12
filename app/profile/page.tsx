@@ -4,6 +4,8 @@ import { createClient } from '@/lib/supabase/server'
 import { BottomNav } from '@/components/bottom-nav'
 import { getLeaderboardEntries } from '@/lib/data'
 import { ordinal, getAvatar } from '@/lib/display'
+import { calcPreTournamentWinnerPoints, calcTopScorerPoints } from '@/lib/scoring'
+import { withCurrentFuturesOdds } from '@/lib/pre-tournament'
 import { AvatarEmojiPicker } from '@/components/avatar-emoji-picker'
 import { ThemeToggle } from '@/components/theme-toggle'
 
@@ -27,6 +29,13 @@ export default async function ProfilePage() {
   const preWinner = pick?.winner_points ?? 0
   const preScorer = pick?.top_scorer_points ?? 0
   const total = matchPoints + pikaPoints + preWinner + preScorer
+  const displayPick = pick ? withCurrentFuturesOdds(pick) : null
+  const expectedWinnerPoints = displayPick
+    ? calcPreTournamentWinnerPoints(displayPick.winner_odds, 'winner')
+    : 0
+  const expectedTopScorerPoints = displayPick
+    ? calcTopScorerPoints(displayPick.top_scorer_odds, true)
+    : 0
 
   const allEntries = await getLeaderboardEntries(supabase)
   const rank = allEntries.findIndex(e => e.id === user.id) + 1
@@ -124,36 +133,32 @@ export default async function ProfilePage() {
         </div>
 
         {/* Pre-tournament picks */}
-        {pick && (
+        {displayPick && (
           <>
             <div className="text-[10px] font-bold uppercase tracking-[1.2px] px-0.5 text-muted">
               Pre-tournament picks
             </div>
             <div className="rounded-[14px] p-4 space-y-3"
               style={{ background: 'var(--color-panel)', border: '1px solid var(--border-base)' }}>
-              <div className="flex items-center justify-between py-1">
-                <span className="text-[12px] text-sub">🏆 Winner</span>
-                <div className="flex items-center gap-2">
-                  <span className="text-[13px] font-semibold text-text">{pick.winner_team}</span>
-                  {pick.winner_points !== null && (
-                    <span className="font-bold text-[12px]"
-                      style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-gold)' }}>
-                      +{pick.winner_points.toFixed(2)}
-                    </span>
-                  )}
+              <div className="flex items-center justify-between gap-3 py-1">
+                <span className="text-[12px] text-sub shrink-0">🏆 Winner</span>
+                <div className="min-w-0 text-right">
+                  <div className="text-[13px] font-semibold text-text truncate">{displayPick.winner_team}</div>
+                  <div className="mt-1 font-bold text-[11px]"
+                    style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-gold)' }}>
+                    if wins +{expectedWinnerPoints.toFixed(2)} pts
+                  </div>
                 </div>
               </div>
-              <div className="flex items-center justify-between py-1"
+              <div className="flex items-center justify-between gap-3 py-1"
                 style={{ borderTop: '1px solid var(--border-base)' }}>
-                <span className="text-[12px] text-sub">⚽ Top Scorer</span>
-                <div className="flex items-center gap-2">
-                  <span className="text-[13px] font-semibold text-text">{pick.top_scorer}</span>
-                  {pick.top_scorer_points !== null && (
-                    <span className="font-bold text-[12px]"
-                      style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-accent)' }}>
-                      +{pick.top_scorer_points.toFixed(2)}
-                    </span>
-                  )}
+                <span className="text-[12px] text-sub shrink-0">⚽ Top Scorer</span>
+                <div className="min-w-0 text-right">
+                  <div className="text-[13px] font-semibold text-text truncate">{displayPick.top_scorer}</div>
+                  <div className="mt-1 font-bold text-[11px]"
+                    style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-accent)' }}>
+                    if wins +{expectedTopScorerPoints.toFixed(2)} pts
+                  </div>
                 </div>
               </div>
               <Link href="/predict"
