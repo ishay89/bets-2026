@@ -8,6 +8,9 @@ import { BottomNav } from '@/components/bottom-nav'
 import { getHistoricalLeaderboardEntries, getLeaderboardEntries, getScoredLeaderboardDays, isFuturesLocked } from '@/lib/data'
 import { maybeSyncLiveScores } from '@/lib/live-sync'
 import type { LeaderboardFuturesPick } from '@/lib/types'
+import { ScenarioSimulator } from '@/components/scenario-simulator'
+import { withCurrentFuturesOdds } from '@/lib/pre-tournament'
+import type { ScenarioFuturesPick } from '@/lib/scenario-leaderboard'
 
 const getCachedLeaderboardEntries = unstable_cache(
   () => getLeaderboardEntries(createAdminClient()),
@@ -42,17 +45,26 @@ const getCachedLiveMatchCount = unstable_cache(
 // each leaderboard name. Only exposed once futures are locked — the same
 // gating as the reveal sheets on /predict — and immutable after that, so a
 // 30 min cache is safe. Small table (one row per player), no pagination risk.
+type CachedFuturesData = {
+  leaderboardPicks: Record<string, LeaderboardFuturesPick>
+  scenarioPicks: ScenarioFuturesPick[]
+}
+
 const getCachedFuturesPicks = unstable_cache(
-  async (): Promise<Record<string, LeaderboardFuturesPick> | null> => {
+  async (): Promise<CachedFuturesData | null> => {
     const supabase = createAdminClient()
     if (!(await isFuturesLocked(supabase))) return null
     const { data, error } = await supabase
       .from('pre_tournament_picks')
-      .select('user_id, winner_team, top_scorer')
+      .select('user_id, winner_team, winner_odds, top_scorer, top_scorer_odds, winner_points, top_scorer_points')
     if (error) throw error
-    return Object.fromEntries(
-      (data ?? []).map(p => [p.user_id, { winner: p.winner_team, scorer: p.top_scorer }]),
-    )
+    const scenarioPicks = (data ?? []).map(withCurrentFuturesOdds)
+    return {
+      leaderboardPicks: Object.fromEntries(
+        scenarioPicks.map(p => [p.user_id, { winner: p.winner_team, scorer: p.top_scorer }]),
+      ),
+      scenarioPicks,
+    }
   },
   ['leaderboard-futures-picks'],
   { revalidate: 1800, tags: ['leaderboard'] },
@@ -81,7 +93,7 @@ export default async function LeaderboardPage({
 
   after(maybeSyncLiveScores)
 
-  const [{ data: { user } }, liveEntries, scoredDays, liveMatchCount, futuresPicks] = await Promise.all([
+  const [{ data: { user } }, liveEntries, scoredDays, liveMatchCount, futuresData] = await Promise.all([
     supabase.auth.getUser(),
     getCachedLeaderboardEntries(),
     getCachedScoredDays(),
@@ -89,6 +101,7 @@ export default async function LeaderboardPage({
     getCachedFuturesPicks(),
   ])
   const selectedDay = scoredDays.find(scoredDay => scoredDay.id === day) ?? null
+  const futuresPicks = futuresData?.leaderboardPicks ?? null
   const entries = selectedDay
     ? await getCachedHistoricalEntries(selectedDay.id)
     : liveEntries
@@ -123,6 +136,15 @@ export default async function LeaderboardPage({
       )}
 
       <main className="pb-24">
+        {!selectedDay && futuresData && (
+          <div className="px-4 pb-4">
+            <ScenarioSimulator
+              entries={liveEntries}
+              picks={futuresData.scenarioPicks}
+              currentUserId={user?.id ?? ''}
+            />
+          </div>
+        )}
         {selectedDay ? (
           <Leaderboard
             entries={entries}
