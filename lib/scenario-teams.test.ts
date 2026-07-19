@@ -42,4 +42,20 @@ describe('getEligibleScenarioTeams', () => {
       match({ stage: 'final', home_team: 'France', away_team: 'Spain', result: '1' }),
     ])).toEqual([])
   })
+
+  it('keeps both finalists eligible while a final level at 90\' is still live', () => {
+    // The final drew 1-1 in regulation, so the 1X2 bet settles as X, but the
+    // match is still live (extra time / penalties) and the champion is undecided.
+    // Scenarios must stay open until an actual winner emerges.
+    expect(getEligibleScenarioTeams([
+      match({ stage: 'final', home_team: 'France', away_team: 'Spain', result: 'X', live_score_home: 1, live_score_away: 1 }),
+    ])).toEqual(['France', 'Spain'])
+  })
+
+  it('locks the final once extra time or penalties produce a winner', () => {
+    // Drew at 90' (result X) but extra time ended 2-1, so Spain lifts the trophy.
+    expect(getEligibleScenarioTeams([
+      match({ stage: 'final', home_team: 'France', away_team: 'Spain', result: 'X', live_score_home: 1, live_score_away: 2 }),
+    ])).toEqual([])
+  })
 })
