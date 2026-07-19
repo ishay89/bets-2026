@@ -13,6 +13,7 @@ import { MissingPicksBanner } from '@/components/missing-picks-banner'
 import { computeUserMissingCounts } from '@/lib/missing-picks'
 import { revealFuturesPicks } from '@/app/predict/pre-tournament-actions'
 import { hasCompletedPreTournamentPick, withCurrentFuturesOdds } from '@/lib/pre-tournament'
+import { settleWinnerPick, settleTopScorerPick } from '@/lib/scoring-writes'
 import {
   getPublishedMatchDaysWithAll,
   getUserPredictions,
@@ -173,7 +174,9 @@ export default async function PredictPage() {
     getCachedCrowdMatchPicks(),
     getCachedCrowdPikPicks(),
     supabase.from('pre_tournament_picks').select('*').eq('user_id', user.id).maybeSingle(),
-    supabase.from('tournament_settings').select('futures_locked, futures_published').eq('id', true).single(),
+    supabase.from('tournament_settings')
+      .select('futures_locked, futures_published, final_winner, final_runner_up, final_top_scorer, scored_at')
+      .eq('id', true).single(),
   ])
   if (futuresPickError) throw futuresPickError
 
@@ -183,6 +186,26 @@ export default async function PredictPage() {
   const displayFuturesPick = futuresPick ? withCurrentFuturesOdds(futuresPick) : futuresPick
   const futuresLocked = tournamentSettings?.futures_locked ?? false
   const futuresPublished = tournamentSettings?.futures_published ?? true
+
+  // Once the tournament is scored, show each player whether their futures bet
+  // landed. Derived from the recorded result + the points already written to
+  // their pick, so the badge and the awarded points always agree.
+  const futuresSettlement =
+    tournamentSettings?.scored_at && futuresPick && tournamentSettings.final_winner
+      ? {
+          winnerOutcome: settleWinnerPick(
+            futuresPick.winner_team,
+            tournamentSettings.final_winner,
+            tournamentSettings.final_runner_up ?? '',
+          ),
+          winnerPoints: futuresPick.winner_points ?? 0,
+          scorerHit: settleTopScorerPick(futuresPick.top_scorer, tournamentSettings.final_top_scorer ?? ''),
+          scorerPoints: futuresPick.top_scorer_points ?? 0,
+          finalWinner: tournamentSettings.final_winner,
+          finalRunnerUp: tournamentSettings.final_runner_up ?? '',
+          finalTopScorer: tournamentSettings.final_top_scorer ?? '',
+        }
+      : null
 
   // Surface live games first, then open upcoming games, then already-played days.
   const sortedDays = sortPredictMatchDays(matchDays)
@@ -253,6 +276,7 @@ export default async function PredictPage() {
             isLocked={futuresLocked}
             myUserId={user.id}
             onReveal={revealFuturesPicks}
+            settlement={futuresSettlement}
           />
         )}
 
@@ -281,6 +305,7 @@ export default async function PredictPage() {
             isLocked={futuresLocked}
             myUserId={user.id}
             onReveal={revealFuturesPicks}
+            settlement={futuresSettlement}
           />
         )}
       </main>

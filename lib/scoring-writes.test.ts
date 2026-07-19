@@ -3,6 +3,8 @@ import {
   buildMatchScoringPayload,
   buildPikanteriaScoringPayload,
   buildTournamentScoringPayload,
+  settleWinnerPick,
+  settleTopScorerPick,
   type ScoredMatchInput,
   type ScoredPikanteriaInput,
   type PreTournamentPickInput,
@@ -136,5 +138,51 @@ describe('buildTournamentScoringPayload', () => {
 
   it('returns an empty array when there are no picks', () => {
     expect(buildTournamentScoringPayload([], 'Brazil', 'France', 'Mbappe')).toEqual([])
+  })
+})
+
+// Settlement helpers turn the final results into per-pick outcomes shown to each
+// player once the tournament is scored. Kept pure and colocated with the point
+// builder so the "did my futures bet land" badge and the awarded points can
+// never disagree about placement.
+describe('settleWinnerPick', () => {
+  it('is champion when the pick matches the tournament winner', () => {
+    expect(settleWinnerPick('Spain', 'Spain', 'Argentina')).toBe('champion')
+  })
+
+  it('is runner-up when the pick matches the runner-up', () => {
+    expect(settleWinnerPick('Argentina', 'Spain', 'Argentina')).toBe('runner-up')
+  })
+
+  it('is missed when the pick is neither', () => {
+    expect(settleWinnerPick('Brazil', 'Spain', 'Argentina')).toBe('missed')
+  })
+
+  it('prefers champion over runner-up if winner and runner-up somehow coincide', () => {
+    expect(settleWinnerPick('Spain', 'Spain', 'Spain')).toBe('champion')
+  })
+})
+
+describe('settleTopScorerPick', () => {
+  it('is a hit when the pick matches the top scorer', () => {
+    expect(settleTopScorerPick('Kylian Mbappé', 'Kylian Mbappé')).toBe(true)
+  })
+
+  it('is a miss otherwise', () => {
+    expect(settleTopScorerPick('Harry Kane', 'Kylian Mbappé')).toBe(false)
+  })
+})
+
+// The point builder and the settlement badge must agree, so the builder is
+// expressed in terms of the same helper the UI uses.
+describe('buildTournamentScoringPayload uses the settlement helpers', () => {
+  it('awards champion/runner-up points consistent with settleWinnerPick', () => {
+    const picks: PreTournamentPickInput[] = [
+      { id: 'c', winner_team: 'Spain', winner_odds: 4.5, top_scorer: 'X', top_scorer_odds: 5 },
+      { id: 'r', winner_team: 'Argentina', winner_odds: 8.0, top_scorer: 'Y', top_scorer_odds: 5 },
+    ]
+    const result = buildTournamentScoringPayload(picks, 'Spain', 'Argentina', 'Z')
+    expect(result[0]).toMatchObject({ id: 'c', winner_points: 6.75 }) // champion 4.5×1.5
+    expect(result[1]).toMatchObject({ id: 'r', winner_points: 6.0 })  // runner-up 8.0×0.75
   })
 })

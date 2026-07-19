@@ -17,6 +17,20 @@ type FuturesPick = {
   top_scorer_odds: number
 } | null
 
+// Present only once the tournament is scored: how this player's futures bet
+// landed, alongside the points they were awarded.
+export type FuturesSettlement = {
+  winnerOutcome: 'champion' | 'runner-up' | 'missed'
+  winnerPoints: number
+  scorerHit: boolean
+  scorerPoints: number
+  finalWinner: string
+  finalRunnerUp: string
+  finalTopScorer: string
+} | null
+
+const fmtPts = (n: number) => `+${n.toFixed(2)} pts`
+
 const inputStyle = {
   background: 'var(--color-bg)',
   border: '1px solid var(--border-base)',
@@ -30,11 +44,13 @@ export function PreTournamentFutures({
   isLocked,
   myUserId,
   onReveal,
+  settlement,
 }: {
   pick: FuturesPick
   isLocked: boolean
   myUserId?: string
   onReveal?: () => Promise<FuturesReveal>
+  settlement?: FuturesSettlement
 }) {
   const cls = 'rounded-lg px-3 py-2 text-sm w-full'
 
@@ -117,6 +133,7 @@ export function PreTournamentFutures({
                 </div>
               </div>
             </div>
+            {settlement && <WinnerSettlementBadge settlement={settlement} />}
             {!isLocked && (
               <form action={saveWinnerPick} className="mt-3 space-y-2">
                 <select name="winner" defaultValue={pick.winner_team} required style={inputStyle} className={cls}>
@@ -166,6 +183,7 @@ export function PreTournamentFutures({
                 </div>
               </div>
             </div>
+            {settlement && <ScorerSettlementBadge settlement={settlement} />}
             {!isLocked && (
               <form action={saveScorerPick} className="mt-3 space-y-2">
                 <select name="scorer" defaultValue={pick.top_scorer} required style={inputStyle} className={cls}>
@@ -258,6 +276,51 @@ export function PreTournamentFutures({
       )}
     </div>
   )
+}
+
+function SettlementBadge({
+  won, icon, headline, sub,
+}: {
+  won: boolean; icon: string; headline: string; sub: string
+}) {
+  return (
+    <div className="mt-3 rounded-[10px] px-3 py-2.5 flex items-center gap-2.5"
+      style={{
+        background: won ? 'var(--color-accent-soft)' : 'var(--color-danger-soft)',
+        border: `1px solid ${won ? 'var(--border-accent)' : 'var(--border-danger)'}`,
+      }}>
+      <span className="text-[18px]">{icon}</span>
+      <div className="flex-1">
+        <div className="text-[13px] font-black"
+          style={{ color: won ? 'var(--color-accent)' : 'var(--color-danger)' }}>
+          {headline}
+        </div>
+        <div className="text-[11px] text-sub">{sub}</div>
+      </div>
+    </div>
+  )
+}
+
+function WinnerSettlementBadge({ settlement }: { settlement: NonNullable<FuturesSettlement> }) {
+  if (settlement.winnerOutcome === 'champion') {
+    return <SettlementBadge won icon="🥇" headline={`Champion! ${fmtPts(settlement.winnerPoints)}`}
+      sub={`${settlement.finalWinner} won the tournament — you called it.`} />
+  }
+  if (settlement.winnerOutcome === 'runner-up') {
+    return <SettlementBadge won icon="🥈" headline={`Runner-up! ${fmtPts(settlement.winnerPoints)}`}
+      sub={`${settlement.finalRunnerUp} reached the final — partial bonus awarded.`} />
+  }
+  return <SettlementBadge won={false} icon="❌" headline="Missed · 0 pts"
+    sub={`${settlement.finalWinner} won, ${settlement.finalRunnerUp} runner-up.`} />
+}
+
+function ScorerSettlementBadge({ settlement }: { settlement: NonNullable<FuturesSettlement> }) {
+  if (settlement.scorerHit) {
+    return <SettlementBadge won icon="⚽" headline={`Top scorer! ${fmtPts(settlement.scorerPoints)}`}
+      sub={`${settlement.finalTopScorer} finished top scorer — nailed it.`} />
+  }
+  return <SettlementBadge won={false} icon="❌" headline="Missed · 0 pts"
+    sub={`${settlement.finalTopScorer} was the top scorer.`} />
 }
 
 function RevealButton({
