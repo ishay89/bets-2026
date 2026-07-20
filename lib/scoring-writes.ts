@@ -120,6 +120,35 @@ function pikanteriaOddsForResult(item: ScoredPikanteriaInput): number {
   return item.odds_x
 }
 
+/**
+ * Where a player's champion pick landed once the final results are in.
+ * `champion` = picked the winner, `runner-up` = picked the beaten finalist,
+ * `missed` = neither. Shared by the point builder and the per-player settlement
+ * badge so the two can never disagree about placement.
+ */
+export type WinnerOutcome = 'champion' | 'runner-up' | 'missed'
+
+export function settleWinnerPick(
+  pickTeam: string,
+  finalWinner: string,
+  finalRunnerUp: string,
+): WinnerOutcome {
+  if (pickTeam === finalWinner) return 'champion'
+  if (pickTeam === finalRunnerUp) return 'runner-up'
+  return 'missed'
+}
+
+/** True when the player's top-scorer pick matches the tournament top scorer. */
+export function settleTopScorerPick(pickScorer: string, finalTopScorer: string): boolean {
+  return pickScorer === finalTopScorer
+}
+
+const WINNER_PLACEMENT: Record<WinnerOutcome, 'winner' | 'runner-up' | 'other'> = {
+  champion: 'winner',
+  'runner-up': 'runner-up',
+  missed: 'other',
+}
+
 /** Build the per-pick bonus-point writes from the final tournament results. */
 export function buildTournamentScoringPayload(
   picks: PreTournamentPickInput[],
@@ -128,14 +157,12 @@ export function buildTournamentScoringPayload(
   topScorer: string,
 ): PreTournamentPointsWrite[] {
   return picks.map(pick => {
-    let placement: 'winner' | 'runner-up' | 'other' = 'other'
-    if (pick.winner_team === winner) placement = 'winner'
-    else if (pick.winner_team === runnerUp) placement = 'runner-up'
+    const placement = WINNER_PLACEMENT[settleWinnerPick(pick.winner_team, winner, runnerUp)]
 
     return {
       id: pick.id,
       winner_points: calcPreTournamentWinnerPoints(pick.winner_odds, placement),
-      top_scorer_points: calcTopScorerPoints(pick.top_scorer_odds, pick.top_scorer === topScorer),
+      top_scorer_points: calcTopScorerPoints(pick.top_scorer_odds, settleTopScorerPick(pick.top_scorer, topScorer)),
     }
   })
 }
